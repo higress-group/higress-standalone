@@ -3,3 +3,57 @@
   <br>
   Higress （无 K8s 版）
 </h1>
+
+[Higress](https://github.com/alibaba/higress/) 是基于阿里内部两年多的 Envoy Gateway 实践沉淀，以开源 [Istio](https://github.com/istio/istio) 与 [Envoy](https://github.com/envoyproxy/envoy) 为核心构建的下一代云原生网关。
+
+提到了云原生，大家就会想到 Kubernetes（K8s）。那么 Higress 能否脱离 K8s 独立部署呢？本项目就针对这一需求提出了一种相应的解决方案。
+
+## 前置需求
+
+为了拉平不同操作系统的运行时差异，当前版本的部署方案是基于 Docker Compose 设计的。所以在使用这一方案进行部署之前，请先在本机安装好 Docker Compose，随后确认以下命令可以正常运行并输出 Docker Compose CLI 的帮助信息：
+
+```bash
+docker compose
+```
+
+## 快速开始
+
+克隆本项目仓库后，在命令行中执行以下命令：
+
+```bash
+cd ./compose
+docker compose --profile full up
+```
+
+稍等片刻后，命令行中会输出以下内容：
+
+```
+compose-initializer-1  | Initializing pilot configurations...
+compose-initializer-1  | JWT token refreshed. Please restart Higress to enable to the new token.
+compose-initializer-1 exited with code 1
+service "initializer" didn't completed successfully: exit 1
+```
+
+如果 Docker Compose 进程在输出上述内容后未自行退出，可按下 CTRL+C 强制退出。随后在命令行下再次执行下方命令。
+
+```bash
+docker compose --profile full up
+```
+
+编辑本机的 hosts 文件，将 `console.higress.io` 域名指向 `127.0.0.1`。
+
+```
+127.0.0.1 console.higress.io
+```
+
+在浏览器中打开 [http://console.higress.io/](http://console.higress.io/) ，并使用 admin 作为用户名和密码进行登录，即可正常通过 Higress Console 操作 Higress 的路由配置。所有配置的域名均需要先通过 hosts 文件将其强制解析至 127.0.0.1 再进行访问。
+
+有关 Higress 自身的详细使用方法，请查看 [Higress 官网](http://higress.io/)。
+## 设计文档
+
+- [方案设计概述](./docs/design.md)
+- [Nacos 配置模型设计](./docs/nacos.md)
+
+## 后续任务
+
+TBD
