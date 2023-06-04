@@ -115,9 +115,9 @@ func (o *HigressServerOptions) Config() (*apiserver.Config, error) {
 		serverConfig.OpenAPIV3Config.Info.Version = "0.1"
 	}
 
-	// TODO: AuthZ and AuthN are not ready yet.
-	o.RecommendedOptions.Authentication = nil
-	o.RecommendedOptions.Authorization = nil
+	o.RecommendedOptions.Authentication.RemoteKubeConfigFileOptional = true
+	o.RecommendedOptions.Authentication.DisableAnonymous = true
+	o.RecommendedOptions.Authorization.RemoteKubeConfigFileOptional = true
 
 	if err := applyTo(o.RecommendedOptions, serverConfig); err != nil {
 		return nil, err
