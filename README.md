@@ -51,9 +51,14 @@ docker compose --profile full up
 有关 Higress 自身的详细使用方法，请查看 [Higress 官网](http://higress.io/)。
 ## 设计文档
 
-- [方案设计概述](./docs/design.md)
+- [方案整体设计](./docs/design.md)
 - [Nacos 配置模型设计](./docs/nacos.md)
 
 ## 后续任务
 
-TBD
+- API Server 支持通过证书对客户端进行认证
+- API Server 支持在用户直接修改 Nacos 配置后推送变更到客户端
+- Secret 数据在加密后再保存到 Nacos
+- API Server 对接日志框架
+- 对接可观测性组件
+- Gateway 和 Pilot 之间的 xDS 通信启用 mTLS
