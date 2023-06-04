@@ -6,10 +6,16 @@ import (
 	"crypto/md5"
 	"errors"
 	"fmt"
+	"io"
+	"reflect"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/nacos-group/nacos-sdk-go/v2/clients/config_client"
 	"github.com/nacos-group/nacos-sdk-go/v2/model"
 	"github.com/nacos-group/nacos-sdk-go/v2/vo"
-	"io"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -23,19 +29,12 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
-	"reflect"
-	"strings"
-	"sync"
-	"time"
 )
 
 const dataIdSeparator = "."
 const wildcardSuffix = dataIdSeparator + "*"
-const maxSearchPageSize = 500
-const searchPageSize = 2
-
-// ErrItemNotExists means the item doesn't actually exist.
-var ErrItemNotExists = fmt.Errorf("item doesn't exist")
+const searchPageSize = 50
+const listRefreshInterval = 10 * time.Second
 
 // ErrItemAlreadyExists means the item already exists.
 var ErrItemAlreadyExists = fmt.Errorf("item already exists")
@@ -64,7 +63,7 @@ func NewNacosREST(
 			}
 		}
 	}
-	return &nacosREST{
+	n := &nacosREST{
 		TableConvertor: rest.NewDefaultTableConvertor(groupResource),
 		groupResource:  groupResource,
 		codec:          codec,
@@ -77,6 +76,8 @@ func NewNacosREST(
 		attrFunc:       attrFunc,
 		watchers:       make(map[int]*nacosWatch, 10),
 	}
+	n.startBackgroundWatcher()
+	return n
 }
 
 type nacosREST struct {
@@ -88,50 +89,81 @@ type nacosREST struct {
 	singularName  string
 	dataIdPrefix  string
 
-	muWatchers sync.RWMutex
-	watchers   map[int]*nacosWatch
+	listRefreshMutex  sync.Mutex
+	listRefreshTicker *time.Ticker
+	watchersMutex     sync.RWMutex
+	watchers          map[int]*nacosWatch
 
 	newFunc     func() runtime.Object
 	newListFunc func() runtime.Object
 	attrFunc    storage.AttrFunc
+
+	configItems map[string]*model.ConfigItem
 }
 
-func (f *nacosREST) GetSingularName() string {
-	return f.singularName
+func (n *nacosREST) GetSingularName() string {
+	return n.singularName
 }
 
-func (f *nacosREST) Destroy() {
-}
-
-func (f *nacosREST) notifyWatchers(ev watch.Event) {
-	f.muWatchers.RLock()
-	accessor, _ := meta.Accessor(ev.Object)
-	fmt.Printf("event %s %s %s/%s count(watcher)=%d\n", ev.Type, ev.Object.GetObjectKind(), accessor.GetNamespace(), accessor.GetName(), len(f.watchers))
-	for _, w := range f.watchers {
-		w.ch <- ev
+func (n *nacosREST) startBackgroundWatcher() {
+	if n.listRefreshTicker != nil {
+		return
 	}
-	f.muWatchers.RUnlock()
+
+	n.listRefreshMutex.Lock()
+	defer n.listRefreshMutex.Unlock()
+
+	if n.listRefreshTicker != nil {
+		return
+	}
+
+	n.listRefreshTicker = time.NewTicker(listRefreshInterval)
+	go func(n *nacosREST) {
+		for {
+			<-n.listRefreshTicker.C
+			n.refreshConfigList()
+		}
+	}(n)
 }
 
-func (f *nacosREST) New() runtime.Object {
-	return f.newFunc()
+func (n *nacosREST) Destroy() {
+	n.listRefreshMutex.Lock()
+	defer n.listRefreshMutex.Unlock()
+	if n.listRefreshTicker != nil {
+		n.listRefreshTicker.Stop()
+		n.listRefreshTicker = nil
+	}
 }
 
-func (f *nacosREST) NewList() runtime.Object {
-	return f.newListFunc()
+func (n *nacosREST) notifyWatchers(ev watch.Event) {
+	n.watchersMutex.RLock()
+	defer n.watchersMutex.RUnlock()
+	accessor, _ := meta.Accessor(ev.Object)
+	fmt.Printf("event %s %s %s/%s count(watcher)=%d\n", ev.Type, ev.Object.GetObjectKind(), accessor.GetNamespace(), accessor.GetName(), len(n.watchers))
+	for _, w := range n.watchers {
+		w.SendEvent(ev, false)
+	}
 }
 
-func (f *nacosREST) NamespaceScoped() bool {
-	return f.isNamespaced
+func (n *nacosREST) New() runtime.Object {
+	return n.newFunc()
 }
 
-func (f *nacosREST) Get(
+func (n *nacosREST) NewList() runtime.Object {
+	return n.newListFunc()
+}
+
+func (n *nacosREST) NamespaceScoped() bool {
+	return n.isNamespaced
+}
+
+func (n *nacosREST) Get(
 	ctx context.Context,
 	name string,
 	options *metav1.GetOptions,
 ) (runtime.Object, error) {
 	ns, _ := genericapirequest.NamespaceFrom(ctx)
-	obj, _, err := f.read(f.codec, ns, f.objectDataId(ctx, name), f.newFunc)
+	obj, _, err := n.read(n.codec, ns, n.objectDataId(ctx, name), n.newFunc)
 	if obj == nil && err == nil {
 		requestInfo, ok := genericapirequest.RequestInfoFrom(ctx)
 		var groupResource = schema.GroupResource{}
@@ -139,18 +171,18 @@ func (f *nacosREST) Get(
 			groupResource.Group = requestInfo.APIGroup
 			groupResource.Resource = requestInfo.Resource
 		}
-		fmt.Printf("%s %s/%s not found\n", f.groupResource, ns, name)
+		fmt.Printf("%s %s/%s not found\n", n.groupResource, ns, name)
 		return nil, apierrors.NewNotFound(groupResource, name)
 	}
-	fmt.Printf("%s %s/%s got\n", f.groupResource, ns, name)
+	fmt.Printf("%s %s/%s got\n", n.groupResource, ns, name)
 	return obj, err
 }
 
-func (f *nacosREST) List(
+func (n *nacosREST) List(
 	ctx context.Context,
 	options *metainternalversion.ListOptions,
 ) (runtime.Object, error) {
-	newListObj := f.NewList()
+	newListObj := n.NewList()
 	v, err := getListPrt(newListObj)
 	if err != nil {
 		return nil, err
@@ -160,14 +192,14 @@ func (f *nacosREST) List(
 
 	searchConfigParam := vo.SearchConfigParam{
 		Search:   "blur",
-		DataId:   f.dataIdPrefix + wildcardSuffix,
+		DataId:   n.dataIdPrefix + wildcardSuffix,
 		Group:    ns,
 		PageSize: searchPageSize,
 	}
-	predicate := f.buildListPredicate(options)
+	predicate := n.buildListPredicate(options)
 	count := 0
-	err = f.enumerateConfigs(&searchConfigParam, func(item *model.ConfigItem) {
-		obj, err := f.decodeConfig(f.codec, item.Content, f.newFunc)
+	err = n.enumerateConfigs(&searchConfigParam, func(item *model.ConfigItem) {
+		obj, err := n.decodeConfig(n.codec, item.Content, n.newFunc)
 		if obj == nil || err != nil {
 			return
 		}
@@ -180,11 +212,11 @@ func (f *nacosREST) List(
 		return nil, err
 	}
 
-	fmt.Printf("%s %s list count=%d\n", f.groupResource, ns, count)
+	fmt.Printf("%s %s list count=%d\n", n.groupResource, ns, count)
 	return newListObj, nil
 }
 
-func (f *nacosREST) Create(
+func (n *nacosREST) Create(
 	ctx context.Context,
 	obj runtime.Object,
 	createValidation rest.ValidateObjectFunc,
@@ -205,27 +237,22 @@ func (f *nacosREST) Create(
 
 	name := accessor.GetName()
 
-	dataId := f.objectDataId(ctx, name)
+	dataId := n.objectDataId(ctx, name)
 
-	currentConfig, err := f.readRaw(ns, dataId)
+	currentConfig, err := n.readRaw(ns, dataId)
 	if currentConfig != "" && err == nil {
-		return nil, apierrors.NewConflict(f.groupResource, name, ErrItemAlreadyExists)
+		return nil, apierrors.NewConflict(n.groupResource, name, ErrItemAlreadyExists)
 	}
 
 	accessor.SetCreationTimestamp(metav1.NewTime(time.Now()))
-	if err := f.write(f.codec, ns, dataId, "", obj); err != nil {
+	if err := n.write(n.codec, ns, dataId, "", obj); err != nil {
 		return nil, err
 	}
-
-	f.notifyWatchers(watch.Event{
-		Type:   watch.Added,
-		Object: obj,
-	})
 
 	return obj, nil
 }
 
-func (f *nacosREST) Update(
+func (n *nacosREST) Update(
 	ctx context.Context,
 	name string,
 	objInfo rest.UpdatedObjectInfo,
@@ -235,10 +262,10 @@ func (f *nacosREST) Update(
 	options *metav1.UpdateOptions,
 ) (runtime.Object, bool, error) {
 	ns, _ := genericapirequest.NamespaceFrom(ctx)
-	dataId := f.objectDataId(ctx, name)
+	dataId := n.objectDataId(ctx, name)
 
 	isCreate := false
-	oldObj, oldConfig, err := f.read(f.codec, ns, dataId, f.newFunc)
+	oldObj, oldConfig, err := n.read(n.codec, ns, dataId, n.newFunc)
 	if err != nil {
 		return nil, false, err
 	}
@@ -265,7 +292,7 @@ func (f *nacosREST) Update(
 	}
 
 	if isCreate {
-		obj, err := f.Create(ctx, updatedObj, createValidation, nil)
+		obj, err := n.Create(ctx, updatedObj, createValidation, nil)
 		return obj, err == nil, err
 	}
 
@@ -276,28 +303,24 @@ func (f *nacosREST) Update(
 	}
 
 	if updatedAccessor.GetResourceVersion() != oldAccessor.GetResourceVersion() {
-		return nil, false, apierrors.NewConflict(f.groupResource, name, nil)
+		return nil, false, apierrors.NewConflict(n.groupResource, name, nil)
 	}
 
-	if err := f.write(f.codec, ns, dataId, oldAccessor.GetResourceVersion(), updatedObj); err != nil {
+	if err := n.write(n.codec, ns, dataId, oldAccessor.GetResourceVersion(), updatedObj); err != nil {
 		return nil, false, err
 	}
 
-	f.notifyWatchers(watch.Event{
-		Type:   watch.Modified,
-		Object: updatedObj,
-	})
 	return updatedObj, false, nil
 }
 
-func (f *nacosREST) Delete(
+func (n *nacosREST) Delete(
 	ctx context.Context,
 	name string,
 	deleteValidation rest.ValidateObjectFunc,
 	options *metav1.DeleteOptions) (runtime.Object, bool, error) {
-	dataId := f.objectDataId(ctx, name)
+	dataId := n.objectDataId(ctx, name)
 
-	oldObj, err := f.Get(ctx, name, nil)
+	oldObj, err := n.Get(ctx, name, nil)
 	if err != nil {
 		return nil, false, err
 	}
@@ -308,7 +331,7 @@ func (f *nacosREST) Delete(
 	}
 
 	ns, _ := genericapirequest.NamespaceFrom(ctx)
-	deleted, err := f.configClient.DeleteConfig(vo.ConfigParam{
+	deleted, err := n.configClient.DeleteConfig(vo.ConfigParam{
 		DataId: dataId,
 		Group:  ns,
 	})
@@ -319,56 +342,58 @@ func (f *nacosREST) Delete(
 		return nil, false, errors.New("delete config failed: " + dataId)
 	}
 
-	f.notifyWatchers(watch.Event{
-		Type:   watch.Deleted,
-		Object: oldObj,
-	})
 	return oldObj, true, nil
 }
 
-func (f *nacosREST) DeleteCollection(
+func (n *nacosREST) DeleteCollection(
 	ctx context.Context,
 	deleteValidation rest.ValidateObjectFunc,
 	options *metav1.DeleteOptions,
 	listOptions *metainternalversion.ListOptions,
 ) (runtime.Object, error) {
-	list, err := f.List(ctx, listOptions)
+	list, err := n.List(ctx, listOptions)
 	if err != nil {
 		return nil, err
 	}
 
-	deletedItems := f.NewList()
+	deletedItems := n.NewList()
 	v, err := getListPrt(deletedItems)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, obj := range list.(*unstructured.UnstructuredList).Items {
-		if deletedObj, deleted, err := f.Delete(ctx, obj.GetName(), deleteValidation, options); deleted && err == nil {
+		if deletedObj, deleted, err := n.Delete(ctx, obj.GetName(), deleteValidation, options); deleted && err == nil {
 			appendItem(v, deletedObj)
 		}
 	}
 	return deletedItems, nil
 }
 
-func (f *nacosREST) objectDataId(ctx context.Context, name string) string {
-	//if f.isNamespaced {
+func (n *nacosREST) objectDataId(ctx context.Context, name string) string {
+	//if n.isNamespaced {
 	//	// FIXME: return error if namespace is not found
 	//	ns, _ := genericapirequest.NamespaceFrom(ctx)
-	//	return strings.Join([]string{f.dataIdPrefix, ns, name}, dataIdSeparator)
+	//	return strings.Join([]string{n.dataIdPrefix, ns, name}, dataIdSeparator)
 	//}
-	return strings.Join([]string{f.dataIdPrefix, name}, dataIdSeparator)
+	return strings.Join([]string{n.dataIdPrefix, name}, dataIdSeparator)
 }
 
-func (f *nacosREST) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (n *nacosREST) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+	ns, _ := genericapirequest.NamespaceFrom(ctx)
+	predicate := n.buildListPredicate(options)
 	nw := &nacosWatch{
-		id: len(f.watchers),
-		f:  f,
-		ch: make(chan watch.Event, 10),
+		id:        len(n.watchers),
+		f:         n,
+		ch:        make(chan watch.Event, 1024),
+		ns:        ns,
+		predicate: &predicate,
 	}
 
+	n.startBackgroundWatcher()
+
 	// On initial watch, send all the existing objects
-	list, err := f.List(ctx, options)
+	list, err := n.List(ctx, options)
 	if err != nil {
 		return nil, err
 	}
@@ -378,19 +403,20 @@ func (f *nacosREST) Watch(ctx context.Context, options *metainternalversion.List
 
 	for i := 0; i < items.Len(); i++ {
 		obj := items.Index(i).Addr().Interface().(runtime.Object)
-		nw.ch <- watch.Event{
+		nw.SendEvent(watch.Event{
 			Type:   watch.Added,
 			Object: obj,
-		}
+		}, true)
 	}
 
-	f.muWatchers.Lock()
-	f.watchers[nw.id] = nw
-	f.muWatchers.Unlock()
+	n.watchersMutex.Lock()
+	defer n.watchersMutex.Unlock()
+	n.watchers[nw.id] = nw
 
 	return nw, nil
 }
-func (f *nacosREST) buildListPredicate(options *metainternalversion.ListOptions) storage.SelectionPredicate {
+
+func (n *nacosREST) buildListPredicate(options *metainternalversion.ListOptions) storage.SelectionPredicate {
 	label := labels.Everything()
 	field := fields.Everything()
 	if options != nil {
@@ -404,15 +430,15 @@ func (f *nacosREST) buildListPredicate(options *metainternalversion.ListOptions)
 	return storage.SelectionPredicate{
 		Label:    label,
 		Field:    field,
-		GetAttrs: f.attrFunc,
+		GetAttrs: n.attrFunc,
 	}
 }
 
-func (f *nacosREST) enumerateConfigs(param *vo.SearchConfigParam, action func(*model.ConfigItem)) error {
+func (n *nacosREST) enumerateConfigs(param *vo.SearchConfigParam, action func(*model.ConfigItem)) error {
 	searchConfigParam := *param
 	searchConfigParam.PageNo = 1
 	for {
-		page, err := f.configClient.SearchConfig(searchConfigParam)
+		page, err := n.configClient.SearchConfig(searchConfigParam)
 		if err != nil {
 			return err
 		}
@@ -422,7 +448,8 @@ func (f *nacosREST) enumerateConfigs(param *vo.SearchConfigParam, action func(*m
 		}
 
 		for _, item := range page.PageItems {
-			action(&item)
+			localItem := *(&item)
+			action(&localItem)
 		}
 
 		if page.PagesAvailable <= searchConfigParam.PageNo {
@@ -434,29 +461,29 @@ func (f *nacosREST) enumerateConfigs(param *vo.SearchConfigParam, action func(*m
 	return nil
 }
 
-func (f *nacosREST) read(decoder runtime.Decoder, group, dataId string, newFunc func() runtime.Object) (runtime.Object, string, error) {
-	config, err := f.readRaw(group, dataId)
+func (n *nacosREST) read(decoder runtime.Decoder, group, dataId string, newFunc func() runtime.Object) (runtime.Object, string, error) {
+	config, err := n.readRaw(group, dataId)
 	if err != nil {
 		return nil, "", err
 	}
 	if config == "" {
 		return nil, "", nil
 	}
-	obj, err := f.decodeConfig(decoder, config, newFunc)
+	obj, err := n.decodeConfig(decoder, config, newFunc)
 	if err != nil {
 		return nil, config, err
 	}
 	return obj, config, nil
 }
 
-func (f *nacosREST) readRaw(group, dataId string) (string, error) {
-	return f.configClient.GetConfig(vo.ConfigParam{
+func (n *nacosREST) readRaw(group, dataId string) (string, error) {
+	return n.configClient.GetConfig(vo.ConfigParam{
 		DataId: dataId,
 		Group:  group,
 	})
 }
 
-func (f *nacosREST) decodeConfig(decoder runtime.Decoder, config string, newFunc func() runtime.Object) (runtime.Object, error) {
+func (n *nacosREST) decodeConfig(decoder runtime.Decoder, config string, newFunc func() runtime.Object) (runtime.Object, error) {
 	obj, _, err := decoder.Decode([]byte(config), nil, newFunc())
 	if err != nil {
 		return nil, err
@@ -468,7 +495,7 @@ func (f *nacosREST) decodeConfig(decoder runtime.Decoder, config string, newFunc
 	return obj, nil
 }
 
-func (f *nacosREST) write(encoder runtime.Encoder, group, dataId, oldMd5 string, obj runtime.Object) error {
+func (n *nacosREST) write(encoder runtime.Encoder, group, dataId, oldMd5 string, obj runtime.Object) error {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return err
@@ -481,11 +508,11 @@ func (f *nacosREST) write(encoder runtime.Encoder, group, dataId, oldMd5 string,
 		return err
 	}
 	content := buf.String()
-	return f.writeRaw(group, dataId, content, oldMd5)
+	return n.writeRaw(group, dataId, content, oldMd5)
 }
 
-func (f *nacosREST) writeRaw(group, dataId, content, oldMd5 string) error {
-	published, err := f.configClient.PublishConfig(vo.ConfigParam{
+func (n *nacosREST) writeRaw(group, dataId, content, oldMd5 string) error {
+	published, err := n.configClient.PublishConfig(vo.ConfigParam{
 		DataId:  dataId,
 		Group:   group,
 		Content: content,
@@ -499,6 +526,83 @@ func (f *nacosREST) writeRaw(group, dataId, content, oldMd5 string) error {
 	return nil
 }
 
+func (n *nacosREST) refreshConfigList() {
+	n.listRefreshMutex.Lock()
+	defer n.listRefreshMutex.Unlock()
+
+	configItems := map[string]*model.ConfigItem{}
+	var newConfigKeys []string
+	err := n.enumerateConfigs(&vo.SearchConfigParam{
+		Search: "blur",
+		DataId: n.dataIdPrefix + wildcardSuffix,
+	}, func(item *model.ConfigItem) {
+		key := item.Group + "/" + item.DataId
+		if _, ok := n.configItems[key]; !ok {
+			newConfigKeys = append(newConfigKeys, key)
+		}
+		configItems[key] = item
+	})
+	if err != nil {
+		return
+	}
+
+	var removedConfigKeys []string
+	for key, _ := range n.configItems {
+		if _, ok := configItems[key]; !ok {
+			removedConfigKeys = append(removedConfigKeys, key)
+		}
+	}
+
+	for _, key := range newConfigKeys {
+		configItem := configItems[key]
+		obj, err := n.decodeConfig(n.codec, configItem.Content, n.newFunc)
+		if err != nil {
+			delete(configItems, key)
+			continue
+		}
+		fmt.Printf("%s/%s is added\n", configItem.Group, configItem.DataId)
+		n.notifyWatchers(watch.Event{
+			Type:   watch.Added,
+			Object: obj,
+		})
+		err = n.configClient.ListenConfig(vo.ConfigParam{
+			DataId: configItem.DataId,
+			Group:  configItem.Group,
+			OnChange: func(namespace, group, dataId, data string) {
+				obj, err := n.decodeConfig(n.codec, data, n.newFunc)
+				if err != nil {
+					return
+				}
+				fmt.Printf("%s/%s is changed\n", group, dataId)
+				n.notifyWatchers(watch.Event{
+					Type:   watch.Modified,
+					Object: obj,
+				})
+			},
+		})
+		if err != nil {
+			fmt.Printf("failed to listen config %s: %v", key, err)
+		}
+	}
+	for _, key := range removedConfigKeys {
+		configItem := n.configItems[key]
+		obj, err := n.decodeConfig(n.codec, configItem.Content, n.newFunc)
+		if err != nil {
+			continue
+		}
+		_ = n.configClient.CancelListenConfig(vo.ConfigParam{
+			DataId: configItem.DataId,
+			Group:  configItem.Group,
+		})
+		fmt.Printf("%s/%s is deleted\n", configItem.Group, configItem.DataId)
+		n.notifyWatchers(watch.Event{
+			Type:   watch.Deleted,
+			Object: obj,
+		})
+	}
+	n.configItems = configItems
+}
+
 func calculateMd5(str string) string {
 	w := md5.New()
 	_, _ = io.WriteString(w, str)
@@ -506,22 +610,47 @@ func calculateMd5(str string) string {
 }
 
 type nacosWatch struct {
-	f  *nacosREST
-	id int
-	ch chan watch.Event
+	f         *nacosREST
+	id        int
+	ch        chan watch.Event
+	ns        string
+	predicate *storage.SelectionPredicate
 }
 
 func (w *nacosWatch) Stop() {
-	w.f.muWatchers.Lock()
+	w.f.watchersMutex.Lock()
+	defer w.f.watchersMutex.Unlock()
 	delete(w.f.watchers, w.id)
-	w.f.muWatchers.Unlock()
 }
 
 func (w *nacosWatch) ResultChan() <-chan watch.Event {
 	return w.ch
 }
 
+func (w *nacosWatch) SendEvent(ev watch.Event, force bool) bool {
+	if !force {
+		if w.predicate != nil {
+			match, err := w.predicate.Matches(ev.Object)
+			if err == nil && !match {
+				// If something went wrong, we assume it's a match
+				return false
+			}
+		}
+		if ns := w.ns; ns != "" {
+			accessor, err := meta.Accessor(ev.Object)
+			if err != nil {
+				return false
+			}
+			if accessor.GetNamespace() != ns {
+				return false
+			}
+		}
+	}
+	w.ch <- ev
+	return true
+}
+
 // TODO: implement custom table printer optionally
-// func (f *nacosREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
+// func (n *nacosREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 // 	return &metav1.Table{}, nil
 // }
