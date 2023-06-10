@@ -12,7 +12,7 @@ networks:
 
 services:
   nacos:
-    image: nacos/nacos-server:v2.2.2
+    image: nacos/nacos-server:${NACOS_SERVER_TAG:-v2.2.2}
     profiles: [ "nacos", "apiserver", "controller", "pilot", "gateway", "full" ]
     env_file:
       - ./env/nacos.env
@@ -52,7 +52,7 @@ services:
       - ./volumes/fileServer:/home/static
 
   apiserver:
-    image: ch3cho/higress-api-server:v0.0.1
+    image: ch3cho/higress-api-server:${API_SERVER_TAG:-0.0.2}
     command:
       - --secure-port
       - "8443"
@@ -80,7 +80,7 @@ services:
       - ./volumes/api:/etc/api:ro
 
   controller:
-    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress:1.0.0
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress:${HIGRESS_CONTROLLER_TAG:-1.0.0}
     command:
       - serve
       - --kubeconfig=/home/higress/.kube/config
@@ -104,7 +104,7 @@ services:
       - ./volumes/kube:/home/higress/.kube:ro
 
   pilot:
-    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/pilot:1.0.0
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/pilot:${HIGRESS_PILOT_TAG:-${HIGRESS_TAG:-1.0.0}}
     command:
       - discovery
       - --monitoringAddr=:15014
@@ -133,7 +133,7 @@ services:
       - ./volumes/pilot/config:/etc/istio/config:ro
 
   gateway:
-    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/gateway:1.0.0
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/gateway:${HIGRESS_GATEWAY_TAG:-${HIGRESS_TAG:-1.0.0}}
     command:
       - proxy
       - router
@@ -161,7 +161,7 @@ services:
       - ./volumes/gateway/podinfo:/etc/istio/pod:po
 
   console:
-    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/console:1.0.0
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/console:${HIGRESS_CONSOLE_TAG:-${HIGRESS_TAG:-1.0.0}}
     profiles: [ "console", "full" ]
     env_file:
       - ./env/console.env
