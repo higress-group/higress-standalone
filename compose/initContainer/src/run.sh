@@ -81,7 +81,7 @@ initializeNacos() {
 initializeApiServer() {
   echo "Initializing API server configurations..."
 
-  mkdir -p api && cd "$_"
+  mkdir -p "$VOLUMES_ROOT/api" && cd "$_"
   check_exit_code "Creating volume for API server fails with $?"
 
   if [ ! -f ca.key ] || [ ! -f ca.crt ]
@@ -89,13 +89,17 @@ initializeApiServer() {
     echo "  Generating CA certificate...";
     openssl req -nodes -new -x509 -keyout ca.key -out ca.crt -subj "/CN=higress-root-ca/O=higress" > /dev/null 2>&1
     check_exit_code "  Generating CA certificate for API server fails with $?";
-  fi;
+  else
+    echo "  CA certificate already exists.";
+  fi
   if [ ! -f client.key ] || [ ! -f client.crt ]
   then
     echo "  Generating client certificate..."
     openssl req -out client.csr -new -newkey rsa:$RSA_KEY_LENGTH -nodes -keyout client.key -subj "/CN=higress/O=system:masters" > /dev/null 2>&1 \
       && openssl x509 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 01 -sha256 -out client.crt > /dev/null 2>&1
     check_exit_code "  Generating client certificate for API client fails with $?";
+  else
+    echo "  Client certificate already exists.";
   fi
 
   CA_CERT=$(cat ca.crt | base64 -w 0)
@@ -126,6 +130,8 @@ contexts:
 preferences: {}
 current-context: higress
 EOF
+  else
+    echo "Kubeconfig already exists."
   fi
 }
 
