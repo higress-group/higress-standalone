@@ -116,7 +116,6 @@ func (o *HigressServerOptions) Config() (*apiserver.Config, error) {
 	}
 
 	o.RecommendedOptions.Authentication.RemoteKubeConfigFileOptional = true
-	o.RecommendedOptions.Authentication.DisableAnonymous = true
 	o.RecommendedOptions.Authorization.RemoteKubeConfigFileOptional = true
 
 	if err := applyTo(o.RecommendedOptions, serverConfig); err != nil {

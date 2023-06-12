@@ -72,7 +72,7 @@ services:
       - higress-net
     restart: on-failure
     healthcheck:
-      test: [ "CMD", "curl", "-fk", "https://127.0.0.1:8443/apis" ]
+      test: [ "CMD", "curl", "-fk", "https://127.0.0.1:8443/readyz" ]
       interval: 1s
       timeout: 3s
       retries: 60
