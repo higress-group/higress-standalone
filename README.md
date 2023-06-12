@@ -56,9 +56,9 @@ docker compose --profile full up
 
 ## 后续任务
 
-- API Server 支持通过证书对客户端进行认证
-- API Server 支持在用户直接修改 Nacos 配置后推送变更到客户端
+- API Server 支持通过证书对客户端进行认证 - 已完成
+- API Server 支持在用户直接修改 Nacos 配置后推送变更到客户端 - 已完成
 - Secret 数据在加密后再保存到 Nacos
 - API Server 对接日志框架
-- 对接可观测性组件
+- 对接可观测性组件 - 部分完成（已支持采集请求指标，暂不支持采集服务器指标，如 CPU、内存等）
 - Gateway 和 Pilot 之间的 xDS 通信启用 mTLS
