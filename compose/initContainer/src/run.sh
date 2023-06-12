@@ -102,8 +102,8 @@ initializeApiServer() {
     echo "  Client certificate already exists.";
   fi
 
-  CA_CERT=$(cat ca.crt | base64 -w 0)
-  CA_KEY=$(cat ca.key | base64 -w 0)
+  CLIENT_CERT=$(cat client.crt | base64 -w 0)
+  CLIENT_KEY=$(cat client.key | base64 -w 0)
 
   if [ ! -f $VOLUMES_ROOT/kube/config ]
   then
@@ -120,8 +120,8 @@ clusters:
 users:
   - name: higress-admin
     user:
-      client-certificate-data: ${CA_CERT}
-      client-key-data: ${CA_KEY}
+      client-certificate-data: ${CLIENT_CERT}
+      client-key-data: ${CLIENT_KEY}
 contexts:
   - name: higress
     context:
