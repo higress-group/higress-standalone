@@ -131,7 +131,7 @@ preferences: {}
 current-context: higress
 EOF
   else
-    echo "Kubeconfig already exists."
+    echo "  kubeconfig already exists."
   fi
 }
 
@@ -153,7 +153,7 @@ rootca@higress.io
 
 
 EOF
-    check_exit_code "Generating Root CA certificate for pilot fails with $?"
+    check_exit_code "  Generating Root CA certificate for pilot fails with $?"
   fi
 
   if [ ! -f ca-key.pem ] || [ ! -f ca-cert.pem ]
