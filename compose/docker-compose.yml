@@ -31,7 +31,7 @@ services:
     restart: always
 
   initializer:
-    build: 
+    build:
       context: ./initContainer
     profiles: [ "apiserver", "controller", "pilot", "gateway", "full" ]
     depends_on:
@@ -44,7 +44,7 @@ services:
       - ./env:/mnt/env
 
   fileserver:
-    build: 
+    build:
       context: ./fileServer
     profiles: [ "apiserver", "controller", "pilot", "gateway", "full" ]
     networks:
@@ -176,9 +176,55 @@ services:
     volumes:
       - ./volumes/kube:/home/higress/.kube:ro
 
-  httpbin:
+  prometheus:
+    image: prom/prometheus:${PROMETHEUS_TAG:-v2.40.7}
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--web.external-url=/prometheus"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention=6h"
+    profiles: [ "prom", "o11y", "full" ]
+    env_file:
+      - ./env/prometheus.env
+    depends_on:
+      pilot:
+        condition: service_healthy
+    networks:
+      higress-net:
+        ipv4_address: 172.28.5.101
+    ports:
+      - "${PROMETHUES_PORT:-19090}:9090/tcp"
+    restart: on-failure
+    volumes:
+      - ./volumes/prometheus/config:/etc/prometheus:rw
+      - ./volumes/prometheus/data:/prometheus:rw
+
+  grafana:
+    image: grafana/grafana:${GRAFANA_TAG:-9.3.6}
+    profiles: [ "grafana", "o11y", "full" ]
+    env_file:
+      - ./env/grafana.env
+    depends_on:
+      pilot:
+        condition: service_healthy
+    networks:
+      higress-net:
+        ipv4_address: 172.28.5.102
+    ports:
+      - "${GRAFANA_PORT:-13000}:3000/tcp"
+    restart: on-failure
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://127.0.0.1:3000/robots.txt" ]
+      interval: 1s
+      timeout: 3s
+      retries: 60
+    volumes:
+      - ./volumes/grafana/config:/etc/grafana:rw
+      - ./volumes/grafana/data:/var/lib/grafana:rw
+
+  echoserver:
     image: mendhak/http-https-echo:29
     profiles: [ "gateway", "full" ]
     networks:
       higress-net:
-        ipv4_address: 172.28.5.101
+        ipv4_address: 172.28.5.150

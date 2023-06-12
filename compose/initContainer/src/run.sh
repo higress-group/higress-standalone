@@ -7,6 +7,7 @@ ENV_ROOT="/mnt/env"
 RSA_KEY_LENGTH=4096
 
 NACOS_NAMESPACE_ID="higress-system"
+CONSOLE_DOMAIN="console.higress.io"
 
 now() {
   echo "$(date --utc +%Y-%m-%dT%H:%M:%SZ)"
@@ -318,7 +319,61 @@ metadata:
 type: Opaque
 EOF
   publish_nacos_config_if_absent "higress-system" "secrets.higress-console" "$content"
+}
 
+intializePrometheus() {
+  mkdir -p $VOLUMES_ROOT/prometheus && cd "$_"
+
+  mkdir ./config
+  cat <<EOF > ./config/prometheus.yml
+global:
+  scrape_interval:     15s 
+  evaluation_interval: 15s
+scrape_configs:
+  - job_name: 'prometheus'
+    metrics_path: /prometheus/metrics
+    static_configs:
+    - targets: ['localhost:9090']
+  - job_name: 'gateway_container'
+    metrics_path: /stats/prometheus
+    static_configs:
+    - targets: ['gateway:15020']
+EOF
+
+  mkdir ./data
+}
+
+initializeGrafana() {
+  mkdir -p $VOLUMES_ROOT/grafana && cd "$_"
+
+  mkdir ./config
+  cat <<EOF > ./config/grafana.ini
+[server]
+protocol=http
+domain=localhost
+root_url="%(protocol)s://%(domain)s/grafana"
+serve_from_sub_path=true
+
+[auth]
+disable_login_form=true
+disable_signout_menu=true
+
+[auth.anonymous]
+enabled=true
+org_name=Main Org.
+org_role=Viewer
+
+[users]
+default_theme=light
+
+[security]
+allow_embedding=true
+EOF
+
+  mkdir ./data
+}
+
+initializeIngresses() {
   read -r -d '' content << EOF
 apiVersion: networking.higress.io/v1
 kind: McpBridge
@@ -330,6 +385,14 @@ spec:
   registries:
   - domain: 172.28.5.100:8080
     name: higress-console
+    port: 80
+    type: static
+  - domain: 172.28.5.101:9090
+    name: higress-console-prometheus
+    port: 80
+    type: static
+  - domain: 172.28.5.102:3000
+    name: higress-console-grafana
     port: 80
     type: static
 EOF
@@ -348,7 +411,7 @@ metadata:
 spec:
   ingressClassName: higress
   rules:
-  - host: console.higress.io
+  - host: ${CONSOLE_DOMAIN}
     http:
       paths:
       - backend:
@@ -360,6 +423,58 @@ spec:
         pathType: Prefix
 EOF
   publish_nacos_config_if_absent "higress-system" "ingresses.higress-console" "$content"
+
+  read -r -d '' content << EOF
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    higress.io/destination: higress-console-prometheus.static
+    higress.io/ignore-path-case: "false"
+  creationTimestamp: "$(now)"
+  name: higress-console-prometheus
+  namespace: higress-system
+spec:
+  ingressClassName: higress
+  rules:
+  - host: ${CONSOLE_DOMAIN}
+    http:
+      paths:
+      - backend:
+          resource:
+            apiGroup: networking.higress.io
+            kind: McpBridge
+            name: default
+        path: /prometheus
+        pathType: Prefix
+EOF
+  publish_nacos_config_if_absent "higress-system" "ingresses.higress-console-prometheus" "$content"
+
+  read -r -d '' content << EOF
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    higress.io/destination: higress-console-grafana.static
+    higress.io/ignore-path-case: "false"
+  creationTimestamp: "$(now)"
+  name: higress-console-grafana
+  namespace: higress-system
+spec:
+  ingressClassName: higress
+  rules:
+  - host: ${CONSOLE_DOMAIN}
+    http:
+      paths:
+      - backend:
+          resource:
+            apiGroup: networking.higress.io
+            kind: McpBridge
+            name: default
+        path: /grafana
+        pathType: Prefix
+EOF
+  publish_nacos_config_if_absent "higress-system" "ingresses.higress-console-grafana" "$content"
 }
 
 initializeNacos
@@ -367,3 +482,6 @@ initializeApiServer
 initializePilot
 initializeGateway
 initializeConsole
+intializePrometheus
+initializeGrafana
+initializeIngresses
