@@ -12,7 +12,7 @@ networks:
 
 services:
   nacos:
-    image: nacos/nacos-server:${NACOS_SERVER_TAG:-v2.2.2}
+    image: nacos/nacos-server:${NACOS_SERVER_TAG:-v2.2.3}
     profiles: [ "nacos", "apiserver", "controller", "pilot", "gateway", "full" ]
     env_file:
       - ./env/nacos.env
