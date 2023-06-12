@@ -26,7 +26,8 @@ services:
     volumes:
       - ./volumes/nacos:/home/nacos/data
     ports:
-      - "${NACOS_PORT:-8848}:8848/tcp"
+      - "${NACOS_HTTP_PORT:-8848}:8848/tcp"
+      - "${NACOS_GRPC_PORT:-9848}:9848/tcp"
     restart: always
 
   initializer:
@@ -179,4 +180,5 @@ services:
     image: mendhak/http-https-echo:29
     profiles: [ "gateway", "full" ]
     networks:
-      - higress-net
+      higress-net:
+        ipv4_address: 172.28.5.101
