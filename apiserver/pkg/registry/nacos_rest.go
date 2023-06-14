@@ -29,6 +29,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/klog/v2"
 )
 
 const dataIdSeparator = "."
@@ -139,7 +140,7 @@ func (n *nacosREST) notifyWatchers(ev watch.Event) {
 	n.watchersMutex.RLock()
 	defer n.watchersMutex.RUnlock()
 	accessor, _ := meta.Accessor(ev.Object)
-	fmt.Printf("event %s %s %s/%s count(watcher)=%d\n", ev.Type, ev.Object.GetObjectKind(), accessor.GetNamespace(), accessor.GetName(), len(n.watchers))
+	klog.Info("event %s %s %s/%s count(watcher)=%d", ev.Type, ev.Object.GetObjectKind(), accessor.GetNamespace(), accessor.GetName(), len(n.watchers))
 	for _, w := range n.watchers {
 		w.SendEvent(ev, false)
 	}
@@ -171,10 +172,10 @@ func (n *nacosREST) Get(
 			groupResource.Group = requestInfo.APIGroup
 			groupResource.Resource = requestInfo.Resource
 		}
-		fmt.Printf("%s %s/%s not found\n", n.groupResource, ns, name)
+		klog.Warningf("%s %s/%s not found", n.groupResource, ns, name)
 		return nil, apierrors.NewNotFound(groupResource, name)
 	}
-	fmt.Printf("%s %s/%s got\n", n.groupResource, ns, name)
+	klog.Infof("%s %s/%s got", n.groupResource, ns, name)
 	return obj, err
 }
 
@@ -212,7 +213,7 @@ func (n *nacosREST) List(
 		return nil, err
 	}
 
-	fmt.Printf("%s %s list count=%d\n", n.groupResource, ns, count)
+	klog.Infof("%s %s list count=%d", n.groupResource, ns, count)
 	return newListObj, nil
 }
 
@@ -560,7 +561,7 @@ func (n *nacosREST) refreshConfigList() {
 			delete(configItems, key)
 			continue
 		}
-		fmt.Printf("%s/%s is added\n", configItem.Group, configItem.DataId)
+		klog.Infof("%s/%s is added", configItem.Group, configItem.DataId)
 		n.notifyWatchers(watch.Event{
 			Type:   watch.Added,
 			Object: obj,
@@ -573,7 +574,7 @@ func (n *nacosREST) refreshConfigList() {
 				if err != nil {
 					return
 				}
-				fmt.Printf("%s/%s is changed\n", group, dataId)
+				klog.Infof("%s/%s is changed", group, dataId)
 				n.notifyWatchers(watch.Event{
 					Type:   watch.Modified,
 					Object: obj,
@@ -581,7 +582,7 @@ func (n *nacosREST) refreshConfigList() {
 			},
 		})
 		if err != nil {
-			fmt.Printf("failed to listen config %s: %v", key, err)
+			klog.Errorf("failed to listen config %s: %v", key, err)
 		}
 	}
 	for _, key := range removedConfigKeys {
@@ -594,7 +595,7 @@ func (n *nacosREST) refreshConfigList() {
 			DataId: configItem.DataId,
 			Group:  configItem.Group,
 		})
-		fmt.Printf("%s/%s is deleted\n", configItem.Group, configItem.DataId)
+		klog.Infof("%s/%s is deleted", configItem.Group, configItem.DataId)
 		n.notifyWatchers(watch.Event{
 			Type:   watch.Deleted,
 			Object: obj,
