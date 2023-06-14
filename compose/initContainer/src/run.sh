@@ -251,6 +251,8 @@ EOF
   cp $VOLUMES_ROOT/pilot/cacerts/jwks.json ./jwks.json
 
   mkdir -p $VOLUMES_ROOT/pilot/config && cd "$_"
+  if [ ! -f ./mesh ]
+  then
   cat <<EOF > ./mesh
 accessLogEncoding: TEXT
 accessLogFile: /dev/stdout
@@ -273,9 +275,13 @@ protocolDetectionTimeout: 100ms
 rootNamespace: higress-system
 trustDomain: cluster.local
 EOF
+  fi
+  if [ ! -f ./meshNetworks ]
+  then
 cat <<EOF > ./meshNetworks
 networks: {}
 EOF
+  fi
 }
 
 initializeGateway() {
@@ -324,7 +330,9 @@ EOF
 intializePrometheus() {
   mkdir -p $VOLUMES_ROOT/prometheus && cd "$_"
 
-  mkdir ./config
+  mkdir -p ./config
+  if [ ! -f ./config/prometheus.yml ]
+  then
   cat <<EOF > ./config/prometheus.yml
 global:
   scrape_interval:     15s 
@@ -339,14 +347,17 @@ scrape_configs:
     static_configs:
     - targets: ['gateway:15020']
 EOF
+  fi
 
-  mkdir ./data
+  mkdir -p ./data
 }
 
 initializeGrafana() {
   mkdir -p $VOLUMES_ROOT/grafana && cd "$_"
 
-  mkdir ./config
+  mkdir -p ./config
+  if [ ! -f ./config/grafana.ini ]
+  then
   cat <<EOF > ./config/grafana.ini
 [server]
 protocol=http
@@ -369,8 +380,9 @@ default_theme=light
 [security]
 allow_embedding=true
 EOF
+  fi
 
-  mkdir ./data
+  mkdir -p ./data
 }
 
 initializeIngresses() {
