@@ -93,12 +93,21 @@ initializeApiServer() {
   else
     echo "  CA certificate already exists.";
   fi
+  if [ ! -f server.key ] || [ ! -f server.crt ]
+  then
+    echo "  Generating server certificate..."
+    openssl req -out server.csr -new -newkey rsa:$RSA_KEY_LENGTH -nodes -keyout server.key -subj "/CN=higress-api-server/O=higress" > /dev/null 2>&1 \
+      && openssl x509 -req -days 365 -in server.csr -CA ca.crt -CAkey ca.key -set_serial 01 -sha256 -out server.crt > /dev/null 2>&1
+    check_exit_code "  Generating server certificate fails with $?";
+  else
+    echo "  Server certificate already exists.";
+  fi
   if [ ! -f client.key ] || [ ! -f client.crt ]
   then
     echo "  Generating client certificate..."
     openssl req -out client.csr -new -newkey rsa:$RSA_KEY_LENGTH -nodes -keyout client.key -subj "/CN=higress/O=system:masters" > /dev/null 2>&1 \
-      && openssl x509 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 01 -sha256 -out client.crt > /dev/null 2>&1
-    check_exit_code "  Generating client certificate for API client fails with $?";
+      && openssl x509 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 02 -sha256 -out client.crt > /dev/null 2>&1
+    check_exit_code "  Generating client certificate fails with $?";
   else
     echo "  Client certificate already exists.";
   fi
@@ -350,6 +359,7 @@ EOF
   fi
 
   mkdir -p ./data
+  chmod a+w ./data
 }
 
 initializeGrafana() {
@@ -383,6 +393,7 @@ EOF
   fi
 
   mkdir -p ./data
+  chmod a+w ./data
 }
 
 initializeIngresses() {

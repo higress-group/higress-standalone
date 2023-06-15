@@ -59,6 +59,10 @@ services:
       - "8443"
       - --client-ca-file
       - /etc/api/ca.crt
+      - --tls-cert-file
+      - /etc/api/server.crt
+      - --tls-private-key-file
+      - /etc/api/server.key
       - --nacos-server
       - http://nacos:8848/nacos
       - --nacos-ns-id

@@ -28,4 +28,5 @@ vendor/
 
 /ca.*
 /client.*
+/server.*
 apiserver.local.config
