@@ -9,17 +9,21 @@ import (
 	"github.com/nacos-group/nacos-sdk-go/v2/vo"
 	"github.com/spf13/pflag"
 	"net/url"
+	"os"
 	"strconv"
 )
 
 type NacosOptions struct {
-	ServerHttpUrls []string
-	NamespaceId    string
-	Username       string
-	Password       string
-	TimeoutMs      uint64
-	LogDir         string
-	CacheDir       string
+	ServerHttpUrls    []string
+	NamespaceId       string
+	Username          string
+	Password          string
+	TimeoutMs         uint64
+	LogDir            string
+	CacheDir          string
+	PrivateKeyFile    string
+	EncryptionKeyFile string
+	EncryptionKey     []byte
 }
 
 func (o *NacosOptions) AddFlags(fs *pflag.FlagSet) {
@@ -45,6 +49,8 @@ func (o *NacosOptions) AddFlags(fs *pflag.FlagSet) {
 		"Supported media types: [application/json, application/yaml, application/vnd.kubernetes.protobuf]")
 	fs.Uint64Var(&o.TimeoutMs, "nacos-timeout", 5000,
 		"Number of workers spawned for DeleteCollection call. These are used to speed up namespace cleanup.")
+	fs.StringVar(&o.EncryptionKeyFile, "nacos-encryption-key-file", "",
+		"A file containing AES key data used for data encryption. The file length must be 16, 24 or 32 bytes. If not set, data encryption will be disabled.")
 
 	fs.StringVar(&o.LogDir, "nacos-log-dir", "/tmp/nacos/log", ""+
 		"Enables the generic garbage collector. MUST be synced with the corresponding flag "+
@@ -87,6 +93,25 @@ func (o *NacosOptions) Validate() []error {
 		}
 	}
 
+	if o.EncryptionKeyFile != "" {
+		key, error := os.ReadFile(o.EncryptionKeyFile)
+		if error != nil {
+			errors = append(errors, fmt.Errorf("failed to read encryption key file: %s", error))
+		} else {
+			o.EncryptionKey = key
+		}
+		switch len(o.EncryptionKey) {
+		case 16:
+		case 24:
+		case 32:
+			// Good
+			break
+		default:
+			errors = append(errors, fmt.Errorf("invalid encryption key length: %d", len(o.EncryptionKey)))
+			break
+		}
+	}
+
 	return errors
 }
 
@@ -107,7 +132,7 @@ func (o *NacosOptions) CreateConfigClient() (config_client.IConfigClient, error)
 		constant.WithDisableUseSnapShot(true),
 	)
 
-	serverConfigs := []constant.ServerConfig{}
+	var serverConfigs []constant.ServerConfig
 	for _, server := range o.ServerHttpUrls {
 		serverUrl, err := url.Parse(server)
 		if err != nil {

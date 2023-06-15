@@ -53,7 +53,7 @@ services:
       - ./volumes/fileServer:/home/static
 
   apiserver:
-    image: ch3cho/higress-api-server:${API_SERVER_TAG:-0.0.2}
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/api-server:${HIGRESS_API_SERVER_TAG:-0.0.3}
     command:
       - --secure-port
       - "8443"
@@ -67,6 +67,8 @@ services:
       - http://nacos:8848/nacos
       - --nacos-ns-id
       - higress-system
+      - --nacos-encryption-key-file
+      - /etc/api/nacos.key
     profiles: [ "apiserver", "controller", "pilot", "gateway", "full" ]
     depends_on:
       nacos:
@@ -166,7 +168,7 @@ services:
       - ./volumes/gateway/podinfo:/etc/istio/pod:po
 
   console:
-    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/console:${HIGRESS_CONSOLE_TAG:-${HIGRESS_TAG:-1.0.0}}
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/console:${HIGRESS_CONSOLE_TAG:-${HIGRESS_TAG:-1.0.1}}
     profiles: [ "console", "full" ]
     env_file:
       - ./env/console.env

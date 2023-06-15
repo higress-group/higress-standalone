@@ -102,6 +102,13 @@ initializeApiServer() {
   else
     echo "  Server certificate already exists.";
   fi
+  if [ ! -f nacos.key ]
+  then
+    echo "  Generating data encryption key..."
+    cat /dev/urandom | tr -dc '[:graph:]' | head -c 32 > nacos.key
+  else
+    echo "  Client certificate already exists.";
+  fi
   if [ ! -f client.key ] || [ ! -f client.crt ]
   then
     echo "  Generating client certificate..."

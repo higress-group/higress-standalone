@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/md5"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alibaba/higress/api-server/pkg/utils"
 	"github.com/nacos-group/nacos-sdk-go/v2/clients/config_client"
 	"github.com/nacos-group/nacos-sdk-go/v2/model"
 	"github.com/nacos-group/nacos-sdk-go/v2/vo"
@@ -36,6 +38,7 @@ const dataIdSeparator = "."
 const wildcardSuffix = dataIdSeparator + "*"
 const searchPageSize = 50
 const listRefreshInterval = 10 * time.Second
+const encryptionMark = "enc|"
 
 // ErrItemAlreadyExists means the item already exists.
 var ErrItemAlreadyExists = fmt.Errorf("item already exists")
@@ -54,6 +57,7 @@ func NewNacosREST(
 	newFunc func() runtime.Object,
 	newListFunc func() runtime.Object,
 	attrFunc storage.AttrFunc,
+	dataEncryptionKey []byte,
 ) rest.Storage {
 	if attrFunc == nil {
 		if isNamespaced {
@@ -76,6 +80,7 @@ func NewNacosREST(
 		newListFunc:    newListFunc,
 		attrFunc:       attrFunc,
 		watchers:       make(map[int]*nacosWatch, 10),
+		encryptionKey:  dataEncryptionKey,
 	}
 	n.startBackgroundWatcher()
 	return n
@@ -98,6 +103,8 @@ type nacosREST struct {
 	newFunc     func() runtime.Object
 	newListFunc func() runtime.Object
 	attrFunc    storage.AttrFunc
+
+	encryptionKey []byte
 
 	configItems map[string]*model.ConfigItem
 }
@@ -140,7 +147,7 @@ func (n *nacosREST) notifyWatchers(ev watch.Event) {
 	n.watchersMutex.RLock()
 	defer n.watchersMutex.RUnlock()
 	accessor, _ := meta.Accessor(ev.Object)
-	klog.Info("event %s %s %s/%s count(watcher)=%d", ev.Type, ev.Object.GetObjectKind(), accessor.GetNamespace(), accessor.GetName(), len(n.watchers))
+	klog.Infof("event %s %s %s/%s count(watcher)=%d", ev.Type, ev.Object.GetObjectKind(), accessor.GetNamespace(), accessor.GetName(), len(n.watchers))
 	for _, w := range n.watchers {
 		w.SendEvent(ev, false)
 	}
@@ -485,6 +492,10 @@ func (n *nacosREST) readRaw(group, dataId string) (string, error) {
 }
 
 func (n *nacosREST) decodeConfig(decoder runtime.Decoder, config string, newFunc func() runtime.Object) (runtime.Object, error) {
+	config, err := n.decryptConfig(config)
+	if err != nil {
+		return nil, err
+	}
 	obj, _, err := decoder.Decode([]byte(config), nil, newFunc())
 	if err != nil {
 		return nil, err
@@ -508,7 +519,10 @@ func (n *nacosREST) write(encoder runtime.Encoder, group, dataId, oldMd5 string,
 	if err := encoder.Encode(obj, buf); err != nil {
 		return err
 	}
-	content := buf.String()
+	content, err := n.encryptConfig(buf.String())
+	if err != nil {
+		return err
+	}
 	return n.writeRaw(group, dataId, content, oldMd5)
 }
 
@@ -602,6 +616,36 @@ func (n *nacosREST) refreshConfigList() {
 		})
 	}
 	n.configItems = configItems
+}
+
+func (n *nacosREST) encryptConfig(config string) (string, error) {
+	if n.encryptionKey == nil {
+		return config, nil
+	}
+
+	encryptedKeyData, err := utils.AesEncrypt([]byte(config), n.encryptionKey)
+	if err != nil {
+		return "", err
+	}
+	return encryptionMark + base64.URLEncoding.EncodeToString(encryptedKeyData), nil
+}
+
+func (n *nacosREST) decryptConfig(config string) (string, error) {
+	if !strings.HasPrefix(config, encryptionMark) {
+		return config, nil
+	}
+	if n.encryptionKey == nil {
+		return "", errors.New("config data is encrypted, but no data encryption key is provided")
+	}
+	encryptedData, err := base64.URLEncoding.DecodeString(strings.TrimPrefix(config, encryptionMark))
+	if err != nil {
+		return "", err
+	}
+	decryptedData, err := utils.AesDecrypt(encryptedData, n.encryptionKey)
+	if err != nil {
+		return "", err
+	}
+	return string(decryptedData), nil
 }
 
 func calculateMd5(str string) string {
