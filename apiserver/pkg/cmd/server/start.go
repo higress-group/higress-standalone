@@ -18,6 +18,8 @@ package server
 
 import (
 	"fmt"
+	"github.com/alibaba/higress/api-server/pkg/apiserver"
+	"github.com/alibaba/higress/api-server/pkg/options"
 	"github.com/spf13/cobra"
 	"io"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -28,8 +30,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
-	"k8s.io/sample-apiserver/pkg/apiserver"
-	"k8s.io/sample-apiserver/pkg/options"
 	netutils "k8s.io/utils/net"
 	"net"
 )

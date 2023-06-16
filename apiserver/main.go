@@ -19,9 +19,9 @@ package main
 import (
 	"os"
 
+	"github.com/alibaba/higress/api-server/pkg/cmd/server"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/component-base/cli"
-	"k8s.io/sample-apiserver/pkg/cmd/server"
 )
 
 func main() {

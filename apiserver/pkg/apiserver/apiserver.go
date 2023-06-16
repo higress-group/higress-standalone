@@ -18,6 +18,8 @@ package apiserver
 
 import (
 	"fmt"
+	"github.com/alibaba/higress/api-server/pkg/options"
+	"github.com/alibaba/higress/api-server/pkg/registry"
 	hiextensionsv1alpha1 "github.com/alibaba/higress/client/pkg/apis/extensions/v1alpha1"
 	hinetworkingv1 "github.com/alibaba/higress/client/pkg/apis/networking/v1"
 	"github.com/nacos-group/nacos-sdk-go/v2/clients/config_client"
@@ -36,8 +38,6 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	"k8s.io/sample-apiserver/pkg/options"
-	"k8s.io/sample-apiserver/pkg/registry"
 )
 
 const (

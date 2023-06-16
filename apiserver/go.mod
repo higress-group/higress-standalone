@@ -1,6 +1,6 @@
 // This is a generated file. Do not edit directly.
 
-module k8s.io/sample-apiserver
+module github.com/alibaba/higress/api-server
 
 go 1.20
 
@@ -14,6 +14,7 @@ require (
 	k8s.io/apiserver v0.0.0-20230513015010-d63fe3d23489
 	k8s.io/client-go v0.22.2
 	k8s.io/component-base v0.22.2
+	k8s.io/klog/v2 v2.100.1
 	k8s.io/kube-openapi v0.0.0-20230501164219-8b0f38b5fd1f
 	k8s.io/utils v0.0.0-20230313181309-38a27ef9d749
 )
@@ -103,7 +104,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	istio.io/api v0.0.0-20211122181927-8da52c66ff23 // indirect
 	istio.io/gogo-genproto v0.0.0-20211115195057-0e34bdd2be67 // indirect
-	k8s.io/klog/v2 v2.100.1 // indirect
 	k8s.io/kms v0.0.0-20230512172557-898c6804e26a // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.1.2 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
