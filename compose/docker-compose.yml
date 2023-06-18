@@ -111,7 +111,7 @@ services:
       - ./volumes/kube:/home/higress/.kube:ro
 
   pilot:
-    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/pilot:${HIGRESS_PILOT_TAG:-${HIGRESS_TAG:-1.0.0}}
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/pilot:${HIGRESS_PILOT_TAG:-${HIGRESS_TAG:-ac2f0a55454f6368ae085ecf39f5cf21552cd3e1}}
     command:
       - discovery
       - --monitoringAddr=:15014
@@ -146,8 +146,8 @@ services:
       - router
       - --domain
       - higress-system.svc.cluster.local
-      - --proxyLogLevel=debug
-      - --proxyComponentLogLevel=misc:debug
+      - --proxyLogLevel=info
+      - --proxyComponentLogLevel=misc:info
       - --log_output_level=all:debug
       - --serviceCluster=higress-gateway
     profiles: [ "gateway", "full" ]

@@ -251,16 +251,6 @@ EOF
     ]
 }
 EOF
-    JWT_HEADER='{"alg":"RS256","typ":"JWT"}'
-    JWT_EXP=$(date -d "+1 year" +%s)
-    JWT_PAYLOAD="{\"iss\":\"higress\",\"aud\":[\"istio-ca\",\"higress-ca\"],\"sub\":\"system:serviceaccount:higress-system:higress-gateway\",\"exp\":${JWT_EXP}}"
-    JWT_TOKEN_TO_SIGN="$(echo -n "$JWT_HEADER" | base64_urlencode).$(echo -n "$JWT_PAYLOAD" | base64_urlencode)"
-    JWT_SIGN=$(echo -n "$JWT_TOKEN_TO_SIGN" | openssl dgst -sha256 -sign ./jwk-private.pem | base64_urlencode)
-    JWT_TOKEN_SIGNED="${JWT_TOKEN_TO_SIGN}.${JWT_SIGN}"
-    echo -n "$JWT_TOKEN_SIGNED" > jwt.txt
-    sed -i "s/^\(HIGRESS_CONSOLE_CONTROLLER_ACCESS_TOKEN\)=.*$/\1=${JWT_TOKEN_SIGNED}/" $ENV_ROOT/console.env
-    echo "JWT token refreshed. Please restart Higress to enable to the new token."
-    exit 1
   fi
 
   mkdir -p $VOLUMES_ROOT/fileServer/.well-known/ && cd "$_"
