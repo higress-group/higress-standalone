@@ -25,21 +25,6 @@ cd ./compose
 docker compose --profile full up
 ```
 
-稍等片刻后，命令行中会输出以下内容：
-
-```
-compose-initializer-1  | Initializing pilot configurations...
-compose-initializer-1  | JWT token refreshed. Please restart Higress to enable to the new token.
-compose-initializer-1 exited with code 1
-service "initializer" didn't completed successfully: exit 1
-```
-
-如果 Docker Compose 进程在输出上述内容后未自行退出，可按下 CTRL+C 强制退出。随后在命令行下再次执行下方命令。
-
-```bash
-docker compose --profile full up
-```
-
 编辑本机的 hosts 文件，将 `console.higress.io` 域名指向 `127.0.0.1`。
 
 ```
