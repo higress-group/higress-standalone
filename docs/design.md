@@ -31,15 +31,15 @@
 1. Mock K8s API Server + Nacos：为了尽可能的不修改 Higress 的代码，所以我们仍旧保持了使用 K8s API 来进行资源管理的方式。这里参考了 K8s 官方开源的 sample-apiserver 和 apiserver-build-alpha 搭建了一个可以独立运行的“伪” K8s API Server。同时，后端存储也则从 etcd 换成了同为阿里开源配置中心 Nacos。关于配置模型部分，大家可以查阅 [Nacos 配置模型设计](./nacos.md) 文档；
 2. Docker Volumes：Docker Volumes 替换了之前 K8s 内置的 Volume Mount，用来向各个容器下发配置数据。所有的配置数据都会以文件的形式保存在对应的 Volume 中。而这些文件的来源就是另一个新增组件：Initializer；
 3. Initializer：这是个非驻留的容器。在整个系统启动的时候，它会在所有 Higress 组件前启动，负责初始化 Nacos 和各个 Volume 中的数据，包括 API Server 所使用的证书、访问 K8s API 所使用的 kubeconfig 文件、Pilot 的 Root Cert 和 CA Cert、各种 JWT Token 以及 Nacos 中的基础配置等等。在完成以上初始化工作后，它就会退出；
-4. File Server：这是一个很奇怪的组件。在部署在 K8s 中时，JWT Token 的认证是通过访问K8s API 来完成。目前我们的 K8s API 暂时还不具备这一功能，而且 JWT Token 的下发也不是由 K8s 基础设施完成的，所以我们为 Pilot 选择了一个不依赖 K8s API 的 Token 认证方式，也就是通过一个外部传入的 JWK 来进行认证。但这个 JWK 并不支持静态配置到环境变量或文件中，必须通过一个 URL 来运行时加载。所以 Initializer 会将这组 JWK 数据保存在一个 Docker Volume 中。这个 Volume 会挂载到 File Server 上。这样 Pilot 就可以访问 File Server 来拿到这组 JWK 了；
-5. ~~Pilot Token~~：这个 Pilot Token 说的不是右上角给 Console 使用的，而是正上方 Gateway 原本使用的。这个 Token 会用在 Gateway 像 Pilot 申请证书时。但这一部分的认证机制目前暂时还没有完全研究透。所以 Gateway 和 Pilot 之前见的 xDS 通信从之前的 HTTPS 协议改为了 HTTP 协议。这样就不再需要申请证书了，所以也就不需要挂载这个 Token 了。
+4. ~~Pilot Token~~：图中一共有两个 Pilot Token
+    1. Gateway 使用 Pilot Token 用来从 Pilot 获取请求 xDS 所需的客户端证书。由于在独立版中，这一证书由 Initializer 负责生成，所以 Gateway 中的证书申请功能已被关闭，自然也就不再需要这个 Token了；
+    2. 在 K8s 中，Console 在请求 Pilot 的 debug 接口时需要传递一个 Token 进行认证。在独立班中，Pilot 的 debug 接口认证功能已被关闭，所以就不再需要这个 Token了。
 
 ## 代码结构
 
 - apiserver：Mock K8s API Server 的代码
 - compose：Docker Compose 配置目录
   - env：保存各个容器的环境变量配置
-  - fileServer：保存 File Server 的容器配置
   - initContainer：保存 Initializer 的容器配置
 
 ## 参考资料
