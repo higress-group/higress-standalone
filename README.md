@@ -46,4 +46,4 @@ docker compose --profile full up
 - Secret 数据在加密后再保存到 Nacos - 已完成
 - API Server 对接日志框架 - 已完成
 - 对接可观测性组件 - 部分完成（已支持采集请求指标，暂不支持采集服务器指标，如 CPU、内存等）
-- Gateway 和 Pilot 之间的 xDS 通信启用 mTLS
+- Gateway 和 Pilot 之间的 xDS 通信启用 mTLS - 已完成
