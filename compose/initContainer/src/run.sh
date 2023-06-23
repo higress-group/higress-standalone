@@ -231,29 +231,6 @@ EOF
     chmod a+r gateway-key.pem
   fi
 
-  if [ ! -f jwk-private.pem ] || [ ! -f jwk-public.pem ]
-  then
-    openssl genrsa -out jwk-private.pem $RSA_KEY_LENGTH > /dev/null && openssl rsa -in jwk-private.pem -out jwk-public.pem -pubout -outform PEM > /dev/null 2>&1
-    check_exit_code "Generating key-pairs for JWK fails with $?"
-    MOD=$(openssl rsa -pubin -in ./jwk-public.pem -noout --modulus | cut -c 9- | xxd -r -p | base64_urlencode)
-    EXP=$(printf "%06x" $(openssl rsa -pubin -in jwk-public.pem -noout -text | sed -n 's/Exponent:\s\+\([[:digit:]]\+\)\s\+(0x[[:digit:]]\+)/\1/p') | xxd -r -p | base64_urlencode)
-    cat <<EOF > jwks.json
-{
-    "keys": [
-        {
-            "kty": "RSA",
-            "n": "${MOD}",
-            "e": "${EXP}",
-            "kid": "higress-pilot-jwk"
-        }
-    ]
-}
-EOF
-  fi
-
-  mkdir -p $VOLUMES_ROOT/fileServer/.well-known/ && cd "$_"
-  cp $VOLUMES_ROOT/pilot/cacerts/jwks.json ./jwks.json
-
   mkdir -p $VOLUMES_ROOT/pilot/config && cd "$_"
   if [ ! -f ./mesh ]
   then

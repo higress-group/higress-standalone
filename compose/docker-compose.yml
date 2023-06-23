@@ -43,15 +43,6 @@ services:
       - ./volumes:/mnt/volumes
       - ./env:/mnt/env
 
-  fileserver:
-    build:
-      context: ./fileServer
-    profiles: [ "apiserver", "controller", "pilot", "gateway", "full" ]
-    networks:
-      - higress-net
-    volumes:
-      - ./volumes/fileServer:/home/static
-
   apiserver:
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/api-server:${HIGRESS_API_SERVER_TAG:-0.0.3}
     command:
