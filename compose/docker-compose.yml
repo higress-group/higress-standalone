@@ -120,6 +120,8 @@ services:
       - cluster.local
       - --keepaliveMaxServerConnectionAge
       - 30m
+      - --caCertFile
+      - /etc/cacerts/ca-cert.pem
     profiles: [ "pilot", "gateway", "full" ]
     depends_on:
       controller:

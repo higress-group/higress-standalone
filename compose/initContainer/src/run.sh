@@ -178,8 +178,7 @@ EOF
     cat <<EOF > ca.cfg
 [req]
 distinguished_name = req_distinguished_name
-x509_extensions = v3_req
-copy_extensions = copy
+req_extensions = v3_req
 prompt = no
 
 [req_distinguished_name]
@@ -211,7 +210,7 @@ EOF
     cat <<EOF > gateway.cfg
 [req]
 distinguished_name = req_distinguished_name
-x509_extensions = v3_req
+req_extensions = v3_req
 prompt = no
 
 [req_distinguished_name]
@@ -227,10 +226,9 @@ subjectAltName = URI:spiffe://cluster.local/ns/higress-system/sa/higress-gateway
 EOF
     openssl genrsa -out gateway-key.pem $RSA_KEY_LENGTH > /dev/null \
       && openssl req -new -key gateway-key.pem -out gateway-cert.csr -config gateway.cfg -batch -sha256 > /dev/null 2>&1 \
-      && openssl x509 -req -days 365 -in gateway-cert.csr -sha256 -CA ca-cert.pem -CAkey ca-key.pem -CAcreateserial -out gateway-cert.pem > /dev/null 2>&1
+      && openssl x509 -req -days 365 -in gateway-cert.csr -sha256 -CA ca-cert.pem -CAkey ca-key.pem -CAcreateserial -out gateway-cert.pem -extensions v3_req -extfile gateway.cfg > /dev/null 2>&1
     check_exit_code "Generating certificate for gateway fails with $?"
     chmod a+r gateway-key.pem
-    # rm ./*csr > /dev/null
   fi
 
   if [ ! -f jwk-private.pem ] || [ ! -f jwk-public.pem ]
@@ -268,8 +266,7 @@ configSources:
 - address: xds://controller:15051
 defaultConfig:
   disableAlpnH2: true
-  discoveryAddress: pilot:15010
-  controlPlaneAuthPolicy: 0
+  discoveryAddress: pilot:15012
   proxyStatsMatcher:
     inclusionRegexps:
     - .*
