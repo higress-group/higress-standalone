@@ -309,6 +309,8 @@ metadata:
   creationTimestamp: "$(now)"
   name: higress-console
   namespace: higress-system
+data:
+  mode: standalone
 EOF
   publish_nacos_config_if_absent "higress-system" "configmaps.higress-console" "$content"
 
