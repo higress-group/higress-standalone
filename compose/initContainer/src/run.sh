@@ -3,9 +3,9 @@
 BASE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 VOLUMES_ROOT="/mnt/volumes"
-ENV_ROOT="/mnt/env"
 RSA_KEY_LENGTH=4096
 
+NACOS_HOST=nacos
 NACOS_NAMESPACE_ID="higress-system"
 CONSOLE_DOMAIN="console.higress.io"
 
@@ -26,10 +26,11 @@ check_exit_code() {
   fi
 }
 
+
 check_nacos_config_exists() {
   # $1 group
   # $2 dataId
-  statusCode = $(curl -s -o /dev/null -w "%{http_code}" "http://nacos:8848/nacos/v1/cs/configs?tenant=${NACOS_NAMESPACE_ID}&dataId=$2&group=$1")
+  statusCode = $(curl -s -o /dev/null -w "%{http_code}" "http://${nacosHost}:8848/nacos/v1/cs/configs?tenant=${NACOS_NAMESPACE_ID}&dataId=$2&group=$1")
   if [ $statusCode -eq 200 ]; then
     return 0
   elif [ $statusCode -eq 404 ]; then
@@ -39,8 +40,6 @@ check_nacos_config_exists() {
     exit $statusCode
   fi
 }
-
-nacosHost=nacos
 
 publish_nacos_config_if_absent() {
   # $1 group
