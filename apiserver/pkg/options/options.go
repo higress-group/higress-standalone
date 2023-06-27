@@ -32,32 +32,24 @@ func (o *NacosOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 
 	fs.StringSliceVar(&o.ServerHttpUrls, "nacos-server", []string{}, ""+
-		"Per-resource etcd servers overrides, comma separated. The individual override "+
-		"format: group/resource#servers, where servers are URLs, semicolon separated. "+
-		"Note that this applies only to resources compiled into this server binary. ")
+		"URL of Nacos service. e.g.: http://localhost:8848/nacos")
 	fs.StringVar(&o.Username, "nacos-username", "", ""+
-		"The media type to use to store objects in storage. "+
-		"Some resources or storage backends may only support a specific media type and will ignore this setting. "+
-		"Supported media types: [application/json, application/yaml, application/vnd.kubernetes.protobuf]")
+		"The username used to access Nacos service. Leave it empty if authentication isn't enabled in Nacos.")
 	fs.StringVar(&o.Password, "nacos-password", "", ""+
-		"The media type to use to store objects in storage. "+
-		"Some resources or storage backends may only support a specific media type and will ignore this setting. "+
-		"Supported media types: [application/json, application/yaml, application/vnd.kubernetes.protobuf]")
+		"The password used to access Nacos service. Leave it empty if authentication isn't enabled in Nacos.")
 	fs.StringVar(&o.NamespaceId, "nacos-ns-id", "", ""+
-		"The media type to use to store objects in storage. "+
-		"Some resources or storage backends may only support a specific media type and will ignore this setting. "+
-		"Supported media types: [application/json, application/yaml, application/vnd.kubernetes.protobuf]")
+		"The namespace ID which Higress configurations are stored in. "+
+		"It is recommended to give Higress a separate namespace for a better isolation.")
 	fs.Uint64Var(&o.TimeoutMs, "nacos-timeout", 5000,
-		"Number of workers spawned for DeleteCollection call. These are used to speed up namespace cleanup.")
+		"The timeout in milliseconds when trying to read data from Nacos server.")
 	fs.StringVar(&o.EncryptionKeyFile, "nacos-encryption-key-file", "",
-		"A file containing AES key data used for data encryption. The file length must be 16, 24 or 32 bytes. If not set, data encryption will be disabled.")
+		"A file containing AES key data used for data encryption. The file length must be 16, 24 or 32 bytes. "+
+			"If not set, data encryption will be disabled.")
 
 	fs.StringVar(&o.LogDir, "nacos-log-dir", "/tmp/nacos/log", ""+
-		"Enables the generic garbage collector. MUST be synced with the corresponding flag "+
-		"of the kube-controller-manager.")
+		"Directory to store Nacos logs.")
 	fs.StringVar(&o.CacheDir, "nacos-cache-dir", "/tmp/nacos/cache", ""+
-		"Enables the generic garbage collector. MUST be synced with the corresponding flag "+
-		"of the kube-controller-manager.")
+		"Directory to store Nacos cache data.")
 }
 
 func (o *NacosOptions) Validate() []error {
