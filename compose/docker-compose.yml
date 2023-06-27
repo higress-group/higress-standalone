@@ -3,17 +3,11 @@ version: '3.9'
 networks:
   higress-net:
     external: false
-    ipam:
-      driver: default
-      config:
-        - subnet: 172.28.0.0/16
-          ip_range: 172.28.5.0/24
-          gateway: 172.28.5.254
 
 services:
   nacos:
     image: nacos/nacos-server:${NACOS_SERVER_TAG:-v2.2.3}
-    profiles: [ "nacos", "apiserver", "controller", "pilot", "gateway", "full" ]
+    profiles: [ "nacos" ]
     env_file:
       - ./env/nacos.env
     networks:
@@ -31,20 +25,38 @@ services:
     restart: always
 
   initializer:
-    build:
-      context: ./initContainer
-    profiles: [ "apiserver", "controller", "pilot", "gateway", "full" ]
-    depends_on:
-      nacos:
-        condition: service_healthy
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/runner:${HIGRESS_RUNNER_TAG}
+    command:
+      - ./init.sh
+    profiles: [ "init" ]
+    environment:
+      - NACOS_SERVER_URL
+      - NACOS_NS
+      - NACOS_USERNAME
+      - NACOS_PASSWORD
     networks:
       - higress-net
     volumes:
       - ./volumes:/mnt/volumes
-      - ./env:/mnt/env
+      - ./scripts:/workspace
+
+  precheck:
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/runner:${HIGRESS_RUNNER_TAG}
+    command:
+      - ./precheck.sh
+    environment:
+      - NACOS_SERVER_URL
+      - NACOS_NS
+      - NACOS_USERNAME
+      - NACOS_PASSWORD
+    networks:
+      - higress-net
+    volumes:
+      - ./volumes:/mnt/volumes:ro
+      - ./scripts:/workspace:ro
 
   apiserver:
-    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/api-server:${HIGRESS_API_SERVER_TAG:-0.0.3}
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/api-server:${HIGRESS_API_SERVER_TAG}
     command:
       - --secure-port
       - "8443"
@@ -55,16 +67,17 @@ services:
       - --tls-private-key-file
       - /etc/api/server.key
       - --nacos-server
-      - http://nacos:8848/nacos
+      - ${NACOS_SERVER_URL}
+      - --nacos-username
+      - "${NACOS_USERNAME}"
+      - --nacos-password
+      - "${NACOS_PASSWORD}"
       - --nacos-ns-id
-      - higress-system
+      - "${NACOS_NS}"
       - --nacos-encryption-key-file
       - /etc/api/nacos.key
-    profiles: [ "apiserver", "controller", "pilot", "gateway", "full" ]
     depends_on:
-      nacos:
-        condition: service_healthy
-      initializer:
+      precheck:
         condition: service_completed_successfully
     networks:
       - higress-net
@@ -78,15 +91,13 @@ services:
       - ./volumes/api:/etc/api:ro
 
   controller:
-    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress:${HIGRESS_CONTROLLER_TAG:-1.0.0}
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress:${HIGRESS_CONTROLLER_TAG}
     command:
       - serve
       - --kubeconfig=/home/higress/.kube/config
       - --gatewaySelectorKey=higress
       - --gatewaySelectorValue=higress-gateway
       - --ingressClass=higress
-      - --debug=true
-    profiles: [ "controller", "pilot", "gateway", "full" ]
     depends_on:
       apiserver:
         condition: service_healthy
@@ -102,18 +113,17 @@ services:
       - ./volumes/kube:/home/higress/.kube:ro
 
   pilot:
-    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/pilot:${HIGRESS_PILOT_TAG:-${HIGRESS_TAG:-ac2f0a55454f6368ae085ecf39f5cf21552cd3e1}}
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/pilot:${HIGRESS_PILOT_TAG}
     command:
       - discovery
       - --monitoringAddr=:15014
-      - --log_output_level=default:debug
+      - --log_output_level=default:info
       - --domain
       - cluster.local
       - --keepaliveMaxServerConnectionAge
       - 30m
       - --caCertFile
       - /etc/cacerts/ca-cert.pem
-    profiles: [ "pilot", "gateway", "full" ]
     depends_on:
       controller:
         condition: service_healthy
@@ -133,17 +143,16 @@ services:
       - ./volumes/pilot/config:/etc/istio/config:ro
 
   gateway:
-    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/gateway:${HIGRESS_GATEWAY_TAG:-${HIGRESS_TAG:-1.0.0}}
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/gateway:${HIGRESS_GATEWAY_TAG}
     command:
       - proxy
       - router
       - --domain
       - higress-system.svc.cluster.local
-      - --proxyLogLevel=info
-      - --proxyComponentLogLevel=misc:info
-      - --log_output_level=all:debug
+      - --proxyLogLevel=warning
+      - --proxyComponentLogLevel=misc:error
+      - --log_output_level=all:info
       - --serviceCluster=higress-gateway
-    profiles: [ "gateway", "full" ]
     env_file:
       - ./env/gateway.env
     depends_on:
@@ -155,75 +164,27 @@ services:
     ports:
       - "${GATEWAY_HTTP_PORT:-80}:80/tcp"
       - "${GATEWAY_HTTPS_PORT:-443}:443/tcp"
-    volumes:
-      - ./volumes/pilot/config:/etc/istio/config:ro
-      - ./volumes/gateway/certs:/etc/certs:ro
-      - ./volumes/gateway/podinfo:/etc/istio/pod:po
-
-  console:
-    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/console:${HIGRESS_CONSOLE_TAG:-${HIGRESS_TAG:-1.0.1}}
-    profiles: [ "console", "full" ]
-    env_file:
-      - ./env/console.env
-    depends_on:
-      initializer:
-        condition: service_completed_successfully
-    networks:
-      higress-net:
-        ipv4_address: 172.28.5.100
-    restart: on-failure
-    volumes:
-      - ./volumes/kube:/home/higress/.kube:ro
-
-  prometheus:
-    image: prom/prometheus:${PROMETHEUS_TAG:-v2.40.7}
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--web.external-url=/prometheus"
-      - "--storage.tsdb.path=/prometheus"
-      - "--storage.tsdb.retention=6h"
-    profiles: [ "prom", "o11y", "full" ]
-    env_file:
-      - ./env/prometheus.env
-    depends_on:
-      pilot:
-        condition: service_healthy
-    networks:
-      higress-net:
-        ipv4_address: 172.28.5.101
-    ports:
-      - "${PROMETHUES_PORT:-19090}:9090/tcp"
-    restart: on-failure
-    volumes:
-      - ./volumes/prometheus/config:/etc/prometheus:rw
-      - ./volumes/prometheus/data:/prometheus:rw
-
-  grafana:
-    image: grafana/grafana:${GRAFANA_TAG:-9.3.6}
-    profiles: [ "grafana", "o11y", "full" ]
-    env_file:
-      - ./env/grafana.env
-    depends_on:
-      pilot:
-        condition: service_healthy
-    networks:
-      higress-net:
-        ipv4_address: 172.28.5.102
-    ports:
-      - "${GRAFANA_PORT:-13000}:3000/tcp"
-    restart: on-failure
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://127.0.0.1:3000/robots.txt" ]
+      test: [ "CMD", "curl", "-fk", "http://127.0.0.1:15021/healthz/ready" ]
       interval: 1s
       timeout: 3s
       retries: 60
     volumes:
-      - ./volumes/grafana/config:/etc/grafana:rw
-      - ./volumes/grafana/data:/var/lib/grafana:rw
+      - ./volumes/pilot/config:/etc/istio/config:ro
+      - ./volumes/gateway/certs:/etc/certs:ro
+      - ./volumes/gateway/podinfo:/etc/istio/pod:ro
 
-  echoserver:
-    image: mendhak/http-https-echo:29
-    profiles: [ "gateway", "full" ]
+  console:
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/console:${HIGRESS_CONSOLE_TAG}
+    env_file:
+      - ./env/console.env
+    depends_on:
+      controller:
+        condition: service_healthy
     networks:
-      higress-net:
-        ipv4_address: 172.28.5.150
+      - higress-net
+    ports:
+      - "${CONSOLE_PORT:-8080}:8080/tcp"
+    restart: on-failure
+    volumes:
+      - ./volumes/kube:/home/higress/.kube:ro

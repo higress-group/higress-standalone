@@ -21,17 +21,10 @@ docker compose
 克隆本项目仓库后，在命令行中执行以下命令：
 
 ```bash
-cd ./compose
-docker compose --profile full up
+./bin/startup.sh
 ```
 
-编辑本机的 hosts 文件，将 `console.higress.io` 域名指向 `127.0.0.1`。
-
-```
-127.0.0.1 console.higress.io
-```
-
-在浏览器中打开 [http://console.higress.io/](http://console.higress.io/) ，并使用 admin 作为用户名和密码进行登录，即可正常通过 Higress Console 操作 Higress 的路由配置。所有配置的域名均需要先通过 hosts 文件将其强制解析至 127.0.0.1 再进行访问。
+在浏览器中打开 [http://localhost:8080/](http://localhost:8080/) ，并使用 admin 作为用户名和密码进行登录，即可正常通过 Higress Console 操作 Higress 的路由配置。所有配置的域名均需要先通过 hosts 文件将其强制解析至 127.0.0.1 再进行访问。
 
 有关 Higress 自身的详细使用方法，请查看 [Higress 官网](http://higress.io/)。
 ## 设计文档

@@ -5,9 +5,8 @@ BASE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 VOLUMES_ROOT="/mnt/volumes"
 RSA_KEY_LENGTH=4096
 
-NACOS_HOST=nacos
-NACOS_NAMESPACE_ID="higress-system"
-CONSOLE_DOMAIN="console.higress.io"
+NACOS_SERVER_URL=${NACOS_SERVER_URL%/}
+NACOS_ACCESS_TOKEN=""
 
 now() {
   echo "$(date --utc +%Y-%m-%dT%H:%M:%SZ)"
@@ -26,18 +25,17 @@ check_exit_code() {
   fi
 }
 
-
 check_nacos_config_exists() {
   # $1 group
   # $2 dataId
-  statusCode = $(curl -s -o /dev/null -w "%{http_code}" "http://${nacosHost}:8848/nacos/v1/cs/configs?tenant=${NACOS_NAMESPACE_ID}&dataId=$2&group=$1")
+  statusCode=$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v1/cs/configs?accessToken=${NACOS_ACCESS_TOKEN}&tenant=${NACOS_NS}&dataId=$2&group=$1")
   if [ $statusCode -eq 200 ]; then
     return 0
   elif [ $statusCode -eq 404 ]; then
     return -1
   else
-    echo ${1:-"  Checking config $1/$2 in namespace ${NACOS_NAMESPACE_ID} failed with $retVal"}
-    exit $statusCode
+    echo ${1:-"  Checking config $1/$2 in namespace ${NACOS_NS} failed with $retVal"}
+    exit -1
   fi
 }
 
@@ -45,35 +43,64 @@ publish_nacos_config_if_absent() {
   # $1 group
   # $2 dataId
   # $3 content
-  statusCode=$(curl -s -o /dev/null -w "%{http_code}" "http://${nacosHost}:8848/nacos/v1/cs/configs?tenant=${NACOS_NAMESPACE_ID}&dataId=$2&group=$1")
+  statusCode=$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v1/cs/configs?accessToken=${NACOS_ACCESS_TOKEN}&tenant=${NACOS_NS}&dataId=$2&group=$1")
   if [ $statusCode -eq 200 ]; then
-    echo "  Config $1/$2 already exists in namespace ${NACOS_NAMESPACE_ID}"
+    echo "  Config $1/$2 already exists in namespace ${NACOS_NS}"
     return 0
   elif [ $statusCode -ne 404 ]; then
-    echo "  Checking config $1/$2 in tenant ${NACOS_NAMESPACE_ID} failed with $statusCode"
-    exit $statusCode
+    echo "  Checking config $1/$2 in tenant ${NACOS_NS} failed with $statusCode"
+    exit -1
   fi
 
-  statusCode="$(curl -s -o /dev/null -w "%{http_code}" "http://${nacosHost}:8848/nacos/v1/cs/configs" --data-urlencode "tenant=${NACOS_NAMESPACE_ID}" --data-urlencode "dataId=$2" --data-urlencode "group=$1" --data-urlencode "content=$3")"
+  statusCode="$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v1/cs/configs?accessToken=${NACOS_ACCESS_TOKEN}" --data-urlencode "tenant=${NACOS_NS}" --data-urlencode "dataId=$2" --data-urlencode "group=$1" --data-urlencode "content=$3")"
   if [ $statusCode -ne 200 ]; then
-    echo "  Publishing config $1/$2 in tenant ${NACOS_NAMESPACE_ID} failed with $statusCode"
-    exit $statusCode
+    echo "  Publishing config $1/$2 in tenant ${NACOS_NS} failed with $statusCode"
+    exit -1 
   fi
   return 0
 }
 
 initializeNacos() {
+  nacosReady=false
+
+  maxWaitTime=180
+  for (( i = 0; i < $maxWaitTime; i++ ))
+  do
+    statusCode=$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/")
+    if [ "$statusCode" -eq "200" ]; then
+      nacosReady=true
+      echo "Nacos is ready."
+      break
+    fi
+    echo "Waiting for Nacos to get ready..."
+    sleep 1 
+  done
+
+  if [ "${nacosReady}" != "true" ]; then
+    echo "Nacos server doesn't get ready within ${maxWaitTime} seconds. Initialization failed."
+    exit -1 
+  fi
+
   echo "Initializing Nacos server..."
-  if grep -q "\"namespace\":\"${NACOS_NAMESPACE_ID}\"" <<< "$(curl -s "http://${nacosHost}:8848/nacos/v1/console/namespaces")"; then
-    echo "  Namespace ${NACOS_NAMESPACE_ID} already exists in nacos"
+
+  if [ -n "$NACOS_USERNAME" ] && [ -n "$NACOS_PASSWORD" ]; then
+    NACOS_ACCESS_TOKEN="$(curl -s "${NACOS_SERVER_URL}/v1/auth/login" -X POST --data-urlencode "username=${NACOS_USERNAME}" --data-urlencode "password=${NACOS_PASSWORD}" | jq -rM '.accessToken')";
+    if [ -z "$NACOS_ACCESS_TOKEN" ]; then
+      echo "  Unable to retrieve access token from Nacos."
+      exit -1 
+    fi
+  fi
+
+  if grep -q "\"namespace\":\"${NACOS_NS}\"" <<< "$(curl -s "${NACOS_SERVER_URL}/v1/console/namespaces?accessToken=${NACOS_ACCESS_TOKEN}")"; then
+    echo "  Namespace ${NACOS_NS} already exists in Nacos."
     return 0
   fi
 
-  echo " Creating namespace ${NACOS_NAMESPACE_ID}..."
-  statusCode="$(curl -s -o /dev/null -w "%{http_code}" "http://${nacosHost}:8848/nacos/v1/console/namespaces" --data-urlencode "customNamespaceId=${NACOS_NAMESPACE_ID}" --data-urlencode "namespaceName=${NACOS_NAMESPACE_ID}")"
+  echo "  Creating namespace ${NACOS_NS}..."
+  statusCode="$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v1/console/namespaces?accessToken=${NACOS_ACCESS_TOKEN}" --data-urlencode "customNamespaceId=${NACOS_NS}" --data-urlencode "namespaceName=${NACOS_NS}")"
   if [ $statusCode -ne 200 ]; then
-    echo "  Creating namespace ${NACOS_NAMESPACE_ID} in nacos failed with $statusCode"
-    exit $statusCode
+    echo "  Creating namespace ${NACOS_NS} in nacos failed with $statusCode."
+    exit -1
   fi
   return 0
 }
@@ -84,16 +111,14 @@ initializeApiServer() {
   mkdir -p "$VOLUMES_ROOT/api" && cd "$_"
   check_exit_code "Creating volume for API server fails with $?"
 
-  if [ ! -f ca.key ] || [ ! -f ca.crt ]
-  then
+  if [ ! -f ca.key ] || [ ! -f ca.crt ]; then
     echo "  Generating CA certificate...";
     openssl req -nodes -new -x509 -keyout ca.key -out ca.crt -subj "/CN=higress-root-ca/O=higress" > /dev/null 2>&1
     check_exit_code "  Generating CA certificate for API server fails with $?";
   else
     echo "  CA certificate already exists.";
   fi
-  if [ ! -f server.key ] || [ ! -f server.crt ]
-  then
+  if [ ! -f server.key ] || [ ! -f server.crt ]; then
     echo "  Generating server certificate..."
     openssl req -out server.csr -new -newkey rsa:$RSA_KEY_LENGTH -nodes -keyout server.key -subj "/CN=higress-api-server/O=higress" > /dev/null 2>&1 \
       && openssl x509 -req -days 365 -in server.csr -CA ca.crt -CAkey ca.key -set_serial 01 -sha256 -out server.crt > /dev/null 2>&1
@@ -101,15 +126,13 @@ initializeApiServer() {
   else
     echo "  Server certificate already exists.";
   fi
-  if [ ! -f nacos.key ]
-  then
+  if [ ! -f nacos.key ]; then
     echo "  Generating data encryption key..."
     cat /dev/urandom | tr -dc '[:graph:]' | head -c 32 > nacos.key
   else
     echo "  Client certificate already exists.";
   fi
-  if [ ! -f client.key ] || [ ! -f client.crt ]
-  then
+  if [ ! -f client.key ] || [ ! -f client.crt ]; then
     echo "  Generating client certificate..."
     openssl req -out client.csr -new -newkey rsa:$RSA_KEY_LENGTH -nodes -keyout client.key -subj "/CN=higress/O=system:masters" > /dev/null 2>&1 \
       && openssl x509 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 02 -sha256 -out client.crt > /dev/null 2>&1
@@ -121,8 +144,7 @@ initializeApiServer() {
   CLIENT_CERT=$(cat client.crt | base64 -w 0)
   CLIENT_KEY=$(cat client.key | base64 -w 0)
 
-  if [ ! -f $VOLUMES_ROOT/kube/config ]
-  then
+  if [ ! -f $VOLUMES_ROOT/kube/config ]; then
     echo "  Generating kubeconfig..."
     mkdir -p $VOLUMES_ROOT/kube
     cat <<EOF > $VOLUMES_ROOT/kube/config
@@ -156,8 +178,7 @@ initializePilot() {
 
   mkdir -p $VOLUMES_ROOT/pilot/cacerts && cd "$_"
 
-  if [ ! -f root-key.pem ] || [ ! -f root-cert.pem ]
-  then
+  if [ ! -f root-key.pem ] || [ ! -f root-cert.pem ]; then
     openssl req -newkey rsa:$RSA_KEY_LENGTH -nodes -keyout root-key.pem -x509 -days 36500 -out root-cert.pem > /dev/null 2>&1 <<EOF
 CN
 Shanghai
@@ -172,8 +193,7 @@ EOF
     check_exit_code "  Generating Root CA certificate for pilot fails with $?"
   fi
 
-  if [ ! -f ca-key.pem ] || [ ! -f ca-cert.pem ]
-  then
+  if [ ! -f ca-key.pem ] || [ ! -f ca-cert.pem ]; then
     cat <<EOF > ca.cfg
 [req]
 distinguished_name = req_distinguished_name
@@ -204,8 +224,7 @@ EOF
     rm ./*csr > /dev/null
   fi
 
-  if [ ! -f gateway-key.pem ] || [ ! -f gateway-cert.pem ]
-  then
+  if [ ! -f gateway-key.pem ] || [ ! -f gateway-cert.pem ]; then
     cat <<EOF > gateway.cfg
 [req]
 distinguished_name = req_distinguished_name
@@ -231,8 +250,7 @@ EOF
   fi
 
   mkdir -p $VOLUMES_ROOT/pilot/config && cd "$_"
-  if [ ! -f ./mesh ]
-  then
+  if [ ! -f ./mesh ]; then
   cat <<EOF > ./mesh
 accessLogEncoding: TEXT
 accessLogFile: /dev/stdout
@@ -255,8 +273,7 @@ rootNamespace: higress-system
 trustDomain: cluster.local
 EOF
   fi
-  if [ ! -f ./meshNetworks ]
-  then
+  if [ ! -f ./meshNetworks ]; then
 cat <<EOF > ./meshNetworks
 networks: {}
 EOF
@@ -287,6 +304,7 @@ metadata:
   namespace: higress-system
 data:
   mode: standalone
+  login.prompt: "Username: admin  Default Password: $(base64 -d <<< "YWRtaW4=")"
 EOF
   publish_nacos_config_if_absent "higress-system" "configmaps.higress-console" "$content"
 
@@ -308,175 +326,8 @@ EOF
   publish_nacos_config_if_absent "higress-system" "secrets.higress-console" "$content"
 }
 
-intializePrometheus() {
-  mkdir -p $VOLUMES_ROOT/prometheus && cd "$_"
-
-  mkdir -p ./config
-  if [ ! -f ./config/prometheus.yml ]
-  then
-  cat <<EOF > ./config/prometheus.yml
-global:
-  scrape_interval:     15s 
-  evaluation_interval: 15s
-scrape_configs:
-  - job_name: 'prometheus'
-    metrics_path: /prometheus/metrics
-    static_configs:
-    - targets: ['localhost:9090']
-  - job_name: 'gateway_container'
-    metrics_path: /stats/prometheus
-    static_configs:
-    - targets: ['gateway:15020']
-EOF
-  fi
-
-  mkdir -p ./data
-  chmod a+w ./data
-}
-
-initializeGrafana() {
-  mkdir -p $VOLUMES_ROOT/grafana && cd "$_"
-
-  mkdir -p ./config
-  if [ ! -f ./config/grafana.ini ]
-  then
-  cat <<EOF > ./config/grafana.ini
-[server]
-protocol=http
-domain=localhost
-root_url="%(protocol)s://%(domain)s/grafana"
-serve_from_sub_path=true
-
-[auth]
-disable_login_form=true
-disable_signout_menu=true
-
-[auth.anonymous]
-enabled=true
-org_name=Main Org.
-org_role=Viewer
-
-[users]
-default_theme=light
-
-[security]
-allow_embedding=true
-EOF
-  fi
-
-  mkdir -p ./data
-  chmod a+w ./data
-}
-
-initializeIngresses() {
-  read -r -d '' content << EOF
-apiVersion: networking.higress.io/v1
-kind: McpBridge
-metadata:
-  creationTimestamp: "$(now)"
-  name: default
-  namespace: higress-system
-spec:
-  registries:
-  - domain: 172.28.5.100:8080
-    name: higress-console
-    port: 80
-    type: static
-  - domain: 172.28.5.101:9090
-    name: higress-console-prometheus
-    port: 80
-    type: static
-  - domain: 172.28.5.102:3000
-    name: higress-console-grafana
-    port: 80
-    type: static
-EOF
-  publish_nacos_config_if_absent "higress-system" "mcpbridges.default" "$content"
-
-  read -r -d '' content << EOF
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  annotations:
-    higress.io/destination: higress-console.static
-    higress.io/ignore-path-case: "false"
-  creationTimestamp: "$(now)"
-  name: higress-console
-  namespace: higress-system
-spec:
-  ingressClassName: higress
-  rules:
-  - host: ${CONSOLE_DOMAIN}
-    http:
-      paths:
-      - backend:
-          resource:
-            apiGroup: networking.higress.io
-            kind: McpBridge
-            name: default
-        path: /
-        pathType: Prefix
-EOF
-  publish_nacos_config_if_absent "higress-system" "ingresses.higress-console" "$content"
-
-  read -r -d '' content << EOF
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  annotations:
-    higress.io/destination: higress-console-prometheus.static
-    higress.io/ignore-path-case: "false"
-  creationTimestamp: "$(now)"
-  name: higress-console-prometheus
-  namespace: higress-system
-spec:
-  ingressClassName: higress
-  rules:
-  - host: ${CONSOLE_DOMAIN}
-    http:
-      paths:
-      - backend:
-          resource:
-            apiGroup: networking.higress.io
-            kind: McpBridge
-            name: default
-        path: /prometheus
-        pathType: Prefix
-EOF
-  publish_nacos_config_if_absent "higress-system" "ingresses.higress-console-prometheus" "$content"
-
-  read -r -d '' content << EOF
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  annotations:
-    higress.io/destination: higress-console-grafana.static
-    higress.io/ignore-path-case: "false"
-  creationTimestamp: "$(now)"
-  name: higress-console-grafana
-  namespace: higress-system
-spec:
-  ingressClassName: higress
-  rules:
-  - host: ${CONSOLE_DOMAIN}
-    http:
-      paths:
-      - backend:
-          resource:
-            apiGroup: networking.higress.io
-            kind: McpBridge
-            name: default
-        path: /grafana
-        pathType: Prefix
-EOF
-  publish_nacos_config_if_absent "higress-system" "ingresses.higress-console-grafana" "$content"
-}
-
 initializeNacos
 initializeApiServer
 initializePilot
 initializeGateway
 initializeConsole
-intializePrometheus
-initializeGrafana
-initializeIngresses

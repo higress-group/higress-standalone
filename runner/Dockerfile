@@ -2,10 +2,8 @@ FROM docker.io/ubuntu
 
 WORKDIR /workspace
 
-COPY ./src/ ./
-
 RUN apt-get update \
-  && apt-get install -y curl openssl xxd \
+  && apt-get install -y curl openssl xxd jq \
   && rm -rf /var/lib/apt/lists/*
 
-ENTRYPOINT [ "/bin/bash", "./run.sh" ]
+ENTRYPOINT [ "/bin/bash" ]
