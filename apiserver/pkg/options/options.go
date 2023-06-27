@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type NacosOptions struct {
@@ -140,9 +141,13 @@ func (o *NacosOptions) CreateConfigClient() (config_client.IConfigClient, error)
 		} else {
 			port = 80
 		}
+		path := serverUrl.Path
+		if strings.HasSuffix(path, "/") {
+			path = path[:len(path)-1]
+		}
 		serverConfig := constant.ServerConfig{
 			IpAddr:      serverUrl.Hostname(),
-			ContextPath: serverUrl.Path,
+			ContextPath: path,
 			Port:        port,
 			Scheme:      serverUrl.Scheme,
 		}
