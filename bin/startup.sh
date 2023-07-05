@@ -1,7 +1,9 @@
 #! /bin/bash
 
-ROOT=$(dirname $(dirname "$(readlink -f "$0")"))
+cd "$(dirname -- "$0")"
+ROOT=$(dirname -- "$(pwd -P)")
 COMPOSE_ROOT="$ROOT/compose"
+cd - > /dev/null
 
 source $COMPOSE_ROOT/.env
 
