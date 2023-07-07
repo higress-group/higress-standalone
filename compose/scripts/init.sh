@@ -57,6 +57,19 @@ publish_nacos_config_if_absent() {
     echo "  Publishing config $1/$2 in tenant ${NACOS_NS} failed with $statusCode"
     exit -1 
   fi
+  publish_nacos_config "$1" "$2" "$3"
+  return 0
+}
+
+publish_nacos_config() {
+  # $1 group
+  # $2 dataId
+  # $3 content
+  statusCode="$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v1/cs/configs?accessToken=${NACOS_ACCESS_TOKEN}" --data-urlencode "tenant=${NACOS_NS}" --data-urlencode "dataId=$2" --data-urlencode "group=$1" --data-urlencode "content=$3")"
+  if [ $statusCode -ne 200 ]; then
+    echo "  Publishing config $1/$2 in tenant ${NACOS_NS} failed with $statusCode"
+    exit -1 
+  fi
   return 0
 }
 
@@ -128,7 +141,11 @@ initializeApiServer() {
   fi
   if [ ! -f nacos.key ]; then
     echo "  Generating data encryption key..."
-    cat /dev/urandom | tr -dc '[:graph:]' | head -c 32 > nacos.key
+    if [ -z "$NACOS_DATA_ENC_KEY" ]; then
+      cat /dev/urandom | tr -dc '[:graph:]' | head -c 32 > nacos.key
+    else
+      echo -n "$NACOS_DATA_ENC_KEY" > nacos.key
+    fi
   else
     echo "  Client certificate already exists.";
   fi
@@ -292,8 +309,45 @@ initializeGateway() {
   echo 'higress="higress-gateway"' > ./labels
 }
 
+initializeMcpBridge() {
+  echo "Initializing McpBridge resource..."
+
+  if [[ "$NACOS_SERVER_URL" =~ ^http://([a-zA-Z0-9.]+?)(:([0-9]+))/nacos$ ]]; then
+    NACOS_SERVER_DOMAIN="${BASH_REMATCH[1]}"
+    NACOS_SERVER_PORT="${BASH_REMATCH[3]}"
+  else
+    echo "Unable to parse Nacos server URL. Skip creating the McpBridge resource"
+    return
+  fi
+
+  read -r -d '' content << EOF
+apiVersion: networking.higress.io/v1
+kind: McpBridge
+metadata:
+  creationTimestamp: "$(now)"
+  name: default
+  namespace: higress-system
+spec:
+  registries:
+  - domain: ${NACOS_SERVER_DOMAIN}
+    nacosGroups:
+    - DEFAULT_GROUP
+    nacosNamespaceId: ""
+    name: nacos
+    port: ${NACOS_SERVER_PORT:-80}
+    type: nacos2
+EOF
+  publish_nacos_config_if_absent "higress-system" "mcpbridges.default" "$content"
+}
+
 initializeConsole() {
   echo "Initializing console configurations..."
+
+  LOGIN_PROMPT=""
+  if [ -z "$HIGRESS_CONSOLE_PASSWORD" ]; then
+    HIGRESS_CONSOLE_PASSWORD="admin"
+    LOGIN_PROMPT="Username: admin  Default Password: admin"
+  fi
 
   read -r -d '' content << EOF
 apiVersion: v1 
@@ -304,18 +358,18 @@ metadata:
   namespace: higress-system
 data:
   mode: standalone
-  login.prompt: "Username: admin  Default Password: $(base64 -d <<< "YWRtaW4=")"
+  login.prompt: "$LOGIN_PROMPT"
 EOF
-  publish_nacos_config_if_absent "higress-system" "configmaps.higress-console" "$content"
+  publish_nacos_config "higress-system" "configmaps.higress-console" "$content"
 
   read -r -d '' content << EOF
 apiVersion: v1
 data:
   adminDisplayName: QWRtaW4=
-  adminPassword: YWRtaW4=
+  adminPassword: $(echo -n "$HIGRESS_CONSOLE_PASSWORD" | base64 -w 0)
   adminUsername: YWRtaW4=
-  iv: $(cat /dev/urandom | tr -dc '[:graph:]' | fold -w 16 | head -n 1 | tr -d '\n' | base64)
-  key: $(cat /dev/urandom | tr -dc '[:graph:]' | fold -w 32 | head -n 1 | tr -d '\n' | base64)
+  iv: $(cat /dev/urandom | tr -dc '[:graph:]' | fold -w 16 | head -n 1 | tr -d '\n' | base64 -w 0)
+  key: $(cat /dev/urandom | tr -dc '[:graph:]' | fold -w 32 | head -n 1 | tr -d '\n' | base64 -w 0)
 kind: Secret
 metadata:
   creationTimestamp: "$(now)"
@@ -323,11 +377,12 @@ metadata:
   namespace: higress-system
 type: Opaque
 EOF
-  publish_nacos_config_if_absent "higress-system" "secrets.higress-console" "$content"
+  publish_nacos_config "higress-system" "secrets.higress-console" "$content"
 }
 
 initializeNacos
 initializeApiServer
 initializePilot
 initializeGateway
+initializeMcpBridge
 initializeConsole
