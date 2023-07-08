@@ -350,7 +350,7 @@ EOF
 runInitializer() {
   echo "==== Build Configurations ==== "
 
-  cd "$COMPOSE_ROOT" && docker compose -p higress run --rm initializer
+  cd "$COMPOSE_ROOT" && docker compose -p higress run -T --rm initializer
   retVal=$?
   if [ $retVal -ne 0 ]; then
     echo "Higress configuration failed with $retVal."
