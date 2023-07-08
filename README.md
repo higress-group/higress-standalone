@@ -18,7 +18,7 @@ docker compose
 
 ## 快速开始
 
-克隆本项目仓库后，在命令行中执行以下命令：
+下载本项目的代码后，在命令行中执行以下命令：
 
 ```bash
 ./bin/configure.sh -a
