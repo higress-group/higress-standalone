@@ -72,6 +72,12 @@ parseArgs() {
         MODE="params"
         shift
         ;;
+      -k)
+        NACOS_DATA_ENC_KEY="${2}"
+        MODE="params"
+        shift
+        shift
+        ;;
       --data-enc-key=*)
         NACOS_DATA_ENC_KEY="${1#*=}"
         MODE="params"
@@ -285,7 +291,7 @@ outputUsage() {
      --nacos-password=NACOS-PASSWORD
                             the password used to access Nacos
                             only needed if auth is enabled in Nacos
-     --data-enc-key=KEY     the key used to encrypt sensitive configurations
+ -k, --data-enc-key=KEY     the key used to encrypt sensitive configurations
                             MUST contain 32 characters
                             A random key will be generated if unspecified
  -p, --console-password=CONSOLE-PASSWORD
