@@ -269,7 +269,31 @@ configureConsole() {
 }
 
 outputUsage() {
-  echo 'Hello world!'
+  echo -n "Usage: $(basename -- "$0") [OPTIONS...]"
+  echo '
+ -a, --auto-start           start Higress after configuration
+ -c, --config-url=URL       URL of the Nacos service 
+                            format: nacos://192.168.0.1:8848
+     --use-builtin-nacos    use the built-in Nacos service instead of
+                            an external one
+     --nacos-ns=NACOS-NAMESPACE
+                            the ID of Nacos namespace to store configurations
+                            default to "higress-system" if unspecified
+     --nacos-username=NACOS-USERNAME
+                            the username used to access Nacos
+                            only needed if auth is enabled in Nacos
+     --nacos-password=NACOS-PASSWORD
+                            the password used to access Nacos
+                            only needed if auth is enabled in Nacos
+     --data-enc-key=KEY     the key used to encrypt sensitive configurations
+                            MUST contain 32 characters
+                            A random key will be generated if unspecified
+ -p, --console-password=CONSOLE-PASSWORD
+                            the password to be used to visit Higress Console
+                            default to "admin" if unspecified
+ -r, --rerun                re-run the configuration workflow even
+                            Higress is already configured
+ -h, --help                 give this help list'
 }
 
 outputWelcomeMessage() {
