@@ -349,14 +349,14 @@ readWithDefault() {
 }
 
 run() {
-  $ROOT/bin/startup.sh
+  bash $ROOT/bin/startup.sh
 }
 
 parseArgs "$@"
 CONFIGURED_MARK="$COMPOSE_ROOT/.configured"
 if [ -f "$CONFIGURED_MARK" ];  then
   if [ "$RERUN" == "Y" ]; then
-    $ROOT/bin/reset.sh
+    bash $ROOT/bin/reset.sh
   else
     echo "Higress is already configured. Please add \"-r\" if you want to re-run the configuration workflow."
     exit -1
