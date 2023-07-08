@@ -41,10 +41,15 @@ parseArgs() {
         AUTO_START="Y"
         shift
         ;;
-      -c|--config-url)
+      -c)
         EXTERNAL_NACOS_SERVER_URL="$2"
         MODE="params"
         shift
+        shift
+        ;;
+      --config-url=*)
+        EXTERNAL_NACOS_SERVER_URL="${1#*=}"
+        MODE="params"
         shift
         ;;
       --use-builtin-nacos)
@@ -52,34 +57,35 @@ parseArgs() {
         MODE="params"
         shift
         ;;
-      --nacos-ns)
-        NACOS_NS="$2"
+      --nacos-ns=*)
+        NACOS_NS="${1#*=}"
         MODE="params"
         shift
-        shift
         ;;
-      --nacos-username)
-        NACOS_USERNAME="$2"
+      --nacos-username=*)
+        NACOS_USERNAME="${1#*=}"
         MODE="params"
         shift
-        shift
         ;;
-      --nacos-password)
-        NACOS_PASSWORD="$2"
+      --nacos-password=*)
+        NACOS_PASSWORD="${1#*=}"
         MODE="params"
         shift
-        shift
         ;;
-      --data-enc-key)
-        NACOS_DATA_ENC_KEY="$2"
+      --data-enc-key=*)
+        NACOS_DATA_ENC_KEY="${1#*=}"
         MODE="params"
         shift
-        shift
         ;;
-      -p|--console-password)
+      -p)
         HIGRESS_CONSOLE_PASSWORD="$2"
         MODE="params"
         shift
+        shift
+        ;;
+      --console-password=*)
+        HIGRESS_CONSOLE_PASSWORD="${1#*=}"
+        MODE="params"
         shift
         ;;
       -h|--help)
