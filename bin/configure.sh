@@ -181,7 +181,7 @@ configureNacos() {
       NACOS_PASSWORD=""
 
       echo "Starting built-in Nacos service..."
-      cd "$COMPOSE_ROOT" && docker compose up -d nacos
+      cd "$COMPOSE_ROOT" && docker compose -p higress up -d nacos
       retVal=$?
       if [ $retVal -ne 0 ]; then
         echo ${1:-"  Starting built-in Nacos service fails with $retVal"}
@@ -308,7 +308,7 @@ EOF
 runInitializer() {
   echo "==== Build Configurations ==== "
 
-  cd "$COMPOSE_ROOT" && docker compose run --rm initializer
+  cd "$COMPOSE_ROOT" && docker compose -p higress run --rm initializer
   retVal=$?
   if [ $retVal -ne 0 ]; then
     echo "Higress configuration failed with $retVal."
