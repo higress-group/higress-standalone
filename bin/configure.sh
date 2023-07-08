@@ -276,6 +276,8 @@ outputWelcomeMessage() {
   echo "Usage:"
   echo "  Start: $ROOT/bin/startup.sh"
   echo "  Stop: $ROOT/bin/stop.sh"
+  echo "  View Component Statuses: $ROOT/bin/status.sh"
+  echo "  View Logs: $ROOT/bin/logs.sh"
   echo "  Re-configure: $ROOT/bin/configure.sh -r"
   echo ""
   echo "Happy Higressing!"
@@ -352,12 +354,14 @@ run() {
 
 parseArgs "$@"
 CONFIGURED_MARK="$COMPOSE_ROOT/.configured"
-if [ -f "$CONFIGURED_MARK" ] && [ "$RERUN" != "Y" ]; then
-  echo "Higress is already configured. Please add \"-r\" if you want to re-run the configuration workflow."
-  exit -1
+if [ -f "$CONFIGURED_MARK" ];  then
+  if [ "$RERUN" == "Y" ]; then
+    $ROOT/bin/reset.sh
+  else
+    echo "Higress is already configured. Please add \"-r\" if you want to re-run the configuration workflow."
+    exit -1
+  fi
 fi
-$ROOT/bin/shutdown.sh
-$ROOT/bin/reset.sh
 configure
 touch "$CONFIGURED_MARK"
 if [ "$AUTO_START" == "Y" ]; then

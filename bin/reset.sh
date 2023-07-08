@@ -16,4 +16,5 @@
 
 ROOT=$(dirname $(dirname "$(readlink -f "$0")"))
 COMPOSE_ROOT="$ROOT/compose"
+$ROOT/bin/shutdown.sh
 cd "$COMPOSE_ROOT" && sudo rm -rf ./volumes && rm -f ./.configured

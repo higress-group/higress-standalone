@@ -16,4 +16,4 @@
 
 ROOT=$(dirname $(dirname "$(readlink -f "$0")"))
 COMPOSE_ROOT="$ROOT/compose"
-cd "$COMPOSE_ROOT" && docker compose down --remove-orphans
+cd "$COMPOSE_ROOT" && docker compose -p higress down --remove-orphans
