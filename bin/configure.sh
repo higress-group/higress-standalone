@@ -49,6 +49,7 @@ parseArgs() {
         ;;
       --use-builtin-nacos)
         USE_BUILTIN_NACOS="Y"
+        MODE="params"
         shift
         ;;
       --nacos-ns)
@@ -165,6 +166,11 @@ configureByArgs() {
       echo "Expecting 32 characters for --data-enc-key, but got ${KEY_LENGTH}."
       exit -1
     fi
+  fi
+
+  if [ "$USE_BUILTIN_NACOS" == "Y" ]; then
+    echo "Starting built-in Nacos service..."
+    cd "$COMPOSE_ROOT" && docker compose -p higress up -d nacos
   fi
 }
 
