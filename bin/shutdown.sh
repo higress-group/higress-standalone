@@ -14,6 +14,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-ROOT=$(dirname $(dirname "$(readlink -f "$0")"))
+cd "$(dirname -- "$0")"
+ROOT=$(dirname -- "$(pwd -P)")
 COMPOSE_ROOT="$ROOT/compose"
+cd - > /dev/null
+
 cd "$COMPOSE_ROOT" && docker compose -p higress down --remove-orphans

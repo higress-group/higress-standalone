@@ -14,7 +14,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-ROOT=$(dirname $(dirname "$(readlink -f "$0")"))
+cd "$(dirname -- "$0")"
+ROOT=$(dirname -- "$(pwd -P)")
 COMPOSE_ROOT="$ROOT/compose"
+cd - > /dev/null
+
 bash $ROOT/bin/shutdown.sh
 cd "$COMPOSE_ROOT" && sudo rm -rf ./volumes && rm -f ./.configured
