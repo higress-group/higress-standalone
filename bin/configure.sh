@@ -169,15 +169,12 @@ configureByArgs() {
     fi
   fi
 
-  if [ "$USE_BUILTIN_NACOS" != "Y" ]; then
-    KEY_LENGTH=${#NACOS_DATA_ENC_KEY}
-    if [ $KEY_LENGTH == 0 ]; then
-      echo "--data-enc-key is required when using external Nacos service."
-      exit -1
-    elif [ $KEY_LENGTH != 32 ]; then
-      echo "Expecting 32 characters for --data-enc-key, but got ${KEY_LENGTH}."
-      exit -1
-    fi
+  KEY_LENGTH=${#NACOS_DATA_ENC_KEY}
+  if [ $KEY_LENGTH == 0 ]; then
+    NACOS_DATA_ENC_KEY=$(cat /dev/urandom | tr -dc '[:alnum:]' | head -c 32)
+  elif [ $KEY_LENGTH != 32 ] && [ "$USE_BUILTIN_NACOS" != "Y" ]; then
+    echo "Expecting 32 characters for --data-enc-key, but got ${KEY_LENGTH}."
+    exit -1
   fi
 
   if [ "$USE_BUILTIN_NACOS" == "Y" ]; then
@@ -256,10 +253,12 @@ configureStandaloneNacosServer() {
 
   while true
   do
-    readNonEmpty "Please input a 32-char long string for data encryption: "
+    readWithDefault "Please input a 32-char long string for data encryption (Enter to generate a random one): " ""
     NACOS_DATA_ENC_KEY=$input
     KEY_LENGTH=${#NACOS_DATA_ENC_KEY}
-    if [ $KEY_LENGTH != 32 ]; then
+    if [ $KEY_LENGTH == 0 ]; then
+      NACOS_DATA_ENC_KEY=$(cat /dev/urandom | tr -dc '[:alnum:]' | head -c 32)
+    elif [ $KEY_LENGTH != 32 ]; then
       echo "Expecting 32 characters, but got ${KEY_LENGTH}."
       continue;
     fi
@@ -315,6 +314,13 @@ outputWelcomeMessage() {
 '
   echo "Higress is configured successfully."
   echo ""
+  if [ "$USE_BUILTIN_NACOS" != "Y" ]; then
+    echo "Important Notes:"
+    echo "  Sensitive configurations are encrypted when saving to Nacos."
+    echo "  When configuring another server with the same Nacos configuration service, please make sure to add the following argument so all servers use the same encryption key:"
+    echo "    --data-enc-key='${NACOS_DATA_ENC_KEY}'"
+  echo ""
+  fi
   echo "Usage:"
   echo "  Start: $ROOT/bin/startup.sh"
   echo "  Stop: $ROOT/bin/stop.sh"
