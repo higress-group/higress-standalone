@@ -91,6 +91,7 @@ func getOpenAPIDefinitions(openapicommon.ReferenceCallback) map[string]openapico
 
 		"github.com/alibaba/higress/client/pkg/apis/extensions/v1alpha1.WasmPlugin": {},
 		"github.com/alibaba/higress/client/pkg/apis/networking/v1.McpBridge":        {},
+		"github.com/alibaba/higress/client/pkg/apis/networking/v1.Http2Rpc":         {},
 	}
 }
 

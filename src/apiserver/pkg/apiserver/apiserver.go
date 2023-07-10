@@ -246,6 +246,10 @@ func (c completedConfig) New() (*HigressServer, error) {
 			func() runtime.Object { return &hinetworkingv1.McpBridge{} },
 			func() runtime.Object { return &hinetworkingv1.McpBridgeList{} },
 			nil, nil)
+		appendStorage(hinetworkingv1Storages, configClient, hinetworkingv1.SchemeGroupVersion, true, "http2rpc", "http2rpcs",
+			func() runtime.Object { return &hinetworkingv1.Http2Rpc{} },
+			func() runtime.Object { return &hinetworkingv1.Http2RpcList{} },
+			nil, nil)
 		hinetworkingv1ApiGroupInfo.VersionedResourcesStorageMap[hinetworkingv1.SchemeGroupVersion.Version] = hinetworkingv1Storages
 		if err := s.GenericAPIServer.InstallAPIGroup(&hinetworkingv1ApiGroupInfo); err != nil {
 			return nil, err

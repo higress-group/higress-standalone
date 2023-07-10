@@ -5,7 +5,7 @@ module github.com/alibaba/higress/api-server
 go 1.20
 
 require (
-	github.com/alibaba/higress v1.0.0
+	github.com/alibaba/higress v1.1.0
 	github.com/nacos-group/nacos-sdk-go/v2 v2.2.2
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
