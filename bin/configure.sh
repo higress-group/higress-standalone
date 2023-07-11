@@ -171,7 +171,7 @@ configureByArgs() {
 
   KEY_LENGTH=${#NACOS_DATA_ENC_KEY}
   if [ $KEY_LENGTH == 0 ]; then
-    NACOS_DATA_ENC_KEY=$(cat /dev/urandom | tr -dc '[:alnum:]' | head -c 32)
+    NACOS_DATA_ENC_KEY=$(cat /dev/urandom | head -n 10 | md5sum |head -c32)
   elif [ $KEY_LENGTH != 32 ] && [ "$USE_BUILTIN_NACOS" != "Y" ]; then
     echo "Expecting 32 characters for --data-enc-key, but got ${KEY_LENGTH}."
     exit -1
@@ -180,6 +180,10 @@ configureByArgs() {
   if [ "$USE_BUILTIN_NACOS" == "Y" ]; then
     echo "Starting built-in Nacos service..."
     cd "$COMPOSE_ROOT" && docker compose -p higress up -d nacos
+  fi
+
+  if [ -z "$HIGRESS_CONSOLE_PASSWORD" ]; then
+      HIGRESS_CONSOLE_PASSWORD=$(cat /dev/urandom | head -n 10 | md5sum |head -c32)
   fi
 }
 
@@ -397,6 +401,7 @@ readWithDefault() {
 }
 
 run() {
+  export HIGRESS_CONSOLE_PASSWORD
   bash $ROOT/bin/startup.sh
 }
 
