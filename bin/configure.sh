@@ -332,6 +332,10 @@ outputWelcomeMessage() {
   echo "  View Logs: $ROOT/bin/logs.sh"
   echo "  Re-configure: $ROOT/bin/configure.sh -r"
   echo ""
+  echo "Note:"
+  echo " Higress Console Username:admin"
+  echo " Higress Console Password:${HIGRESS_CONSOLE_PASSWORD}"
+  echo ""
   echo "Happy Higressing!"
 }
 
@@ -401,7 +405,6 @@ readWithDefault() {
 }
 
 run() {
-  export HIGRESS_CONSOLE_PASSWORD
   bash $ROOT/bin/startup.sh
 }
 
