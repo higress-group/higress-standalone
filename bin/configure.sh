@@ -171,7 +171,7 @@ configureByArgs() {
 
   KEY_LENGTH=${#NACOS_DATA_ENC_KEY}
   if [ $KEY_LENGTH == 0 ]; then
-    NACOS_DATA_ENC_KEY=$(cat /dev/urandom | tr -dc '[:alnum:]' | head -c 32)
+    NACOS_DATA_ENC_KEY=$(cat /dev/urandom | head -n 10 | md5sum |head -c32)
   elif [ $KEY_LENGTH != 32 ] && [ "$USE_BUILTIN_NACOS" != "Y" ]; then
     echo "Expecting 32 characters for --data-enc-key, but got ${KEY_LENGTH}."
     exit -1
@@ -180,6 +180,10 @@ configureByArgs() {
   if [ "$USE_BUILTIN_NACOS" == "Y" ]; then
     echo "Starting built-in Nacos service..."
     cd "$COMPOSE_ROOT" && docker compose -p higress up -d nacos
+  fi
+
+  if [ -z "$HIGRESS_CONSOLE_PASSWORD" ]; then
+      HIGRESS_CONSOLE_PASSWORD=$(cat /dev/urandom | head -n 10 | md5sum |head -c32)
   fi
 }
 
@@ -295,7 +299,7 @@ outputUsage() {
                             A random key will be generated if unspecified
  -p, --console-password=CONSOLE-PASSWORD
                             the password to be used to visit Higress Console
-                            default to "admin" if unspecified
+                            default to random string if unspecified
  -r, --rerun                re-run the configuration workflow even if
                             Higress is already configured
  -h, --help                 give this help list'
@@ -327,6 +331,10 @@ outputWelcomeMessage() {
   echo "  View Component Statuses: $ROOT/bin/status.sh"
   echo "  View Logs: $ROOT/bin/logs.sh"
   echo "  Re-configure: $ROOT/bin/configure.sh -r"
+  echo ""
+  echo "Note:"
+  echo " Higress Console Username:admin"
+  echo " Higress Console Password:${HIGRESS_CONSOLE_PASSWORD}"
   echo ""
   echo "Happy Higressing!"
 }
