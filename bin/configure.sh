@@ -257,7 +257,7 @@ configureStandaloneNacosServer() {
     NACOS_DATA_ENC_KEY=$input
     KEY_LENGTH=${#NACOS_DATA_ENC_KEY}
     if [ $KEY_LENGTH == 0 ]; then
-      NACOS_DATA_ENC_KEY=$(cat /dev/urandom | tr -dc '[:alnum:]' | head -c 32)
+      NACOS_DATA_ENC_KEY=$(cat /dev/urandom | head -n 10 | md5sum |head -c32)
     elif [ $KEY_LENGTH != 32 ]; then
       echo "Expecting 32 characters, but got ${KEY_LENGTH}."
       continue;
