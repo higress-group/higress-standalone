@@ -299,7 +299,7 @@ outputUsage() {
                             A random key will be generated if unspecified
  -p, --console-password=CONSOLE-PASSWORD
                             the password to be used to visit Higress Console
-                            default to "admin" if unspecified
+                            default to random string if unspecified
  -r, --rerun                re-run the configuration workflow even if
                             Higress is already configured
  -h, --help                 give this help list'
