@@ -333,8 +333,8 @@ outputWelcomeMessage() {
   echo "  Re-configure: $ROOT/bin/configure.sh -r"
   echo ""
   echo "Note:"
-  echo " Higress Console Username:admin"
-  echo " Higress Console Password:${HIGRESS_CONSOLE_PASSWORD}"
+  echo " Higress Console Username: admin"
+  echo " Higress Console Password: ${HIGRESS_CONSOLE_PASSWORD}"
   echo ""
   echo "Happy Higressing!"
 }
