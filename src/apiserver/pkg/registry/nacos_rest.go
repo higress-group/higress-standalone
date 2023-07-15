@@ -11,10 +11,12 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/alibaba/higress/api-server/pkg/utils"
 	"github.com/nacos-group/nacos-sdk-go/v2/clients/config_client"
+	"github.com/nacos-group/nacos-sdk-go/v2/common/constant"
 	"github.com/nacos-group/nacos-sdk-go/v2/model"
 	"github.com/nacos-group/nacos-sdk-go/v2/vo"
 
@@ -39,6 +41,9 @@ const wildcardSuffix = dataIdSeparator + "*"
 const searchPageSize = 50
 const listRefreshInterval = 10 * time.Second
 const encryptionMark = "enc|"
+const namesSuffix = "__names__"
+const namesGroup = constant.DEFAULT_GROUP
+const emptyNamesPlaceholder = "EMPTY"
 
 // ErrItemAlreadyExists means the item already exists.
 var ErrItemAlreadyExists = fmt.Errorf("item already exists")
@@ -82,6 +87,7 @@ func NewNacosREST(
 		watchers:       make(map[int]*nacosWatch, 10),
 		encryptionKey:  dataEncryptionKey,
 	}
+	n.namesDataId = n.dataIdPrefix + dataIdSeparator + namesSuffix
 	n.startBackgroundWatcher()
 	return n
 }
@@ -95,10 +101,11 @@ type nacosREST struct {
 	singularName  string
 	dataIdPrefix  string
 
-	listRefreshMutex  sync.Mutex
-	listRefreshTicker *time.Ticker
-	watchersMutex     sync.RWMutex
-	watchers          map[int]*nacosWatch
+	listRefreshMutex   sync.Mutex
+	listRefreshTicker  *time.Ticker
+	listConfigListened int32
+	watchersMutex      sync.RWMutex
+	watchers           map[int]*nacosWatch
 
 	newFunc     func() runtime.Object
 	newListFunc func() runtime.Object
@@ -106,6 +113,7 @@ type nacosREST struct {
 
 	encryptionKey []byte
 
+	namesDataId string
 	configItems map[string]*model.ConfigItem
 }
 
@@ -129,9 +137,31 @@ func (n *nacosREST) startBackgroundWatcher() {
 	go func(n *nacosREST) {
 		for {
 			<-n.listRefreshTicker.C
-			n.refreshConfigList()
+			n.listRefreshTickerFunc()
 		}
 	}(n)
+}
+
+func (n *nacosREST) listRefreshTickerFunc() {
+	if atomic.LoadInt32(&n.listConfigListened) == 0 {
+		if err := n.watchNamesConfig(); err == nil {
+			atomic.StoreInt32(&n.listConfigListened, 1)
+		} else {
+			klog.Errorf("failed to watch names config: %v", err)
+		}
+	}
+
+	n.refreshConfigList()
+}
+
+func (n *nacosREST) watchNamesConfig() error {
+	return n.configClient.ListenConfig(vo.ConfigParam{
+		DataId: n.namesDataId,
+		Group:  namesGroup,
+		OnChange: func(namespace, group, dataId, data string) {
+			n.refreshConfigList()
+		},
+	})
 }
 
 func (n *nacosREST) Destroy() {
@@ -257,6 +287,18 @@ func (n *nacosREST) Create(
 		return nil, err
 	}
 
+	nameKey := ns + "/" + name
+	namesData, err := n.readRaw(namesGroup, n.namesDataId)
+	if err != nil {
+		klog.Errorf("failed to read %s/%s: %v", namesGroup, n.namesDataId, err)
+	} else {
+		newNamesData := namesData + nameKey + "\n"
+		err := n.writeRaw(namesGroup, n.namesDataId, newNamesData, calculateMd5(namesData))
+		if err != nil {
+			klog.Errorf("failed to update %s/%s: %v", namesGroup, n.namesDataId, err)
+		}
+	}
+
 	return obj, nil
 }
 
@@ -350,6 +392,22 @@ func (n *nacosREST) Delete(
 		return nil, false, errors.New("delete config failed: " + dataId)
 	}
 
+	nameKey := ns + "/" + name
+	namesData, err := n.readRaw(namesGroup, n.namesDataId)
+	if err != nil {
+		klog.Errorf("failed to read %s/%s: %v", namesGroup, n.namesDataId, err)
+	} else {
+		newNamesData := strings.Replace(namesData, nameKey+"\n", "", -1)
+		if newNamesData == "" {
+			// Use a placeholder since Nacos does not support empty content
+			newNamesData = emptyNamesPlaceholder
+		}
+		err := n.writeRaw(namesGroup, n.namesDataId, newNamesData, calculateMd5(namesData))
+		if err != nil {
+			klog.Errorf("failed to update %s/%s: %v", namesGroup, n.namesDataId, err)
+		}
+	}
+
 	return oldObj, true, nil
 }
 
@@ -379,11 +437,6 @@ func (n *nacosREST) DeleteCollection(
 }
 
 func (n *nacosREST) objectDataId(ctx context.Context, name string) string {
-	//if n.isNamespaced {
-	//	// FIXME: return error if namespace is not found
-	//	ns, _ := genericapirequest.NamespaceFrom(ctx)
-	//	return strings.Join([]string{n.dataIdPrefix, ns, name}, dataIdSeparator)
-	//}
 	return strings.Join([]string{n.dataIdPrefix, name}, dataIdSeparator)
 }
 
@@ -546,12 +599,16 @@ func (n *nacosREST) refreshConfigList() {
 	defer n.listRefreshMutex.Unlock()
 
 	configItems := map[string]*model.ConfigItem{}
-	var newConfigKeys []string
+	var allConfigKeys, newConfigKeys []string
 	err := n.enumerateConfigs(&vo.SearchConfigParam{
 		Search: "blur",
 		DataId: n.dataIdPrefix + wildcardSuffix,
 	}, func(item *model.ConfigItem) {
+		if item.Group == namesGroup && item.DataId == n.namesDataId {
+			return
+		}
 		key := item.Group + "/" + item.DataId
+		allConfigKeys = append(allConfigKeys, key)
 		if _, ok := n.configItems[key]; !ok {
 			newConfigKeys = append(newConfigKeys, key)
 		}
@@ -559,6 +616,19 @@ func (n *nacosREST) refreshConfigList() {
 	})
 	if err != nil {
 		return
+	}
+
+	namesData, err := n.readRaw(namesGroup, n.namesDataId)
+	if err != nil {
+		klog.Errorf("failed to read %s/%s: %v", namesGroup, n.namesDataId, err)
+	} else if len(allConfigKeys) > 0 {
+		newNamesData := strings.Join(allConfigKeys, "\n") + "\n"
+		if namesData != newNamesData {
+			err := n.writeRaw(namesGroup, n.namesDataId, newNamesData, calculateMd5(namesData))
+			if err != nil {
+				klog.Errorf("failed to update %s/%s: %v", namesGroup, n.namesDataId, err)
+			}
+		}
 	}
 
 	var removedConfigKeys []string

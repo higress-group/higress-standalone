@@ -38,7 +38,7 @@ func (o *NacosOptions) AddFlags(fs *pflag.FlagSet) {
 		"The username used to access Nacos service. Leave it empty if authentication isn't enabled in Nacos.")
 	fs.StringVar(&o.Password, "nacos-password", "", ""+
 		"The password used to access Nacos service. Leave it empty if authentication isn't enabled in Nacos.")
-	fs.StringVar(&o.NamespaceId, "nacos-ns-id", "", ""+
+	fs.StringVar(&o.NamespaceId, "nacos-ns-id", "higress-system", ""+
 		"The namespace ID which Higress configurations are stored in. "+
 		"It is recommended to give Higress a separate namespace for a better isolation.")
 	fs.Uint64Var(&o.TimeoutMs, "nacos-timeout", 5000,
