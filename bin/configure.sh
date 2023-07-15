@@ -16,6 +16,11 @@
 
 BUILTIN_NACOS_SERVER_URL=nacos://nacos:8848
 DEFAULT_NACOS_NS=higress-system
+DEFAULT_NACOS_HTTP_PORT=8848
+DEFAULT_GATEWAY_HTTP_PORT=80
+DEFAULT_GATEWAY_HTTPS_PORT=443
+DEFAULT_GATEWAY_METRICS_PORT=15020
+DEFAULT_CONSOLE_PORT=8080
 
 cd "$(dirname -- "$0")"
 ROOT=$(dirname -- "$(pwd -P)")
@@ -94,6 +99,31 @@ parseArgs() {
         MODE="params"
         shift
         ;;
+      --nacos-port=*)
+        NACOS_HTTP_PORT="${1#*=}"
+        MODE="params"
+        shift
+        ;;
+      --gateway-http-port=*)
+        GATEWAY_HTTP_PORT="${1#*=}"
+        MODE="params"
+        shift
+        ;;
+      --gateway-https-port=*)
+        GATEWAY_HTTPS_PORT="${1#*=}"
+        MODE="params"
+        shift
+        ;;
+      --gateway-metrics-port=*)
+        GATEWAY_METRICS_PORT="${1#*=}"
+        MODE="params"
+        shift
+        ;;
+      --console-port=*)
+        CONSOLE_PORT="${1#*=}"
+        MODE="params"
+        shift
+        ;;
       -h|--help)
         outputUsage
         exit 0
@@ -118,6 +148,7 @@ configure() {
   else
     configureNacos
     configureConsole
+    configurePorts
   fi
   writeConfiguration
   runInitializer
@@ -131,6 +162,13 @@ resetEnv() {
   NACOS_PASSWORD=""
   NACOS_DATA_ENC_KEY=""
   HIGRESS_CONSOLE_PASSWORD=""
+
+  NACOS_HTTP_PORT=$DEFAULT_NACOS_HTTP_PORT
+  NACOS_GRPC_PORT=$(($DEFAULT_NACOS_HTTP_PORT + 1000))
+  GATEWAY_HTTP_PORT=$DEFAULT_GATEWAY_HTTP_PORT
+  GATEWAY_HTTPS_PORT=$DEFAULT_GATEWAY_HTTPS_PORT
+  GATEWAY_METRICS_PORT=$DEFAULT_GATEWAY_METRICS_PORT
+  CONSOLE_PORT=$DEFAULT_CONSOLE_PORT
 }
 
 configureByArgs() {
@@ -144,6 +182,7 @@ configureByArgs() {
       COMPOSE_PROFILES="nacos";
       NACOS_SERVER_URL="$BUILTIN_NACOS_SERVER_URL"
     else
+      COMPOSE_PROFILES=""
       NACOS_SERVER_URL="$EXTERNAL_NACOS_SERVER_URL"
       if [[ $NACOS_SERVER_URL != "nacos://"* ]]; then
         echo "Only \"nacos://\" is supported in the Nacos URL at the moment."
@@ -178,14 +217,22 @@ configureByArgs() {
     exit -1
   fi
 
-  if [ "$USE_BUILTIN_NACOS" == "Y" ]; then
-    echo "Starting built-in Nacos service..."
-    cd "$COMPOSE_ROOT" && docker compose -p higress up -d nacos
-  fi
-
   if [ -z "$HIGRESS_CONSOLE_PASSWORD" ]; then
       HIGRESS_CONSOLE_PASSWORD=$(cat /dev/urandom | head -n 10 | md5sum |head -c32)
   fi
+
+  if [ "$USE_BUILTIN_NACOS" == "Y" ]; then
+    validatePort $NACOS_HTTP_PORT "Invalid --nacos-port value." 1
+    NACOS_GRPC_PORT=$(($NACOS_HTTP_PORT + 1000))
+    validatePort $NACOS_GRPC_PORT "--nacos-port value must be less than 64536." 1
+  else
+    NACOS_HTTP_PORT=$DEFAULT_NACOS_HTTP_PORT
+    NACOS_GRPC_PORT=$(($DEFAULT_NACOS_HTTP_PORT + 1000))
+  fi
+  validatePort $GATEWAY_HTTP_PORT "Invalid --gateway-http-port value." 1
+  validatePort $GATEWAY_HTTPS_PORT "Invalid --gateway-https-port value." 1
+  validatePort $GATEWAY_METRICS_PORT "Invalid --gateway-metrics-port value." 1
+  validatePort $CONSOLE_PORT "Invalid --console-port value." 1
 }
 
 configureNacos() {
@@ -195,18 +242,11 @@ configureNacos() {
     readNonEmpty "Use built-in Nacos service (Y/N): "
     enableNacos=$input
     if [ "$enableNacos" == "Y" ] || [ "$enableNacos" == "y" ]; then
+      USE_BUILTIN_NACOS="Y"
       COMPOSE_PROFILES="nacos";
       NACOS_SERVER_URL="${BUILTIN_NACOS_SERVER_URL}"
       NACOS_USERNAME=""
       NACOS_PASSWORD=""
-
-      echo "Starting built-in Nacos service..."
-      cd "$COMPOSE_ROOT" && docker compose -p higress up -d nacos
-      retVal=$?
-      if [ $retVal -ne 0 ]; then
-        echo ${1:-"  Starting built-in Nacos service fails with $retVal"}
-        exit $retVal
-      fi
       break;
     elif [ "$enableNacos" == "N" ] || [ "$enableNacos" == "n" ]; then
       COMPOSE_PROFILES=""
@@ -278,11 +318,36 @@ configureConsole() {
   HIGRESS_CONSOLE_PASSWORD=$input
 }
 
+configurePorts() {
+  echo "==== Configure Ports to be used by Higress ===="
+
+  if [ "$USE_BUILTIN_NACOS" == "Y" ]; then
+    while true
+    do
+      readPortWithDefault "Please input the local HTTP port to access the built-in Nacos [${DEFAULT_NACOS_HTTP_PORT}]: " ${DEFAULT_NACOS_HTTP_PORT}
+      NACOS_HTTP_PORT=$input
+      NACOS_GRPC_PORT=$(($NACOS_HTTP_PORT + 1000))
+      validatePort $NACOS_GRPC_PORT "The HTTP port of Nacos must be less than 64536." 0
+      if [ $? -eq 0 ]; then
+        break
+      fi
+    done
+  fi
+  readPortWithDefault "Please input the local HTTP port to access Higress Gateway [${DEFAULT_GATEWAY_HTTP_PORT}]: " ${DEFAULT_GATEWAY_HTTP_PORT}
+  GATEWAY_HTTP_PORT=$input
+  readPortWithDefault "Please input the local HTTPS port to access Higress Gateway [${DEFAULT_GATEWAY_HTTPS_PORT}]: " ${DEFAULT_GATEWAY_HTTPS_PORT}
+  GATEWAY_HTTPS_PORT=$input
+  readPortWithDefault "Please input the local metrics port to be used Higress Gateway [${DEFAULT_GATEWAY_METRICS_PORT}]: " ${DEFAULT_GATEWAY_METRICS_PORT}
+  GATEWAY_METRICS_PORT=$input
+  readPortWithDefault "Please input the local port to access Higress Console [${DEFAULT_CONSOLE_PORT}]: " ${DEFAULT_CONSOLE_PORT}
+  CONSOLE_PORT=$input
+}
+
 outputUsage() {
   echo -n "Usage: $(basename -- "$0") [OPTIONS...]"
   echo '
  -a, --auto-start           start Higress after configuration
- -c, --config-url=URL       URL of the Nacos service 
+ -c, --config-url=URL       URL of the Nacos service
                             format: nacos://192.168.0.1:8848
      --use-builtin-nacos    use the built-in Nacos service instead of
                             an external one
@@ -301,6 +366,21 @@ outputUsage() {
  -p, --console-password=CONSOLE-PASSWORD
                             the password to be used to visit Higress Console
                             default to random string if unspecified
+     --nacos-port=NACOS-PORT
+                            the HTTP port used to access the built-in Nacos
+                            default to 8848 if unspecified
+     --gateway-http-port=GATEWAY-HTTP-PORT
+                            the HTTP port to be listened by the gateway
+                            default to 80 if unspecified
+     --gateway-https-port=GATEWAY-HTTPS-PORT
+                            the HTTPS port to be listened by the gateway
+                            default to 443 if unspecified
+     --gateway-metrics-port=GATEWAY-METRICS-PORT
+                            the metrics port to be listened by the gateway
+                            default to 15012 if unspecified
+     --console-port=CONSOLE-PORT
+                            the port used to visit Higress Console
+                            default to 8080 if unspecified
  -r, --rerun                re-run the configuration workflow even if
                             Higress is already configured
  -h, --help                 give this help list'
@@ -308,12 +388,12 @@ outputUsage() {
 
 outputWelcomeMessage() {
   echo '
- ___  ___  ___  ________  ________  _______   ________   ________      
-|\  \|\  \|\  \|\   ____\|\   __  \|\  ___ \ |\   ____\ |\   ____\     
-\ \  \\\  \ \  \ \  \___|\ \  \|\  \ \   __/|\ \  \___|_\ \  \___|_    
- \ \   __  \ \  \ \  \  __\ \   _  _\ \  \_|/_\ \_____  \\ \_____  \   
-  \ \  \ \  \ \  \ \  \|\  \ \  \\  \\ \  \_|\ \|____|\  \\|____|\  \  
-   \ \__\ \__\ \__\ \_______\ \__\\ _\\ \_______\____\_\  \ ____\_\  \ 
+ ___  ___  ___  ________  ________  _______   ________   ________
+|\  \|\  \|\  \|\   ____\|\   __  \|\  ___ \ |\   ____\ |\   ____\
+\ \  \\\  \ \  \ \  \___|\ \  \|\  \ \   __/|\ \  \___|_\ \  \___|_
+ \ \   __  \ \  \ \  \  __\ \   _  _\ \  \_|/_\ \_____  \\ \_____  \
+  \ \  \ \  \ \  \ \  \|\  \ \  \\  \\ \  \_|\ \|____|\  \\|____|\  \
+   \ \__\ \__\ \__\ \_______\ \__\\ _\\ \_______\____\_\  \ ____\_\  \
     \|__|\|__|\|__|\|_______|\|__|\|__|\|_______|\_________\\_________\
                                                 \|_________\|_________|
 '
@@ -359,17 +439,42 @@ HIGRESS_PILOT_TAG='${HIGRESS_PILOT_TAG}'
 HIGRESS_GATEWAY_TAG='${HIGRESS_GATEWAY_TAG}'
 HIGRESS_CONSOLE_TAG='${HIGRESS_CONSOLE_TAG}'
 HIGRESS_CONSOLE_PASSWORD='${HIGRESS_CONSOLE_PASSWORD}'
+NACOS_HTTP_PORT='${NACOS_HTTP_PORT}'
+NACOS_GRPC_PORT='${NACOS_GRPC_PORT}'
+GATEWAY_HTTP_PORT='${GATEWAY_HTTP_PORT}'
+GATEWAY_HTTPS_PORT='${GATEWAY_HTTPS_PORT}'
+GATEWAY_METRICS_PORT='${GATEWAY_METRICS_PORT}'
+CONSOLE_PORT='${CONSOLE_PORT}'
 EOF
 }
 
 runInitializer() {
   echo "==== Build Configurations ==== "
 
+  if [ "$USE_BUILTIN_NACOS" == "Y" ]; then
+    echo "Starting built-in Nacos service..."
+    cd "$COMPOSE_ROOT" && docker compose -p higress up -d nacos
+    retVal=$?
+    if [ $retVal -ne 0 ]; then
+      echo "Starting built-in Nacos service fails with $retVal"
+      exit $retVal
+    fi
+  fi
+
   cd "$COMPOSE_ROOT" && docker compose -p higress run -T --rm initializer
-  retVal=$?
+  local retVal=$?
   if [ $retVal -ne 0 ]; then
     echo "Higress configuration failed with $retVal."
     exit -1
+  fi
+
+  if [ "$USE_BUILTIN_NACOS" == "Y" ] && [ "${AUTO_START}" != "Y" ]; then
+    echo "Stopping built-in Nacos service..."
+    cd "$COMPOSE_ROOT" && docker compose -p higress down --remove-orphans
+    local retVal=$?
+    if [ $retVal -ne 0 ]; then
+      echo "Stopping built-in Nacos service fails with $retVal"
+    fi
   fi
 }
 
@@ -405,6 +510,38 @@ readWithDefault() {
   fi
 }
 
+readPortWithDefault() {
+  # $1 prompt
+  # $2 default
+  for (( ; ; ))
+  do
+    read -p "$1" input
+    if [ -z "$input" ]; then
+      input="$2"
+      break
+    fi
+    validatePort "$input" "Invalid port number." 0
+    if [ $? -eq 0 ]; then
+      break
+    fi
+  done
+}
+
+validatePort() {
+  # $1 port
+  # $2 error message
+  # $3 exit when error if set to 1
+  if [[ $1 =~ ^[0-9]+$ ]] && [ $1 -gt 0 ] && [ $1 -lt 65536 ]; then
+    return 0
+  fi
+  echo "$2"
+  if [ $3 -eq 1 ]; then
+    exit -1
+  else
+    return -1
+  fi
+}
+
 run() {
   bash $ROOT/bin/startup.sh
 }
@@ -421,8 +558,7 @@ if [ -f "$CONFIGURED_MARK" ];  then
 fi
 configure
 touch "$CONFIGURED_MARK"
-if [ "$AUTO_START" == "Y" ]; then
-  echo ""
+if [ "${AUTO_START}" == "Y" ]; then
   echo ""
   run
 fi
