@@ -113,6 +113,7 @@ services:
       retries: 60
     volumes:
       - ./volumes/kube:/home/higress/.kube:ro
+      - ./volumes/controller/log/nacos:/var/log/nacos:rw
 
   pilot:
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/pilot:${HIGRESS_PILOT_TAG}
