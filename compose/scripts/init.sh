@@ -190,6 +190,15 @@ EOF
   fi
 }
 
+initializeController() {
+  echo "Initializing controller configurations..."
+
+  mkdir -p $VOLUMES_ROOT/controller && cd "$_"
+
+  mkdir -p ./log/nacos
+  chmod a+w ./log/nacos
+}
+
 initializePilot() {
   echo "Initializing pilot configurations..."
 
@@ -382,6 +391,7 @@ EOF
 
 initializeNacos
 initializeApiServer
+initializeController
 initializePilot
 initializeGateway
 initializeMcpBridge

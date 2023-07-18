@@ -141,6 +141,7 @@ configureByArgs() {
 
   if [ "$USE_BUILTIN_NACOS" == "Y" ] || [ -n "$EXTERNAL_NACOS_SERVER_URL" ]; then
     if [ "$USE_BUILTIN_NACOS" == "Y" ]; then
+      COMPOSE_PROFILES="nacos";
       NACOS_SERVER_URL="$BUILTIN_NACOS_SERVER_URL"
     else
       NACOS_SERVER_URL="$EXTERNAL_NACOS_SERVER_URL"
