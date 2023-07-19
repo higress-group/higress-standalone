@@ -98,7 +98,7 @@ services:
       - serve
       - --kubeconfig=/home/higress/.kube/config
       - --gatewaySelectorKey=higress
-      - --gatewaySelectorValue=higress-gateway
+      - --gatewaySelectorValue=higress-system-higress-gateway
       - --ingressClass=higress
     depends_on:
       apiserver:
@@ -177,6 +177,7 @@ services:
       - ./volumes/pilot/config:/etc/istio/config:ro
       - ./volumes/gateway/certs:/etc/certs:ro
       - ./volumes/gateway/podinfo:/etc/istio/pod:ro
+      - ./volumes/gateway/istio/data:/var/lib/istio/data:rw
 
   console:
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/console:${HIGRESS_CONSOLE_TAG}
