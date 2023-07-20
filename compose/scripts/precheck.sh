@@ -63,8 +63,9 @@ checkNacos() {
   if [ -n "$NACOS_USERNAME" ] && [ -n "$NACOS_PASSWORD" ]; then
     NACOS_ACCESS_TOKEN="$(curl -s "${NACOS_SERVER_URL}/v1/auth/login" -X POST --data-urlencode "username=${NACOS_USERNAME}" --data-urlencode "password=${NACOS_PASSWORD}" | jq -rM '.accessToken')";
     if [ -z "$NACOS_ACCESS_TOKEN" ]; then
-      echo "  Unable to retrieve access token from Nacos."
-      exit -1 
+      echo "Unable to retrieve access token from Nacos. Possible causes are:"
+      echo "  1. Incorrect username or password."
+      echo "  2. The target Nacos service doesn't have authentication enabled."
     fi
   fi
 
