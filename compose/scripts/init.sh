@@ -316,7 +316,9 @@ initializeGateway() {
   cp $VOLUMES_ROOT/pilot/cacerts/gateway-key.pem ./key.pem
 
   mkdir -p $VOLUMES_ROOT/gateway/podinfo && cd "$_"
-  echo 'higress="higress-gateway"' > ./labels
+  echo 'higress="higress-system-higress-gateway"' > ./labels
+
+  mkdir -p $VOLUMES_ROOT/gateway/istio/data
 }
 
 initializeMcpBridge() {
