@@ -39,6 +39,25 @@ check_nacos_config_exists() {
   fi
 }
 
+get_nacos_config() {
+  # $1 group
+  # $2 dataId
+  config=""
+  tmpFile=$(mktemp /tmp/higress-precheck-nacos.XXXXXXXXX.cfg)
+  statusCode=$(curl -s -o "$tmpFile" -w "%{http_code}" "${NACOS_SERVER_URL}/v1/cs/configs?accessToken=${NACOS_ACCESS_TOKEN}&tenant=${NACOS_NS}&dataId=$2&group=$1")
+  if [ $statusCode -eq 200 ]; then
+    config=$(cat "$tmpFile")
+    rm "$tmpFile"
+    return 0
+  elif [ $statusCode -eq 404 ]; then
+    config = ""
+    return -1
+  else
+    echo ${1:-"  Getting config $1/$2 in namespace ${NACOS_NS} failed with $retVal"}
+    exit -1
+  fi
+}
+
 checkNacos() {
   echo "Checking Nacos server..."
 
@@ -137,15 +156,23 @@ checkPilot() {
     exit -1 
   fi
 
-  if [ ! -d "$VOLUMES_ROOT/pilot/config/" ]; then
-    echo "  The config folder of pilot is missing."
-    exit -1 
+  mkdir -p $VOLUMES_ROOT/pilot/config && cd "$_"
+  get_nacos_config "higress-system" "configmaps.higress-config"
+  check_exit_code "  The ConfigMap resource of 'higress-config' isn't found in Nacos."
+  fileNames=$(yq '.data | keys | .[]' <<< "$config")
+  if [ -z "$fileNames" ]; then
+    echo "  Missing required files in higress-config ConfigMap."
+    exit -1
   fi
-  cd $VOLUMES_ROOT/pilot/config/
-  if [ ! -f "./mesh" ] && [ ! -f "./meshNetworks" ]; then
-    echo "  One or some of the mesh configuration files of pilot are missing."
-    exit -1 
-  fi
+  IFS=$'\n'
+  for fileName in $fileNames
+  do
+    echo "FileName: $fileName"
+    if [ -z "$fileName" ]; then
+      continue
+    fi
+    echo "$config" | yq ".data.$fileName" > "./$fileName"
+  done
 }
 
 checkGateway() {

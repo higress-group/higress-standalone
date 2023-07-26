@@ -54,7 +54,7 @@ services:
     networks:
       - higress-net
     volumes:
-      - ./volumes:/mnt/volumes:ro
+      - ./volumes:/mnt/volumes:rw
       - ./scripts:/workspace:ro
 
   apiserver:
