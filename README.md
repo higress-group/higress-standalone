@@ -13,7 +13,7 @@
 为了拉平不同操作系统的运行时差异，当前版本的部署方案是基于 Docker Compose 设计的。所以在使用这一方案进行部署之前，请先在本机安装好 Docker Compose，随后确认以下命令可以正常运行并输出 Docker Compose CLI 的帮助信息：
 
 ```bash
-docker compose
+docker-compose
 ```
 
 ## 快速开始
