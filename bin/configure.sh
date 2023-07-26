@@ -337,7 +337,7 @@ configurePorts() {
   GATEWAY_HTTP_PORT=$input
   readPortWithDefault "Please input the local HTTPS port to access Higress Gateway [${DEFAULT_GATEWAY_HTTPS_PORT}]: " ${DEFAULT_GATEWAY_HTTPS_PORT}
   GATEWAY_HTTPS_PORT=$input
-  readPortWithDefault "Please input the local metrics port to be used Higress Gateway [${DEFAULT_GATEWAY_METRICS_PORT}]: " ${DEFAULT_GATEWAY_METRICS_PORT}
+  readPortWithDefault "Please input the local metrics port to be listened by Higress Gateway [${DEFAULT_GATEWAY_METRICS_PORT}]: " ${DEFAULT_GATEWAY_METRICS_PORT}
   GATEWAY_METRICS_PORT=$input
   readPortWithDefault "Please input the local port to access Higress Console [${DEFAULT_CONSOLE_PORT}]: " ${DEFAULT_CONSOLE_PORT}
   CONSOLE_PORT=$input

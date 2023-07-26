@@ -276,35 +276,39 @@ EOF
     chmod a+r gateway-key.pem
   fi
 
-  mkdir -p $VOLUMES_ROOT/pilot/config && cd "$_"
-  if [ ! -f ./mesh ]; then
-  cat <<EOF > ./mesh
-accessLogEncoding: TEXT
-accessLogFile: /dev/stdout
-accessLogFormat: |
-  {"authority":"%REQ(:AUTHORITY)%","bytes_received":"%BYTES_RECEIVED%","bytes_sent":"%BYTES_SENT%","downstream_local_address":"%DOWNSTREAM_LOCAL_ADDRESS%","downstream_remote_address":"%DOWNSTREAM_REMOTE_ADDRESS%","duration":"%DURATION%","istio_policy_status":"%DYNAMIC_METADATA(istio.mixer:status)%","method":"%REQ(:METHOD)%","path":"%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%","protocol":"%PROTOCOL%","request_id":"%REQ(X-REQUEST-ID)%","requested_server_name":"%REQUESTED_SERVER_NAME%","response_code":"%RESPONSE_CODE%","response_flags":"%RESPONSE_FLAGS%","route_name":"%ROUTE_NAME%","start_time":"%START_TIME%","trace_id":"%REQ(X-B3-TRACEID)%","upstream_cluster":"%UPSTREAM_CLUSTER%","upstream_host":"%UPSTREAM_HOST%","upstream_local_address":"%UPSTREAM_LOCAL_ADDRESS%","upstream_service_time":"%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%","upstream_transport_failure_reason":"%UPSTREAM_TRANSPORT_FAILURE_REASON%","user_agent":"%REQ(USER-AGENT)%","x_forwarded_for":"%REQ(X-FORWARDED-FOR)%"}
-configSources:
-- address: xds://controller:15051
-defaultConfig:
-  disableAlpnH2: true
-  discoveryAddress: pilot:15012
-  proxyStatsMatcher:
-    inclusionRegexps:
-    - .*
-dnsRefreshRate: 200s
-enableAutoMtls: false
-enablePrometheusMerge: true
-ingressControllerMode: "OFF"
-protocolDetectionTimeout: 100ms
-rootNamespace: higress-system
-trustDomain: cluster.local
+  read -r -d '' content << EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app: higress-gateway
+    higress: higress-system-higress-gateway
+  name: higress-config
+  namespace: higress-system
+data:
+  mesh: |-
+    accessLogEncoding: TEXT
+    accessLogFile: /dev/stdout
+    accessLogFormat: |
+      {"authority":"%REQ(:AUTHORITY)%","bytes_received":"%BYTES_RECEIVED%","bytes_sent":"%BYTES_SENT%","downstream_local_address":"%DOWNSTREAM_LOCAL_ADDRESS%","downstream_remote_address":"%DOWNSTREAM_REMOTE_ADDRESS%","duration":"%DURATION%","istio_policy_status":"%DYNAMIC_METADATA(istio.mixer:status)%","method":"%REQ(:METHOD)%","path":"%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%","protocol":"%PROTOCOL%","request_id":"%REQ(X-REQUEST-ID)%","requested_server_name":"%REQUESTED_SERVER_NAME%","response_code":"%RESPONSE_CODE%","response_flags":"%RESPONSE_FLAGS%","route_name":"%ROUTE_NAME%","start_time":"%START_TIME%","trace_id":"%REQ(X-B3-TRACEID)%","upstream_cluster":"%UPSTREAM_CLUSTER%","upstream_host":"%UPSTREAM_HOST%","upstream_local_address":"%UPSTREAM_LOCAL_ADDRESS%","upstream_service_time":"%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%","upstream_transport_failure_reason":"%UPSTREAM_TRANSPORT_FAILURE_REASON%","user_agent":"%REQ(USER-AGENT)%","x_forwarded_for":"%REQ(X-FORWARDED-FOR)%"}
+    configSources:
+    - address: xds://controller:15051
+    defaultConfig:
+      disableAlpnH2: true
+      discoveryAddress: pilot:15012
+      proxyStatsMatcher:
+        inclusionRegexps:
+        - .*
+    dnsRefreshRate: 200s
+    enableAutoMtls: false
+    enablePrometheusMerge: true
+    ingressControllerMode: "OFF"
+    protocolDetectionTimeout: 100ms
+    rootNamespace: higress-system
+    trustDomain: cluster.local
+  meshNetworks: 'networks: {}'
 EOF
-  fi
-  if [ ! -f ./meshNetworks ]; then
-cat <<EOF > ./meshNetworks
-networks: {}
-EOF
-  fi
+  publish_nacos_config_if_absent "higress-system" "configmaps.higress-config" "$content"
 }
 
 initializeGateway() {
