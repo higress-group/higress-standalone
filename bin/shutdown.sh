@@ -20,4 +20,4 @@ COMPOSE_ROOT="$ROOT/compose"
 cd - > /dev/null
 
 source $COMPOSE_ROOT/.env
-cd "$COMPOSE_ROOT" && COMPOSE_PROFILES="$COMPOSE_PROFILES" && docker compose -p higress down --remove-orphans
+cd "$COMPOSE_ROOT" && COMPOSE_PROFILES="$COMPOSE_PROFILES" && docker-compose -p higress down --remove-orphans
