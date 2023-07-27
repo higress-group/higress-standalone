@@ -86,6 +86,8 @@ func getOpenAPIDefinitions(openapicommon.ReferenceCallback) map[string]openapico
 		"k8s.io/api/admissionregistration/v1.MutatingWebhookConfiguration":   {},
 		"k8s.io/api/admissionregistration/v1.ValidatingWebhookConfiguration": {},
 
+		"k8s.io/api/authorization/v1.SubjectAccessReview": {},
+
 		"k8s.io/api/networking/v1.Ingress":      {},
 		"k8s.io/api/networking/v1.IngressClass": {},
 

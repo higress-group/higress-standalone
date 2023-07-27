@@ -20,10 +20,12 @@ import (
 	"fmt"
 	"github.com/alibaba/higress/api-server/pkg/options"
 	"github.com/alibaba/higress/api-server/pkg/registry"
+	"github.com/alibaba/higress/api-server/pkg/storage"
 	hiextensionsv1alpha1 "github.com/alibaba/higress/client/pkg/apis/extensions/v1alpha1"
 	hinetworkingv1 "github.com/alibaba/higress/client/pkg/apis/networking/v1"
 	"github.com/nacos-group/nacos-sdk-go/v2/clients/config_client"
 	admregv1 "k8s.io/api/admissionregistration/v1"
+	authzv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,8 +37,8 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	"k8s.io/apiserver/pkg/storage"
+	genericserverstorage "k8s.io/apiserver/pkg/server/storage"
+	genericstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
 
@@ -57,6 +59,8 @@ func init() {
 	metav1.AddToGroupVersion(Scheme, corev1.SchemeGroupVersion)
 	_ = admregv1.AddToScheme(Scheme)
 	metav1.AddToGroupVersion(Scheme, admregv1.SchemeGroupVersion)
+	_ = authzv1.AddToScheme(Scheme)
+	metav1.AddToGroupVersion(Scheme, authzv1.SchemeGroupVersion)
 	_ = networkingv1.AddToScheme(Scheme)
 	metav1.AddToGroupVersion(Scheme, networkingv1.SchemeGroupVersion)
 	_ = hiextensionsv1alpha1.AddToScheme(Scheme)
@@ -155,7 +159,7 @@ func (c completedConfig) New() (*HigressServer, error) {
 			func() runtime.Object { return &corev1.Secret{} },
 			func() runtime.Object { return &corev1.SecretList{} },
 			func(obj runtime.Object) (labels.Set, fields.Set, error) {
-				labels, fields, err := storage.DefaultNamespaceScopedAttr(obj)
+				labels, fields, err := genericstorage.DefaultNamespaceScopedAttr(obj)
 				if err != nil {
 					return labels, fields, err
 				}
@@ -205,6 +209,16 @@ func (c completedConfig) New() (*HigressServer, error) {
 			nil, nil)
 		admRegv1ApiGroupInfo.VersionedResourcesStorageMap[admregv1.SchemeGroupVersion.Version] = admRegv1Storages
 		if err := s.GenericAPIServer.InstallAPIGroup(&admRegv1ApiGroupInfo); err != nil {
+			return nil, err
+		}
+	}
+
+	{
+		authzv1ApiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(authzv1.SchemeGroupVersion.Group, Scheme, metav1.ParameterCodec, Codecs)
+		authzv1Storages := map[string]rest.Storage{}
+		authzv1Storages["subjectaccessreviews"] = &storage.SubjectAccessReviewStorage{}
+		authzv1ApiGroupInfo.VersionedResourcesStorageMap[authzv1.SchemeGroupVersion.Version] = authzv1Storages
+		if err := s.GenericAPIServer.InstallAPIGroup(&authzv1ApiGroupInfo); err != nil {
 			return nil, err
 		}
 	}
@@ -267,10 +281,10 @@ func appendStorage(storages map[string]rest.Storage,
 	pluralName string,
 	newFunc func() runtime.Object,
 	newListFunc func() runtime.Object,
-	attrFunc storage.AttrFunc,
+	attrFunc genericstorage.AttrFunc,
 	encryptionKey []byte) {
 	groupVersionResource := groupVersion.WithResource(pluralName).GroupResource()
-	codec, _, err := serverstorage.NewStorageCodec(serverstorage.StorageCodecConfig{
+	codec, _, err := genericserverstorage.NewStorageCodec(genericserverstorage.StorageCodecConfig{
 		StorageMediaType:  contentType,
 		StorageSerializer: serializer.NewCodecFactory(Scheme),
 		StorageVersion:    Scheme.PrioritizedVersionsForGroup(groupVersionResource.Group)[0],
