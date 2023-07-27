@@ -19,5 +19,8 @@ ROOT=$(dirname -- "$(pwd -P)")
 COMPOSE_ROOT="$ROOT/compose"
 cd - > /dev/null
 
-source $COMPOSE_ROOT/.env
-cd "$COMPOSE_ROOT" && COMPOSE_PROFILES="$COMPOSE_PROFILES" && docker-compose -p higress down --remove-orphans
+source "$ROOT/bin/base.sh"
+
+source "$COMPOSE_ROOT/.env"
+
+cd "$COMPOSE_ROOT" && COMPOSE_PROFILES="$COMPOSE_PROFILES" && runDockerCompose -p higress down --remove-orphans

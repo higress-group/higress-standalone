@@ -27,7 +27,9 @@ ROOT=$(dirname -- "$(pwd -P)")
 COMPOSE_ROOT="$ROOT/compose"
 cd - > /dev/null
 
-source $COMPOSE_ROOT/.env
+source "$ROOT/bin/base.sh"
+
+source "$COMPOSE_ROOT/.env"
 
 parseArgs() {
   resetEnv
@@ -453,7 +455,7 @@ runInitializer() {
 
   if [ "$USE_BUILTIN_NACOS" == "Y" ]; then
     echo "Starting built-in Nacos service..."
-    cd "$COMPOSE_ROOT" && docker-compose -p higress up -d nacos
+    cd "$COMPOSE_ROOT" && runDockerCompose -p higress up -d nacos
     retVal=$?
     if [ $retVal -ne 0 ]; then
       echo "Starting built-in Nacos service fails with $retVal"
@@ -461,7 +463,7 @@ runInitializer() {
     fi
   fi
 
-  cd "$COMPOSE_ROOT" && docker-compose -p higress run -T --rm initializer
+  cd "$COMPOSE_ROOT" && runDockerCompose -p higress run -T --rm initializer
   local retVal=$?
   if [ $retVal -ne 0 ]; then
     echo "Higress configuration failed with $retVal."
@@ -470,7 +472,7 @@ runInitializer() {
 
   if [ "$USE_BUILTIN_NACOS" == "Y" ] && [ "${AUTO_START}" != "Y" ]; then
     echo "Stopping built-in Nacos service..."
-    cd "$COMPOSE_ROOT" && docker-compose -p higress down --remove-orphans
+    cd "$COMPOSE_ROOT" && runDockerCompose -p higress down --remove-orphans
     local retVal=$?
     if [ $retVal -ne 0 ]; then
       echo "Stopping built-in Nacos service fails with $retVal"
