@@ -25,8 +25,10 @@ if [ ! -f "$CONFIGURED_MARK" ]; then
   exit -1
 fi
 
-source $COMPOSE_ROOT/.env
-cd "$COMPOSE_ROOT" && COMPOSE_PROFILES="$COMPOSE_PROFILES" docker-compose -p higress up -d
+source "$ROOT/bin/base.sh"
+
+source "$COMPOSE_ROOT/.env"
+cd "$COMPOSE_ROOT" && COMPOSE_PROFILES="$COMPOSE_PROFILES" runDockerCompose -p higress up -d
 
 retVal=$?
 if [ $retVal -ne 0 ]; then
