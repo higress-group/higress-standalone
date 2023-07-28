@@ -545,11 +545,11 @@ func (n *nacosREST) readRaw(group, dataId string) (string, error) {
 }
 
 func (n *nacosREST) decodeConfig(decoder runtime.Decoder, config string, newFunc func() runtime.Object) (runtime.Object, error) {
-	config, err := n.decryptConfig(config)
+	decryptedConfig, err := n.decryptConfig(config)
 	if err != nil {
 		return nil, err
 	}
-	obj, _, err := decoder.Decode([]byte(config), nil, newFunc())
+	obj, _, err := decoder.Decode([]byte(decryptedConfig), nil, newFunc())
 	if err != nil {
 		return nil, err
 	}
