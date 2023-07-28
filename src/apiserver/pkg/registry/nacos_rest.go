@@ -352,7 +352,7 @@ func (n *nacosREST) Update(
 		}
 	}
 
-	if updatedAccessor.GetResourceVersion() != oldAccessor.GetResourceVersion() {
+	if updatedAccessor.GetResourceVersion() != "" && updatedAccessor.GetResourceVersion() != oldAccessor.GetResourceVersion() {
 		return nil, false, apierrors.NewConflict(n.groupResource, name, nil)
 	}
 
