@@ -410,7 +410,7 @@ outputWelcomeMessage() {
   fi
   echo "Usage:"
   echo "  Start: $ROOT/bin/startup.sh"
-  echo "  Stop: $ROOT/bin/stop.sh"
+  echo "  Stop: $ROOT/bin/shutdown.sh"
   echo "  View Component Statuses: $ROOT/bin/status.sh"
   echo "  View Logs: $ROOT/bin/logs.sh"
   echo "  Re-configure: $ROOT/bin/configure.sh -r"
