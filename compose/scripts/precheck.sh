@@ -7,16 +7,13 @@ RSA_KEY_LENGTH=4096
 
 NACOS_SERVER_URL=${NACOS_SERVER_URL%/}
 NACOS_ACCESS_TOKEN=""
+FILE_ROOT_DIR="/opt/data"
 
 now() {
   echo "$(date --utc +%Y-%m-%dT%H:%M:%SZ)"
 }
 
-base64_urlencode() {
-  openssl enc -base64 -A | tr '+/' '-_' | tr -d '='; 
-}
-
-check_exit_code() {
+checkExitCode() {
   # $1 message
   retVal=$?
   if [ $retVal -ne 0 ]; then
@@ -25,26 +22,79 @@ check_exit_code() {
   fi
 }
 
-check_nacos_config_exists() {
-  # $1 group
-  # $2 dataId
-  statusCode=$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v1/cs/configs?accessToken=${NACOS_ACCESS_TOKEN}&tenant=${NACOS_NS}&dataId=$2&group=$1")
+checkConfigExists() {
+  # $1 namespace
+  # $2 configType: plural
+  # $3 configName
+  case $CONFIG_STORAGE in
+    nacos)
+      return checkNacosConfigExists "$@"
+      ;;
+    file)
+      return checkFileConfigExists "$@"
+      ;;
+    *)
+      printf "  Unknown storage type: %s\n" "$CONFIG_STORAGE"
+      exit -1
+      ;;
+  esac
+}
+
+checkNacosConfigExists() {
+  # $1 namespace
+  # $2 configType: plural
+  # $3 configName
+  local group="$1"
+  local dataId="$2.$3"
+  statusCode=$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v1/cs/configs?accessToken=${NACOS_ACCESS_TOKEN}&tenant=${NACOS_NS}&dataId=${dataId}&group=${group}")
   if [ $statusCode -eq 200 ]; then
     return 0
   elif [ $statusCode -eq 404 ]; then
     return -1
   else
-    echo ${1:-"  Checking config $1/$2 in namespace ${NACOS_NS} failed with $retVal"}
+    echo ${1:-"  Checking config ${group}/${dataId} in namespace ${NACOS_NS} failed with $retVal"}
     exit -1
   fi
 }
 
-get_nacos_config() {
-  # $1 group
-  # $2 dataId
+checkFileConfigExists() {
+  # $1 namespace: ignored. only for alignment
+  # $2 configType: plural
+  # $3 configName
+  local configFile="${FILE_ROOT_DIR}/$2/$3.yaml"
+  return [ -f "$configFile" ]
+}
+
+getConfig() {
+  # $1 namespace
+  # $2 configType: plural
+  # $3 configName
+  case $CONFIG_STORAGE in
+    nacos)
+      getNacosConfig "$@"
+      ;;
+    file)
+      getFileConfig "$@"
+      ;;
+    *)
+      printf "  Unknown storage type: %s\n" "$CONFIG_STORAGE"
+      exit -1
+      ;;
+  esac
+}
+
+getNacosConfig() {
+  # $1 namespace
+  # $2 configType: plural
+  # $3 configName
+  local group="$1"
+  local dataId="$2.$3"
+
+  echo "Group=$group  DataId=$dataId"
+
   config=""
   tmpFile=$(mktemp /tmp/higress-precheck-nacos.XXXXXXXXX.cfg)
-  statusCode=$(curl -s -o "$tmpFile" -w "%{http_code}" "${NACOS_SERVER_URL}/v1/cs/configs?accessToken=${NACOS_ACCESS_TOKEN}&tenant=${NACOS_NS}&dataId=$2&group=$1")
+  statusCode=$(curl -s -o "$tmpFile" -w "%{http_code}" "${NACOS_SERVER_URL}/v1/cs/configs?accessToken=${NACOS_ACCESS_TOKEN}&tenant=${NACOS_NS}&dataId=${dataId}&group=${group}")
   if [ $statusCode -eq 200 ]; then
     config=$(cat "$tmpFile")
     rm "$tmpFile"
@@ -53,9 +103,39 @@ get_nacos_config() {
     config = ""
     return -1
   else
-    echo ${1:-"  Getting config $1/$2 in namespace ${NACOS_NS} failed with $retVal"}
+    echo ${1:-"  Getting config ${group}/${dataId} in namespace ${NACOS_NS} failed with $retVal"}
     exit -1
   fi
+}
+
+getFileConfig() {
+  # $1 namespace: ignored. only for alignment
+  # $2 configType: plural
+  # $3 configName
+  local configFile="${FILE_ROOT_DIR}/$2/$3.yaml"
+  if [ -f "$configFile" ]; then
+    config=$(cat "$configFile")
+    return 0
+  else
+    config = ""
+    return -1
+  fi
+}
+
+checkStorage() {
+  CONFIG_STORAGE=${CONFIG_STORAGE:-nacos}
+
+  case $CONFIG_STORAGE in
+    nacos)
+      checkNacos
+      ;;
+    file)
+      checkConfigDir
+      ;;
+    *)
+      printf "Unsupported storage type: %s\n" "$CONFIG_STORAGE"
+      ;;
+  esac
 }
 
 checkNacos() {
@@ -93,6 +173,10 @@ checkNacos() {
     echo "  Unable to find namespace ${NACOS_NS} in Nacos."
     exit -1
   fi
+}
+
+checkConfigDir() {
+  echo "Initializing Config Directory..."
 }
 
 checkApiServer() {
@@ -157,8 +241,8 @@ checkPilot() {
   fi
 
   mkdir -p $VOLUMES_ROOT/pilot/config && cd "$_"
-  get_nacos_config "higress-system" "configmaps.higress-config"
-  check_exit_code "  The ConfigMap resource of 'higress-config' isn't found in Nacos."
+  getConfig "higress-system" "configmaps" "higress-config"
+  checkExitCode "  The ConfigMap resource of 'higress-config' doesn't exist."
   fileNames=$(yq '.data | keys | .[]' <<< "$config")
   if [ -z "$fileNames" ]; then
     echo "  Missing required files in higress-config ConfigMap."
@@ -197,19 +281,19 @@ checkGateway() {
 checkConsole() {
   echo "Checking console configurations..."
 
-  check_nacos_config_exists "higress-system" "configmaps.higress-console"
+  checkConfigExists "higress-system" "configmaps" "higress-console"
   if [ ! $?  ]; then
-    echo "  The ConfigMap resource of Higress Console isn't found in Nacos."
+    echo "  The ConfigMap resource of Higress Console doesn't exist."
     exit -1
   fi
-  check_nacos_config_exists "higress-system" "secrets.higress-console"
+  checkConfigExists "higress-system" "secrets" "higress-console"
   if [ ! $? ]; then
-    echo "  The Secret resource of Higress Console isn't found in Nacos."
+    echo "  The Secret resource of Higress Console doesn't exist."
     exit -1
   fi
 }
 
-checkNacos
+checkStorage
 checkApiServer
 checkPilot
 checkGateway

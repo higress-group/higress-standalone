@@ -17,7 +17,8 @@ NACOS_CONTAINER_ARGS="-e NACOS_CORE_AUTH_ENABLED=true -e NACOS_CORE_AUTH_SERVER_
 
 CONFIGURE_ARGS=""
 
-CONFIGURE_INPUT="N
+CONFIGURE_INPUT="nacos
+N
 nacos://${LOCAL_IP}:8848
 Y
 nacos
@@ -33,6 +34,8 @@ admin
 
 declare -A EXPECTED_ENVS=(
   ["COMPOSE_PROFILES"]=''
+  ["CONFIG_STORAGE"]='nacos'
+  ["FILE_ROOT_DIR"]=''
   ["NACOS_SERVER_URL"]="http://${LOCAL_IP}:8848/nacos"
   ["NACOS_NS"]='higress-test'
   ["NACOS_USERNAME"]='nacos'

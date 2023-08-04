@@ -14,7 +14,8 @@
 
 CONFIGURE_ARGS=""
 
-CONFIGURE_INPUT="Y
+CONFIGURE_INPUT="nacos
+Y
 admin
 30001
 30002
@@ -25,6 +26,8 @@ admin
 
 declare -A EXPECTED_ENVS=(
   ["COMPOSE_PROFILES"]='nacos'
+  ["CONFIG_STORAGE"]='nacos'
+  ["FILE_ROOT_DIR"]=''
   ["NACOS_SERVER_URL"]='http://nacos:8848/nacos'
   ["NACOS_NS"]='higress-system'
   ["NACOS_USERNAME"]=''

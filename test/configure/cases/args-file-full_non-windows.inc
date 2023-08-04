@@ -12,26 +12,17 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-USE_EXTERNAL_NACOS="Y"
-NACOS_CONTAINER_ARGS=""
-
-CONFIGURE_ARGS="-c nacos://${LOCAL_IP}:8848 -k 2b9841c866544379bb88ebee3021e341"
+CONFIGURE_ARGS="-c file://tmp/higress/data --console-password=helloworld --gateway-http-port=30002 --gateway-https-port=30003 --gateway-metrics-port=30004 --console-port=30005"
 
 CONFIGURE_INPUT=""
 
 declare -A EXPECTED_ENVS=(
   ["COMPOSE_PROFILES"]=''
-  ["CONFIG_STORAGE"]='nacos'
-  ["FILE_ROOT_DIR"]=''
-  ["NACOS_SERVER_URL"]="http://${LOCAL_IP}:8848/nacos"
-  ["NACOS_NS"]='higress-system'
-  ["NACOS_USERNAME"]=''
-  ["NACOS_PASSWORD"]=''
-  ["NACOS_DATA_ENC_KEY"]='2b9841c866544379bb88ebee3021e341'
-  ["NACOS_HTTP_PORT"]='8848'
-  ["NACOS_GRPC_PORT"]='9848'
-  ["GATEWAY_HTTP_PORT"]='80'
-  ["GATEWAY_HTTPS_PORT"]='443'
-  ["GATEWAY_METRICS_PORT"]='15020'
-  ["CONSOLE_PORT"]='8080'
+  ["CONFIG_STORAGE"]='file'
+  ["FILE_ROOT_DIR"]='/tmp/higress/data'
+  ["HIGRESS_CONSOLE_PASSWORD"]='helloworld'
+  ["GATEWAY_HTTP_PORT"]='30002'
+  ["GATEWAY_HTTPS_PORT"]='30003'
+  ["GATEWAY_METRICS_PORT"]='30004'
+  ["CONSOLE_PORT"]='30005'
 )
