@@ -26,4 +26,4 @@ if [ ! -f "$CONFIGURED_MARK" ]; then
   echo "Higress hasn't been configured yet. Please run \"$ROOT/bin/configure.sh\" first"
   exit -1
 fi
-cd "$COMPOSE_ROOT" && COMPOSE_PROFILES="$COMPOSE_PROFILES" runDockerCompose higress logs "$@"
+cd "$COMPOSE_ROOT" && COMPOSE_PROFILES="$COMPOSE_PROFILES" runDockerCompose -p higress logs "$@"
