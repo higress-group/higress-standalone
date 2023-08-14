@@ -22,6 +22,12 @@ cd - >/dev/null
 
 source "$SCRIPT_DIR/../utils.inc"
 
+OS="$(uname|tr '[:upper:]' '[:lower:]')"
+case "$OS" in
+  # Minimalist GNU for Windows
+  mingw*|cygwin*) OS='windows';;
+esac
+
 # Clean up before starting the test.
 echo "Resetting existed configurations before testing..."
 bash "$ROOT/bin/reset.sh"
@@ -34,21 +40,25 @@ if [ -z "$1" ]; then
   for fullname in $SCRIPT_DIR/cases/*.inc; do
     [ -e "$fullname" ] || continue
     filename=$(basename -- "$fullname")
-    filename=${filename%.*}
+    casename=${filename%.*}
+    
+    [[ "$casename" == *"_windows" ]] && [ "$OS" != "windows" ] && continue
+    [[ "$casename" == *"_non-windows" ]] && [ "$OS" == "windows" ] && continue
+
     echo "=========================================================="
-    echo "--> Executing test case [$filename] <--"
+    echo "--> Executing test case [$casename] <--"
     bash $SCRIPT_DIR/configure-test-runner.sh "$fullname"
-    testResults["$filename"]=$?
+    testResults["$casename"]=$?
     echo "=========================================================="
     echo ""
   done
 else
-  filename="$1.inc"
-  fullname="$SCRIPT_DIR/cases/$filename"
+  casename="$1"
+  fullname="$SCRIPT_DIR/cases/$casename.inc"
   echo "=========================================================="
-  echo "--> Executing test case [$filename] <--"
+  echo "--> Executing test case [$casename] <--"
   bash $SCRIPT_DIR/configure-test-runner.sh "$fullname"
-  testResults["$filename"]=$?
+  testResults["$casename"]=$?
   echo "=========================================================="
   echo ""
 fi

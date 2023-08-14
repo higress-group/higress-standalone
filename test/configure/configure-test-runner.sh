@@ -45,7 +45,7 @@ trap "fail_trap" EXIT
 configure() {
   echo ""
   echo "Configuring Higress instance..."
-  echo -e "$CONFIGURE_INPUT" | bash "$ROOT/bin/configure.sh" $CONFIGURE_ARGS
+  echo "$CONFIGURE_INPUT" | bash "$ROOT/bin/configure.sh" $CONFIGURE_ARGS
   if [ $? -ne 0 ]; then
     echo "Failed to configure the test Higress instance."
     exit 1

@@ -17,7 +17,8 @@ NACOS_CONTAINER_ARGS=""
 
 CONFIGURE_ARGS=""
 
-CONFIGURE_INPUT="N
+CONFIGURE_INPUT="nacos
+N
 nacos://${LOCAL_IP}:8848
 N
 
@@ -32,6 +33,8 @@ admin
 
 declare -A EXPECTED_ENVS=(
   ["COMPOSE_PROFILES"]=''
+  ["CONFIG_STORAGE"]='nacos'
+  ["FILE_ROOT_DIR"]=''
   ["NACOS_SERVER_URL"]="http://${LOCAL_IP}:8848/nacos"
   ["NACOS_NS"]='higress-system'
   ["NACOS_USERNAME"]=''

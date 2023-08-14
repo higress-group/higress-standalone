@@ -20,6 +20,8 @@ CONFIGURE_ARGS="-c nacos://${LOCAL_IP}:8848 --gateway-http-port=30002 --gateway-
 CONFIGURE_INPUT=""
 
 declare -A EXPECTED_ENVS=(
+  ["CONFIG_STORAGE"]='nacos'
+  ["FILE_ROOT_DIR"]=''
   ["COMPOSE_PROFILES"]=''
   ["NACOS_SERVER_URL"]="http://${LOCAL_IP}:8848/nacos"
   ["NACOS_NS"]='higress-system'

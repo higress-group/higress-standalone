@@ -3,6 +3,7 @@ package options
 import (
 	"errors"
 	"fmt"
+	"github.com/alibaba/higress/api-server/pkg/utils"
 	"github.com/nacos-group/nacos-sdk-go/v2/clients"
 	"github.com/nacos-group/nacos-sdk-go/v2/clients/config_client"
 	"github.com/nacos-group/nacos-sdk-go/v2/common/constant"
@@ -13,6 +14,88 @@ import (
 	"strconv"
 	"strings"
 )
+
+const (
+	Storage_File  = "file"
+	Storage_Nacos = "nacos"
+)
+
+func CreateStorageOptions() *StorageOptions {
+	return &StorageOptions{
+		FileOptions:  &FileOptions{},
+		NacosOptions: &NacosOptions{},
+	}
+}
+
+type StorageOptions struct {
+	Mode         string
+	FileOptions  *FileOptions
+	NacosOptions *NacosOptions
+}
+
+func (o *StorageOptions) AddFlags(fs *pflag.FlagSet) {
+	if o == nil {
+		return
+	}
+
+	fs.StringVar(&o.Mode, "storage", Storage_Nacos, "The storage mode. Valid options are: file, nacos.")
+
+	o.FileOptions.AddFlags(fs)
+	o.NacosOptions.AddFlags(fs)
+}
+
+func (o *StorageOptions) Validate() []error {
+	errors := []error{}
+	switch o.Mode {
+	case Storage_File:
+		errors = append(errors, o.FileOptions.Validate()...)
+		break
+	case Storage_Nacos:
+		errors = append(errors, o.NacosOptions.Validate()...)
+		break
+	default:
+		errors = append(errors, fmt.Errorf("invalid storage mode: %s", o.Mode))
+	}
+	return errors
+}
+
+type FileOptions struct {
+	RootDir string
+}
+
+func (o *FileOptions) AddFlags(fs *pflag.FlagSet) {
+	if o == nil {
+		return
+	}
+
+	fs.StringVar(&o.RootDir, "file-root-dir", "./conf", "The root directory of the file backend.")
+}
+
+func (o *FileOptions) Validate() []error {
+	if o == nil {
+		return []error{
+			fmt.Errorf("file configuration is not set"),
+		}
+	}
+
+	errors := []error{}
+
+	if o.RootDir == "" {
+		errors = append(errors, fmt.Errorf("--file-root-dir must be set"))
+	} else {
+		fileInfo, err := os.Stat(o.RootDir)
+		if err != nil {
+			err := utils.EnsureDir(o.RootDir)
+			if err != nil {
+				errors = append(errors, fmt.Errorf("--file-root-dir doesn't exist and cannot be created: %s", err))
+			}
+		} else if !fileInfo.IsDir() {
+			errors = append(errors, fmt.Errorf("--file-root-dir must be set to a directory path"))
+		}
+	}
+
+	return errors
+}
 
 type NacosOptions struct {
 	ServerHttpUrls    []string

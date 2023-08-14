@@ -37,7 +37,7 @@ import (
 // HigressServerOptions contains state for master/api server
 type HigressServerOptions struct {
 	RecommendedOptions *genericoptions.RecommendedOptions
-	NacosOptions       *options.NacosOptions
+	StorageOptions     *options.StorageOptions
 
 	SharedInformerFactory informers.SharedInformerFactory
 	StdOut                io.Writer
@@ -53,9 +53,9 @@ func NewHigressServerOptions(out, errOut io.Writer) *HigressServerOptions {
 			"",
 			apiserver.Codecs.LegacyCodec(),
 		),
-		NacosOptions: &options.NacosOptions{},
-		StdOut:       out,
-		StdErr:       errOut,
+		StorageOptions: options.CreateStorageOptions(),
+		StdOut:         out,
+		StdErr:         errOut,
 	}
 	return o
 }
@@ -64,7 +64,7 @@ func NewHigressServerOptions(out, errOut io.Writer) *HigressServerOptions {
 func (o HigressServerOptions) Validate(args []string) error {
 	errors := []error{}
 	errors = append(errors, validate(o.RecommendedOptions)...)
-	errors = append(errors, o.NacosOptions.Validate()...)
+	errors = append(errors, o.StorageOptions.Validate()...)
 	return utilerrors.NewAggregate(errors)
 }
 
@@ -128,7 +128,7 @@ func (o *HigressServerOptions) Config() (*apiserver.Config, error) {
 	config := &apiserver.Config{
 		GenericConfig: serverConfig,
 		ExtraConfig: apiserver.ExtraConfig{
-			NacosOptions: o.NacosOptions,
+			StorageOptions: o.StorageOptions,
 		},
 	}
 	return config, nil
@@ -213,7 +213,7 @@ func NewCommandStartHigressServer(defaults *HigressServerOptions, stopCh <-chan 
 
 	flags := cmd.Flags()
 	o.RecommendedOptions.AddFlags(flags)
-	o.NacosOptions.AddFlags(flags)
+	o.StorageOptions.AddFlags(flags)
 	utilfeature.DefaultMutableFeatureGate.AddFlag(flags)
 
 	return cmd

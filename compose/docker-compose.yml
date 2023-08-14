@@ -30,6 +30,7 @@ services:
       - ./init.sh
     profiles: [ "init" ]
     environment:
+      - CONFIG_STORAGE
       - NACOS_SERVER_URL
       - NACOS_NS
       - NACOS_USERNAME
@@ -41,12 +42,14 @@ services:
     volumes:
       - ./volumes:/mnt/volumes
       - ./scripts:/workspace
+      - ${FILE_ROOT_DIR:-./volumes/dummy}:/opt/data/:rw
 
   precheck:
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/runner:${HIGRESS_RUNNER_TAG}
     command:
       - ./precheck.sh
     environment:
+      - CONFIG_STORAGE
       - NACOS_SERVER_URL
       - NACOS_NS
       - NACOS_USERNAME
@@ -56,6 +59,7 @@ services:
     volumes:
       - ./volumes:/mnt/volumes:rw
       - ./scripts:/workspace:ro
+      - ${FILE_ROOT_DIR:-./volumes/dummy}:/opt/data/:ro
 
   apiserver:
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/api-server:${HIGRESS_API_SERVER_TAG}
@@ -68,6 +72,10 @@ services:
       - /etc/api/server.crt
       - --tls-private-key-file
       - /etc/api/server.key
+      - --storage
+      - ${CONFIG_STORAGE:-nacos}
+      - --file-root-dir
+      - /opt/data
       - --nacos-server
       - ${NACOS_SERVER_URL}
       - --nacos-username
@@ -91,6 +99,7 @@ services:
       retries: 60
     volumes:
       - ./volumes/api:/etc/api:ro
+      - ${FILE_ROOT_DIR:-./volumes/dummy}:/opt/data/:rw
 
   controller:
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress:${HIGRESS_CONTROLLER_TAG}
@@ -169,7 +178,13 @@ services:
       - "${GATEWAY_HTTPS_PORT:-443}:443/tcp"
       - "${GATEWAY_METRICS_PORT:-15020}:15020/tcp"
     healthcheck:
-      test: [ "CMD", "curl", "-fk", "http://127.0.0.1:15021/healthz/ready" ]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-fk",
+          "http://127.0.0.1:15021/healthz/ready"
+        ]
       interval: 1s
       timeout: 3s
       retries: 60
@@ -190,6 +205,17 @@ services:
       - higress-net
     ports:
       - "${CONSOLE_PORT:-8080}:8080/tcp"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-fk",
+          "http://127.0.0.1:8080/"
+        ]
+      interval: 1s
+      timeout: 3s
+      retries: 60
     restart: always
     volumes:
       - ./volumes/kube:/home/higress/.kube:ro

@@ -18,6 +18,8 @@ CONFIGURE_ARGS="--use-builtin-nacos --console-password=helloworld"
 
 declare -A EXPECTED_ENVS=(
   ["COMPOSE_PROFILES"]='nacos'
+  ["CONFIG_STORAGE"]='nacos'
+  ["FILE_ROOT_DIR"]=''
   ["NACOS_SERVER_URL"]='http://nacos:8848/nacos'
   ["NACOS_NS"]='higress-system'
   ["NACOS_USERNAME"]=''

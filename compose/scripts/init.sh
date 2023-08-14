@@ -7,16 +7,17 @@ RSA_KEY_LENGTH=4096
 
 NACOS_SERVER_URL=${NACOS_SERVER_URL%/}
 NACOS_ACCESS_TOKEN=""
+FILE_ROOT_DIR="/opt/data"
 
 now() {
   echo "$(date --utc +%Y-%m-%dT%H:%M:%SZ)"
 }
 
-base64_urlencode() {
+base64UrlEncode() {
   openssl enc -base64 -A | tr '+/' '-_' | tr -d '='; 
 }
 
-check_exit_code() {
+checkExitCode() {
   # $1 message
   retVal=$?
   if [ $retVal -ne 0 ]; then
@@ -25,52 +26,92 @@ check_exit_code() {
   fi
 }
 
-check_nacos_config_exists() {
-  # $1 group
-  # $2 dataId
-  statusCode=$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v1/cs/configs?accessToken=${NACOS_ACCESS_TOKEN}&tenant=${NACOS_NS}&dataId=$2&group=$1")
-  if [ $statusCode -eq 200 ]; then
-    return 0
-  elif [ $statusCode -eq 404 ]; then
-    return -1
-  else
-    echo ${1:-"  Checking config $1/$2 in namespace ${NACOS_NS} failed with $retVal"}
-    exit -1
-  fi
+publishConfig() {
+  # $1 namespace
+  # $2 configType: plural
+  # $3 configName
+  # $4 content
+  # $5 skipWhenExisted
+  case $CONFIG_STORAGE in
+    nacos)
+      publishNacosConfig "$@"
+      ;;
+    file)
+      publishFileConfig "$@"
+      ;;
+    *)
+      printf "  Unknown storage type: %s\n" "$CONFIG_STORAGE"
+      exit -1
+      ;;
+  esac
 }
 
-publish_nacos_config_if_absent() {
-  # $1 group
-  # $2 dataId
-  # $3 content
-  statusCode=$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v1/cs/configs?accessToken=${NACOS_ACCESS_TOKEN}&tenant=${NACOS_NS}&dataId=$2&group=$1")
-  if [ $statusCode -eq 200 ]; then
-    echo "  Config $1/$2 already exists in namespace ${NACOS_NS}"
-    return 0
-  elif [ $statusCode -ne 404 ]; then
-    echo "  Checking config $1/$2 in tenant ${NACOS_NS} failed with $statusCode"
-    exit -1
+publishNacosConfig() {
+  # $1 namespace
+  # $2 configType: plural
+  # $3 configName
+  # $4 content
+  # $5 skipWhenExisted
+  local group="$1"
+  local dataId="$2.$3"
+  local content="$4"
+  local skipWhenExisted=$5
+
+  if [ "$skipWhenExisted" == true ]; then
+    statusCode=$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v1/cs/configs?accessToken=${NACOS_ACCESS_TOKEN}&tenant=${NACOS_NS}&dataId=${dataId}&group=${group}")
+    if [ $statusCode -eq 200 ]; then
+      echo "  Config $group/$dataId already exists in namespace ${NACOS_NS}"
+      return 0
+    elif [ $statusCode -ne 404 ]; then
+      echo "  Checking config $group/$dataId in tenant ${NACOS_NS} failed with $statusCode"
+      exit -1
+    fi
   fi
 
-  statusCode="$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v1/cs/configs?accessToken=${NACOS_ACCESS_TOKEN}" --data-urlencode "tenant=${NACOS_NS}" --data-urlencode "dataId=$2" --data-urlencode "group=$1" --data-urlencode "content=$3")"
+  statusCode="$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v1/cs/configs?accessToken=${NACOS_ACCESS_TOKEN}" --data-urlencode "tenant=${NACOS_NS}" --data-urlencode "dataId=${dataId}" --data-urlencode "group=${group}" --data-urlencode "content=${content}")"
   if [ $statusCode -ne 200 ]; then
-    echo "  Publishing config $1/$2 in tenant ${NACOS_NS} failed with $statusCode"
+    echo "  Publishing config ${group}/${dataId} in tenant ${NACOS_NS} failed with $statusCode"
     exit -1 
   fi
-  publish_nacos_config "$1" "$2" "$3"
   return 0
 }
 
-publish_nacos_config() {
-  # $1 group
-  # $2 dataId
-  # $3 content
-  statusCode="$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v1/cs/configs?accessToken=${NACOS_ACCESS_TOKEN}" --data-urlencode "tenant=${NACOS_NS}" --data-urlencode "dataId=$2" --data-urlencode "group=$1" --data-urlencode "content=$3")"
-  if [ $statusCode -ne 200 ]; then
-    echo "  Publishing config $1/$2 in tenant ${NACOS_NS} failed with $statusCode"
-    exit -1 
+publishFileConfig() {
+  # $1 namespace: ignored. only for alignment
+  # $2 configType: plural
+  # $3 configName
+  # $4 content
+  # $5 skipWhenExisted
+  local configDir="${FILE_ROOT_DIR}/$2"
+  local configFile="${configDir}/$3.yaml"
+  local content="$4"
+  local skipWhenExisted=$5
+
+  if [ "$skipWhenExisted" == true ] && [ -f "$configFile" ]; then
+      echo "  Config file [$configFile] already exists"
+      exit 0
   fi
+
+  mkdir -p "$configDir"
+  checkExitCode "  Creating config directory [$configDir] fails with $?"
+  echo "$content" > "$configFile"
   return 0
+}
+
+initializeConfigStorage() {
+  CONFIG_STORAGE=${CONFIG_STORAGE:-nacos}
+
+  case $CONFIG_STORAGE in
+    nacos)
+      initializeNacos
+      ;;
+    file)
+      initializeConfigDir
+      ;;
+    *)
+      printf "Unsupported storage type: %s\n" "$CONFIG_STORAGE"
+      ;;
+  esac
 }
 
 initializeNacos() {
@@ -119,16 +160,28 @@ initializeNacos() {
   return 0
 }
 
+initializeConfigDir() {
+  echo "Initializing Config Directory..."
+
+  if [ -z "$FILE_ROOT_DIR" ]; then
+    echo "  Config directory isn't specified."
+    exit -1
+  fi
+
+  mkdir -p "$FILE_ROOT_DIR"
+  checkExitCode "  Creating config directory [$FILE_ROOT_DIR] fails with $?"
+}
+
 initializeApiServer() {
   echo "Initializing API server configurations..."
 
   mkdir -p "$VOLUMES_ROOT/api" && cd "$_"
-  check_exit_code "Creating volume for API server fails with $?"
+  checkExitCode "Creating volume for API server fails with $?"
 
   if [ ! -f ca.key ] || [ ! -f ca.crt ]; then
     echo "  Generating CA certificate...";
     openssl req -nodes -new -x509 -keyout ca.key -out ca.crt -subj "/CN=higress-root-ca/O=higress" > /dev/null 2>&1
-    check_exit_code "  Generating CA certificate for API server fails with $?";
+    checkExitCode "  Generating CA certificate for API server fails with $?";
   else
     echo "  CA certificate already exists.";
   fi
@@ -136,7 +189,7 @@ initializeApiServer() {
     echo "  Generating server certificate..."
     openssl req -out server.csr -new -newkey rsa:$RSA_KEY_LENGTH -nodes -keyout server.key -subj "/CN=higress-api-server/O=higress" > /dev/null 2>&1 \
       && openssl x509 -req -days 365 -in server.csr -CA ca.crt -CAkey ca.key -set_serial 01 -sha256 -out server.crt > /dev/null 2>&1
-    check_exit_code "  Generating server certificate fails with $?";
+    checkExitCode "  Generating server certificate fails with $?";
   else
     echo "  Server certificate already exists.";
   fi
@@ -154,7 +207,7 @@ initializeApiServer() {
     echo "  Generating client certificate..."
     openssl req -out client.csr -new -newkey rsa:$RSA_KEY_LENGTH -nodes -keyout client.key -subj "/CN=higress/O=system:masters" > /dev/null 2>&1 \
       && openssl x509 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 02 -sha256 -out client.crt > /dev/null 2>&1
-    check_exit_code "  Generating client certificate fails with $?";
+    checkExitCode "  Generating client certificate fails with $?";
   else
     echo "  Client certificate already exists.";
   fi
@@ -217,7 +270,7 @@ rootca@higress.io
 
 
 EOF
-    check_exit_code "  Generating Root CA certificate for pilot fails with $?"
+    checkExitCode "  Generating Root CA certificate for pilot fails with $?"
   fi
 
   if [ ! -f ca-key.pem ] || [ ! -f ca-cert.pem ]; then
@@ -245,7 +298,7 @@ EOF
     openssl genrsa -out ca-key.pem $RSA_KEY_LENGTH > /dev/null \
       && openssl req -new -key ca-key.pem -out ca-cert.csr -config ca.cfg -batch -sha256 > /dev/null 2>&1 \
       && openssl x509 -req -days 36500 -in ca-cert.csr -sha256 -CA root-cert.pem -CAkey root-key.pem -CAcreateserial -out ca-cert.pem -extensions v3_req -extfile ca.cfg > /dev/null 2>&1
-    check_exit_code "Generating intermedia CA certificate for pilot fails with $?"
+    checkExitCode "Generating intermedia CA certificate for pilot fails with $?"
     cp ca-cert.pem cert-chain.pem > /dev/null
     chmod a+r ca-key.pem
     rm ./*csr > /dev/null
@@ -272,7 +325,7 @@ EOF
     openssl genrsa -out gateway-key.pem $RSA_KEY_LENGTH > /dev/null \
       && openssl req -new -key gateway-key.pem -out gateway-cert.csr -config gateway.cfg -batch -sha256 > /dev/null 2>&1 \
       && openssl x509 -req -days 365 -in gateway-cert.csr -sha256 -CA ca-cert.pem -CAkey ca-key.pem -CAcreateserial -out gateway-cert.pem -extensions v3_req -extfile gateway.cfg > /dev/null 2>&1
-    check_exit_code "Generating certificate for gateway fails with $?"
+    checkExitCode "Generating certificate for gateway fails with $?"
     chmod a+r gateway-key.pem
   fi
 
@@ -308,7 +361,7 @@ data:
     trustDomain: cluster.local
   meshNetworks: 'networks: {}'
 EOF
-  publish_nacos_config_if_absent "higress-system" "configmaps.higress-config" "$content"
+  publishConfig "higress-system" "configmaps" "higress-config" "$content" true
 }
 
 initializeGateway() {
@@ -328,32 +381,34 @@ initializeGateway() {
 initializeMcpBridge() {
   echo "Initializing McpBridge resource..."
 
-  if [[ "$NACOS_SERVER_URL" =~ ^http://([a-zA-Z0-9.]+?)(:([0-9]+))/nacos$ ]]; then
-    NACOS_SERVER_DOMAIN="${BASH_REMATCH[1]}"
-    NACOS_SERVER_PORT="${BASH_REMATCH[3]}"
-  else
-    echo "Unable to parse Nacos server URL. Skip creating the McpBridge resource"
-    return
-  fi
+  if [ "$CONFIG_STORAGE" == "nacos" ]; then
+    if [[ "$NACOS_SERVER_URL" =~ ^http://([a-zA-Z0-9.]+?)(:([0-9]+))/nacos$ ]]; then
+      NACOS_SERVER_DOMAIN="${BASH_REMATCH[1]}"
+      NACOS_SERVER_PORT="${BASH_REMATCH[3]}"
+    else
+      echo "  Unable to parse Nacos server URL. Skip creating the McpBridge resource"
+      return
+    fi
 
-  read -r -d '' content << EOF
-apiVersion: networking.higress.io/v1
-kind: McpBridge
-metadata:
-  creationTimestamp: "$(now)"
-  name: default
-  namespace: higress-system
-spec:
-  registries:
-  - domain: ${NACOS_SERVER_DOMAIN}
-    nacosGroups:
-    - DEFAULT_GROUP
-    nacosNamespaceId: ""
-    name: nacos
-    port: ${NACOS_SERVER_PORT:-80}
-    type: nacos2
+    read -r -d '' content << EOF
+  apiVersion: networking.higress.io/v1
+  kind: McpBridge
+  metadata:
+    creationTimestamp: "$(now)"
+    name: default
+    namespace: higress-system
+  spec:
+    registries:
+    - domain: ${NACOS_SERVER_DOMAIN}
+      nacosGroups:
+      - DEFAULT_GROUP
+      nacosNamespaceId: ""
+      name: nacos
+      port: ${NACOS_SERVER_PORT:-80}
+      type: nacos2
 EOF
-  publish_nacos_config_if_absent "higress-system" "mcpbridges.default" "$content"
+    publishConfig "higress-system" "mcpbridges" "default" "$content"
+  fi
 }
 
 initializeConsole() {
@@ -376,7 +431,7 @@ data:
   mode: standalone
   login.prompt: "$LOGIN_PROMPT"
 EOF
-  publish_nacos_config "higress-system" "configmaps.higress-console" "$content"
+  publishConfig "higress-system" "configmaps" "higress-console" "$content"
 
   read -r -d '' content << EOF
 apiVersion: v1
@@ -393,10 +448,10 @@ metadata:
   namespace: higress-system
 type: Opaque
 EOF
-  publish_nacos_config "higress-system" "secrets.higress-console" "$content"
+  publishConfig "higress-system" "secrets" "higress-console" "$content"
 }
 
-initializeNacos
+initializeConfigStorage
 initializeApiServer
 initializeController
 initializePilot
