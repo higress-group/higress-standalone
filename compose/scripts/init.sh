@@ -390,22 +390,42 @@ initializeMcpBridge() {
       return
     fi
 
+    nacosAuthSecretName=""
+
+    if [ -n "$NACOS_USERNAME" ] && [ -n "$NACOS_PASSWORD" ]; then
+      nacosAuthSecretName="nacos-auth-default"
+      read -r -d '' content << EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  creationTimestamp: "$(now)"
+  name: ${nacosAuthSecretName}
+  namespace: higress-system
+data:
+  nacosUsername: $(echo -n "${NACOS_USERNAME}" | base64 -w 0)
+  nacosPassword: $(echo -n "${NACOS_PASSWORD}" | base64 -w 0)
+type: Opaque
+EOF
+      publishConfig "higress-system" "secrets" "${nacosAuthSecretName}" "$content"
+    fi
+
     read -r -d '' content << EOF
-  apiVersion: networking.higress.io/v1
-  kind: McpBridge
-  metadata:
-    creationTimestamp: "$(now)"
-    name: default
-    namespace: higress-system
-  spec:
-    registries:
-    - domain: ${NACOS_SERVER_DOMAIN}
-      nacosGroups:
-      - DEFAULT_GROUP
-      nacosNamespaceId: ""
-      name: nacos
-      port: ${NACOS_SERVER_PORT:-80}
-      type: nacos2
+apiVersion: networking.higress.io/v1
+kind: McpBridge
+metadata:
+  creationTimestamp: "$(now)"
+  name: default
+  namespace: higress-system
+spec:
+  registries:
+  - domain: ${NACOS_SERVER_DOMAIN}
+    nacosGroups:
+    - DEFAULT_GROUP
+    nacosNamespaceId: ""
+    name: nacos
+    port: ${NACOS_SERVER_PORT:-80}
+    type: nacos2
+    authSecretName: "${nacosAuthSecretName}"
 EOF
     publishConfig "higress-system" "mcpbridges" "default" "$content"
   fi
