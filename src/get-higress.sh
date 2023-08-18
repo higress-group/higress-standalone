@@ -143,7 +143,7 @@ runAsRoot() {
 # verifySupported checks that the os/arch combination is supported for
 # binary builds, as well whether or not necessary tools are present.
 verifySupported() {
-  local supported="darwin-amd64\nlinux-amd64\nwindows-amd64\n"
+  local supported="darwin-amd64\nlinux-amd64\nwindows-amd64\ndarwin-arm64\nlinux-arm64\nwindows-arm64\n"
   if ! echo "${supported}" | grep -q "${OS}-${ARCH}"; then
     echo "${OS}-${ARCH} platform isn't supported at the moment."
     echo "Stay tuned for updates on https://github.com/alibaba/higress."
