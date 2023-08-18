@@ -31,6 +31,20 @@ source "$ROOT/bin/base.sh"
 
 source "$COMPOSE_ROOT/.env"
 
+initArch() {
+  ARCH=$(uname -m)
+  case $ARCH in
+    armv5*) ARCH="armv5";;
+    armv6*) ARCH="armv6";;
+    armv7*) ARCH="arm";;
+    aarch64) ARCH="arm64";;
+    x86) ARCH="386";;
+    x86_64) ARCH="amd64";;
+    i686) ARCH="386";;
+    i386) ARCH="386";;
+  esac
+}
+
 initOS() {
   OS="$(uname|tr '[:upper:]' '[:lower:]')"
   case "$OS" in
@@ -218,6 +232,10 @@ configureNacosByArgs() {
 
   if [ "$USE_BUILTIN_NACOS" == "Y" ] || [ -n "$CONFIG_URL" ]; then
     if [ "$USE_BUILTIN_NACOS" == "Y" ]; then
+      if [ "$ARCH" != "amd64" ]; then
+        echo "Sorry, built-in Nacos service doesn't support your platform. Please use a standalone Nacos service instead."
+        exit -1
+      fi
       COMPOSE_PROFILES="nacos"
       NACOS_SERVER_URL="$BUILTIN_NACOS_SERVER_URL"
     else
@@ -322,6 +340,10 @@ configureNacos() {
     readNonEmpty "Use built-in Nacos service (Y/N): "
     enableBuiltInNacos=$input
     if [ "$enableBuiltInNacos" == "Y" ] || [ "$enableBuiltInNacos" == "y" ]; then
+      if [ "$ARCH" != "amd64" ]; then
+        echo "Sorry, built-in Nacos service doesn't support your platform."
+        continue
+      fi
       USE_BUILTIN_NACOS="Y"
       COMPOSE_PROFILES="nacos"
       NACOS_SERVER_URL="${BUILTIN_NACOS_SERVER_URL}"
@@ -655,6 +677,7 @@ run() {
   bash $ROOT/bin/startup.sh
 }
 
+initArch
 initOS
 parseArgs "$@"
 CONFIGURED_MARK="$COMPOSE_ROOT/.configured"
