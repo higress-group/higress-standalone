@@ -7,7 +7,14 @@ IMAGE_TAG = $(if $(strip $(IMAGE_VERSION)),${IMAGE_VERSION},${BUILD_TIME}-${COMM
 IMG ?= ${REGISTRY}${IMAGE_NAME}:${IMAGE_TAG}
 
 .DEFAULT:
-build:
+docker-build:
+	docker build \
+			-t ${IMG} \
+			.
+	@echo ""
+	@echo "Image:            ${IMG}"
+
+docker-buildx-push:
 	docker buildx build --no-cache \
 			--platform linux/amd64,linux/arm64 \
 			-t ${IMG} \
