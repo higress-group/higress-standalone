@@ -45,11 +45,13 @@ docker compose
 
   * -c, --config-url=URL
 
-    Nacos 服务 URL。格式：nacos://192.168.0.1:8848
+    配置服务的 URL。
+    - 若使用独立部署的 Nacos 服务，URL 格式为：nacos://192.168.0.1:8848
+    - 若在本地磁盘上保存配置，URL 格式为：file://opt/higress/conf
 
   * --use-builtin-nacos
 
-    使用内置的 Nacos 服务。不建议用于生产环境。
+    使用内置的 Nacos 服务。不建议用于生产环境。如果设置本参数，则无需设置 `-c` 参数
 
   * --nacos-ns=NACOS-NAMESPACE
 
@@ -70,6 +72,26 @@ docker compose
   * -p, --console-password=CONSOLE-PASSWORD
 
     后续用户访问 Higress Console 的密码（用户名固定为 `admin`）。默认值为 `admin`。
+
+  * --nacos-port=NACOS-PORT
+
+    内置 NACOS 服务在服务器本地监听的端口。默认值为 8848。
+
+  * --gateway-http-port=GATEAWY-HTTP-PORT
+
+    Higress Gateway 在服务器本地监听的 HTTP 端口。默认值为 80。
+
+  * --gateway-https-port=GATEAWY-HTTPS-PORT
+
+    Higress Gateway 在服务器本地监听的 HTTPS 端口。默认值为 443。
+
+  * --gateway-metrics-port=GATEWAY-METRIC-PORT
+
+    Higress Gateway 在服务器本地监听的用于暴露运行指标端口。默认值为 15020。
+
+  * --console-port=CONSOLE-PORT
+
+    Higress Console 在服务器本地监听的端口。默认值为 8080。
 
   * -r, --rerun
 
