@@ -12,17 +12,26 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-CONFIGURE_ARGS="-c file:///c/temp/higress/data --console-password=helloworld --gateway-http-port=30002 --gateway-https-port=30003 --gateway-metrics-port=30004 --console-port=30005"
+CONFIGURE_ARGS=""
 
-CONFIGURE_INPUT=""
+CONFIGURE_INPUT='file
+.\temp\data
+admin
+
+
+
+
+'
+
+echo "$CONFIGURE_INPUT"
 
 declare -A EXPECTED_ENVS=(
   ["COMPOSE_PROFILES"]=''
   ["CONFIG_STORAGE"]='file'
-  ["FILE_ROOT_DIR"]='C:\temp\higress\data'
-  ["HIGRESS_CONSOLE_PASSWORD"]='helloworld'
-  ["GATEWAY_HTTP_PORT"]='30002'
-  ["GATEWAY_HTTPS_PORT"]='30003'
-  ["GATEWAY_METRICS_PORT"]='30004'
-  ["CONSOLE_PORT"]='30005'
+  ["FILE_ROOT_DIR"]="$(cygpath -w "$PWD")\\temp\\data"
+  ["HIGRESS_CONSOLE_PASSWORD"]='admin'
+  ["GATEWAY_HTTP_PORT"]='80'
+  ["GATEWAY_HTTPS_PORT"]='443'
+  ["GATEWAY_METRICS_PORT"]='15020'
+  ["CONSOLE_PORT"]='8080'
 )

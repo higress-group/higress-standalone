@@ -17,7 +17,6 @@ CONFIGURE_ARGS=""
 CONFIGURE_INPUT="file
 /tmp/higress/data
 admin
-30001
 30002
 30003
 30004

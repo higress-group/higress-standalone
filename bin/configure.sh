@@ -192,6 +192,7 @@ configure() {
 }
 
 resetEnv() {
+  COMPOSE_PROFILES=""
   CONFIG_STORAGE=""
   FILE_ROOT_DIR=""
   NACOS_SERVER_URL=""
@@ -276,12 +277,23 @@ configureFileStorageByArgs() {
 
   FILE_ROOT_DIR="${CONFIG_URL#file://}"
   if [ "$OS" == "windows" ]; then
-    if [[ "$FILE_ROOT_DIR" == *":"* ]]; then
-      FILE_ROOT_DIR="${FILE_ROOT_DIR//\\//}"
-    else 
-      FILE_ROOT_DIR="/${FILE_ROOT_DIR//\\//}"
+    # Fix path separators
+    FILE_ROOT_DIR="${FILE_ROOT_DIR//\\//}"
+    if [[ "$FILE_ROOT_DIR" == "."* ]] || [[ "$FILE_ROOT_DIR" == "~/"* ]]; then
+      # A relatpath ive or user home based path. Do nothing.
+      :
+    elif [[ "$FILE_ROOT_DIR" != "/"* ]]; then
+      echo 'Invalid file URL. Relative path must begin with a ".". Absolute path must begin with a "/" or "~/".'
+      exit -1
+    elif [[ "$FILE_ROOT_DIR" == *":"* ]]; then
+      FILE_ROOT_DIR="${FILE_ROOT_DIR#/}"
     fi
   fi
+  if [[ "$FILE_ROOT_DIR" == '~/'* ]]; then
+    # A user home based path.
+    FILE_ROOT_DIR="${HOME}${FILE_ROOT_DIR#\~}"
+  fi
+  echo "Root: $FILE_ROOT_DIR"
   mkdir -p "$FILE_ROOT_DIR" && cd "$_"
   if [ $? -ne 0 ]; then
     echo "Unable to create/access the config folder. Please fix it or choose another one."
@@ -415,7 +427,9 @@ configureFileStorage() {
     readNonEmpty "Please input the root path of config folder: "
     FILE_ROOT_DIR="$input"
     if [ "$OS" == "windows" ]; then
-      if [[ "$FILE_ROOT_DIR" == "/"* ]]; then
+      if [[ "$FILE_ROOT_DIR" == "."* ]]; then
+        :
+      elif [[ "$FILE_ROOT_DIR" == "/"* ]]; then
         :
       elif [[ "$FILE_ROOT_DIR" == *":"* ]]; then
         FILE_ROOT_DIR="${FILE_ROOT_DIR//\\//}"
@@ -474,7 +488,7 @@ outputUsage() {
  -a, --auto-start           start Higress after configuration
  -c, --config-url=URL       URL of the config storage
                             Use Nacos with format: nacos://192.168.0.1:8848
-                            Use local files with format: file://opt/higress/conf
+                            Use local files with format: file:///opt/higress/conf
      --use-builtin-nacos    use the built-in Nacos service instead of
                             an external one to store configurations
      --nacos-ns=NACOS-NAMESPACE

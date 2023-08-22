@@ -71,7 +71,7 @@ outputUsage() {
   echo '
  -c, --config-url=URL       URL of the config storage
                             Use Nacos with format: nacos://192.168.0.1:8848
-                            Use local files with format: file://opt/higress/conf
+                            Use local files with format: file:///opt/higress/conf
      --use-builtin-nacos    use the built-in Nacos service instead of
                             an external one
      --nacos-ns=NACOS-NAMESPACE
@@ -190,7 +190,7 @@ download() {
 
 # install installs the product.
 install() {
-  tar -zx --exclude="docs" --exclude="src" -f "$HIGRESS_TMP_FILE" -C "$DESTINATION" --strip-components=1
+  tar -zx --exclude="docs" --exclude="src" --exclude="test" -f "$HIGRESS_TMP_FILE" -C "$DESTINATION" --strip-components=1
   bash "$DESTINATION/bin/configure.sh" --auto-start ${CONFIG_ARGS[@]}
 }
 

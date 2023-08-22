@@ -89,7 +89,7 @@ publishFileConfig() {
 
   if [ "$skipWhenExisted" == true ] && [ -f "$configFile" ]; then
       echo "  Config file [$configFile] already exists"
-      exit 0
+      return 0
   fi
 
   mkdir -p "$configDir"
@@ -381,6 +381,17 @@ initializeGateway() {
 initializeMcpBridge() {
   echo "Initializing McpBridge resource..."
 
+  read -r -d '' content << EOF
+apiVersion: networking.higress.io/v1
+kind: McpBridge
+metadata:
+  creationTimestamp: "$(now)"
+  name: default
+  namespace: higress-system
+spec:
+  registries:
+EOF
+
   if [ "$CONFIG_STORAGE" == "nacos" ]; then
     if [[ "$NACOS_SERVER_URL" =~ ^http://([a-zA-Z0-9.]+?)(:([0-9]+))/nacos$ ]]; then
       NACOS_SERVER_DOMAIN="${BASH_REMATCH[1]}"
@@ -410,14 +421,7 @@ EOF
     fi
 
     read -r -d '' content << EOF
-apiVersion: networking.higress.io/v1
-kind: McpBridge
-metadata:
-  creationTimestamp: "$(now)"
-  name: default
-  namespace: higress-system
-spec:
-  registries:
+${content}
   - domain: ${NACOS_SERVER_DOMAIN}
     nacosGroups:
     - DEFAULT_GROUP
@@ -427,8 +431,9 @@ spec:
     type: nacos2
     authSecretName: "${nacosAuthSecretName}"
 EOF
-    publishConfig "higress-system" "mcpbridges" "default" "$content"
   fi
+
+  publishConfig "higress-system" "mcpbridges" "default" "$content"
 }
 
 initializeConsole() {
