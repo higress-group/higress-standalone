@@ -47,7 +47,7 @@ docker compose
 
     配置服务的 URL。
     - 若使用独立部署的 Nacos 服务，URL 格式为：nacos://192.168.0.1:8848
-    - 若在本地磁盘上保存配置，URL 格式为：file://opt/higress/conf
+    - 若在本地磁盘上保存配置，URL 格式为：file:///opt/higress/conf
 
   * --use-builtin-nacos
 
@@ -71,7 +71,7 @@ docker compose
 
   * -p, --console-password=CONSOLE-PASSWORD
 
-    后续用户访问 Higress Console 的密码（用户名固定为 `admin`）。默认值为 `admin`。
+    后续用户访问 Higress Console 的密码（用户名固定为 `admin`）。若未设置，Higress 将自动生成一个随机的密码。
 
   * --nacos-port=NACOS-PORT
 
@@ -81,7 +81,7 @@ docker compose
 
     Higress Gateway 在服务器本地监听的 HTTP 端口。默认值为 80。
 
-  * --gateway-https-port=GATEAWY-HTTPS-PORT
+  * --gateway-https-port=GATEWAY-HTTPS-PORT
 
     Higress Gateway 在服务器本地监听的 HTTPS 端口。默认值为 443。
 

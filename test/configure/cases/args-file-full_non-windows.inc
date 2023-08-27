@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-CONFIGURE_ARGS="-c file://tmp/higress/data --console-password=helloworld --gateway-http-port=30002 --gateway-https-port=30003 --gateway-metrics-port=30004 --console-port=30005"
+CONFIGURE_ARGS="-c file:///tmp/higress/data --console-password=helloworld --gateway-http-port=30002 --gateway-https-port=30003 --gateway-metrics-port=30004 --console-port=30005"
 
 CONFIGURE_INPUT=""
 
