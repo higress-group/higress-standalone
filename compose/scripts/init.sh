@@ -381,7 +381,7 @@ initializeGateway() {
 initializeMcpBridge() {
   echo "Initializing McpBridge resource..."
 
-  read -r -d '' content << EOF
+  read -r -d '' mcpbridgeContent << EOF
 apiVersion: networking.higress.io/v1
 kind: McpBridge
 metadata:
@@ -405,7 +405,7 @@ EOF
 
     if [ -n "$NACOS_USERNAME" ] && [ -n "$NACOS_PASSWORD" ]; then
       nacosAuthSecretName="nacos-auth-default"
-      read -r -d '' content << EOF
+      read -r -d '' nacosAuthSecretContent << EOF
 apiVersion: v1
 kind: Secret
 metadata:
@@ -417,11 +417,11 @@ data:
   nacosPassword: $(echo -n "${NACOS_PASSWORD}" | base64 -w 0)
 type: Opaque
 EOF
-      publishConfig "higress-system" "secrets" "${nacosAuthSecretName}" "$content"
+      publishConfig "higress-system" "secrets" "${nacosAuthSecretName}" "$nacosAuthSecretContent"
     fi
 
-    read -r -d '' content << EOF
-${content}
+    read -r -d '' mcpbridgeContent << EOF
+${mcpbridgeContent}
   - domain: ${NACOS_SERVER_DOMAIN}
     nacosGroups:
     - DEFAULT_GROUP
@@ -433,7 +433,7 @@ ${content}
 EOF
   fi
 
-  publishConfig "higress-system" "mcpbridges" "default" "$content"
+  publishConfig "higress-system" "mcpbridges" "default" "$mcpbridgeContent"
 }
 
 initializeConsole() {
