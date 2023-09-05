@@ -28,10 +28,12 @@ checkConfigExists() {
   # $3 configName
   case $CONFIG_STORAGE in
     nacos)
-      return checkNacosConfigExists "$@"
+      checkNacosConfigExists "$@"
+      return $?
       ;;
     file)
-      return checkFileConfigExists "$@"
+      checkFileConfigExists "$@"
+      return $?
       ;;
     *)
       printf "  Unknown storage type: %s\n" "$CONFIG_STORAGE"
@@ -52,7 +54,7 @@ checkNacosConfigExists() {
   elif [ $statusCode -eq 404 ]; then
     return -1
   else
-    echo ${1:-"  Checking config ${group}/${dataId} in namespace ${NACOS_NS} failed with $retVal"}
+    echo "  Checking config ${group}/${dataId} in namespace ${NACOS_NS} failed with ${statusCode}"
     exit -1
   fi
 }
@@ -89,8 +91,6 @@ getNacosConfig() {
   # $3 configName
   local group="$1"
   local dataId="$2.$3"
-
-  echo "Group=$group  DataId=$dataId"
 
   config=""
   tmpFile=$(mktemp /tmp/higress-precheck-nacos.XXXXXXXXX.cfg)
@@ -251,7 +251,6 @@ checkPilot() {
   IFS=$'\n'
   for fileName in $fileNames
   do
-    echo "FileName: $fileName"
     if [ -z "$fileName" ]; then
       continue
     fi
@@ -282,12 +281,12 @@ checkConsole() {
   echo "Checking console configurations..."
 
   checkConfigExists "higress-system" "configmaps" "higress-console"
-  if [ ! $?  ]; then
+  if [ $? -ne 0 ]; then
     echo "  The ConfigMap resource of Higress Console doesn't exist."
     exit -1
   fi
   checkConfigExists "higress-system" "secrets" "higress-console"
-  if [ ! $? ]; then
+  if [ $? -ne 0 ]; then
     echo "  The Secret resource of Higress Console doesn't exist."
     exit -1
   fi
