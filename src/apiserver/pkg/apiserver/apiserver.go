@@ -18,6 +18,7 @@ package apiserver
 
 import (
 	"fmt"
+	"github.com/alibaba/higress/api-server/pkg/codec"
 	"github.com/alibaba/higress/api-server/pkg/options"
 	"github.com/alibaba/higress/api-server/pkg/registry"
 	"github.com/alibaba/higress/api-server/pkg/storage"
@@ -167,7 +168,7 @@ func (c completedConfig) New() (*HigressServer, error) {
 
 	storageCreateFunc := func(
 		groupResource schema.GroupResource,
-		codec runtime.Codec,
+		runtimeCodec runtime.Codec,
 		isNamespaced bool,
 		singularName string,
 		newFunc func() runtime.Object,
@@ -177,13 +178,14 @@ func (c completedConfig) New() (*HigressServer, error) {
 	) (rest.Storage, error) {
 		switch storageMode {
 		case options.Storage_File:
-			return registry.NewFileREST(groupResource, codec, storageOptions.FileOptions.RootDir, extension, isNamespaced, singularName, newFunc, newListFunc, attrFunc)
+			runtimeCodec = codec.NewFlatAwareCodec(groupResource, runtimeCodec)
+			return registry.NewFileREST(groupResource, runtimeCodec, storageOptions.FileOptions.RootDir, extension, isNamespaced, singularName, newFunc, newListFunc, attrFunc)
 		case options.Storage_Nacos:
 			var encryptionKey []byte = nil
 			if sensitive {
 				encryptionKey = storageOptions.NacosOptions.EncryptionKey
 			}
-			return registry.NewNacosREST(groupResource, codec, nacosConfigClient, isNamespaced, singularName, newFunc, newListFunc, attrFunc, encryptionKey), nil
+			return registry.NewNacosREST(groupResource, runtimeCodec, nacosConfigClient, isNamespaced, singularName, newFunc, newListFunc, attrFunc, encryptionKey), nil
 		default:
 			panic(fmt.Errorf("invalid storage mode: %s", storageMode))
 		}
@@ -326,7 +328,7 @@ func appendStorage(storages map[string]rest.Storage,
 	sensitive bool,
 ) {
 	groupResource := groupVersion.WithResource(pluralName).GroupResource()
-	codec, _, err := genericserverstorage.NewStorageCodec(genericserverstorage.StorageCodecConfig{
+	storageCodec, _, err := genericserverstorage.NewStorageCodec(genericserverstorage.StorageCodecConfig{
 		StorageMediaType:  contentType,
 		StorageSerializer: serializer.NewCodecFactory(Scheme),
 		StorageVersion:    Scheme.PrioritizedVersionsForGroup(groupResource.Group)[0],
@@ -334,11 +336,12 @@ func appendStorage(storages map[string]rest.Storage,
 		Config:            storagebackend.Config{}, // useless fields
 	})
 	if err != nil {
-		err = fmt.Errorf("unable to create REST storage for a resource due to %v, will die", err)
+		err = fmt.Errorf("unable to create storage codec for a resource due to %v, will die", err)
 		panic(err)
 	}
-	storage, err := storageCreatorFunc(groupResource, codec, isNamespaced, singularName, newFunc, newListFunc, attrFunc, sensitive)
+	storage, err := storageCreatorFunc(groupResource, storageCodec, isNamespaced, singularName, newFunc, newListFunc, attrFunc, sensitive)
 	if err != nil {
+		err = fmt.Errorf("unable to create REST storage for a resource due to %v, will die", err)
 		panic(err)
 	}
 	storages[pluralName] = storage

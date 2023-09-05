@@ -36,6 +36,7 @@ var ErrFileNotExists = fmt.Errorf("file doesn't exist")
 
 const fileChangeProcessInterval = 100 * time.Millisecond
 const fileChangeProcessDelay = 250 * time.Millisecond
+const defaultNamespace = "higress-system"
 
 var _ rest.StandardStorage = &fileREST{}
 var _ rest.Scoper = &fileREST{}
@@ -496,6 +497,7 @@ func (f *fileREST) objectFileName(ctx context.Context, name string) string {
 }
 
 func (f *fileREST) write(encoder runtime.Encoder, filepath string, obj runtime.Object) error {
+	f.normalizeObjectMeta(obj, filepath)
 	buf := new(bytes.Buffer)
 	if err := encoder.Encode(obj, buf); err != nil {
 		return err
@@ -521,7 +523,17 @@ func (f *fileREST) read(decoder runtime.Decoder, path string, newFunc func() run
 	if err != nil {
 		return nil, err
 	}
+	f.normalizeObjectMeta(decodedObj, cleanedPath)
 	return decodedObj, nil
+}
+
+func (f *fileREST) normalizeObjectMeta(obj runtime.Object, path string) {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return
+	}
+	accessor.SetNamespace(defaultNamespace)
+	accessor.SetName(strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)))
 }
 
 func (f *fileREST) visitDir(dirname string, extension string, newFunc func() runtime.Object, codec runtime.Decoder, visitFunc func(string, runtime.Object)) error {
