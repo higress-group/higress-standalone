@@ -90,8 +90,6 @@ getNacosConfig() {
   local group="$1"
   local dataId="$2.$3"
 
-  echo "Group=$group  DataId=$dataId"
-
   config=""
   tmpFile=$(mktemp /tmp/higress-precheck-nacos.XXXXXXXXX.cfg)
   statusCode=$(curl -s -o "$tmpFile" -w "%{http_code}" "${NACOS_SERVER_URL}/v1/cs/configs?accessToken=${NACOS_ACCESS_TOKEN}&tenant=${NACOS_NS}&dataId=${dataId}&group=${group}")
@@ -251,7 +249,6 @@ checkPilot() {
   IFS=$'\n'
   for fileName in $fileNames
   do
-    echo "FileName: $fileName"
     if [ -z "$fileName" ]; then
       continue
     fi
