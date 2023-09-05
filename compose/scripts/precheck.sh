@@ -28,10 +28,12 @@ checkConfigExists() {
   # $3 configName
   case $CONFIG_STORAGE in
     nacos)
-      return checkNacosConfigExists "$@"
+      checkNacosConfigExists "$@"
+      return $?
       ;;
     file)
-      return checkFileConfigExists "$@"
+      checkFileConfigExists "$@"
+      return $?
       ;;
     *)
       printf "  Unknown storage type: %s\n" "$CONFIG_STORAGE"
@@ -52,7 +54,7 @@ checkNacosConfigExists() {
   elif [ $statusCode -eq 404 ]; then
     return -1
   else
-    echo ${1:-"  Checking config ${group}/${dataId} in namespace ${NACOS_NS} failed with $retVal"}
+    echo "  Checking config ${group}/${dataId} in namespace ${NACOS_NS} failed with ${statusCode}"
     exit -1
   fi
 }
