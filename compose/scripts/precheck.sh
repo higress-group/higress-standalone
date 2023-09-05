@@ -64,7 +64,11 @@ checkFileConfigExists() {
   # $2 configType: plural
   # $3 configName
   local configFile="${FILE_ROOT_DIR}/$2/$3.yaml"
-  return [ -f "$configFile" ]
+  if [ -f "$configFile" ]; then
+    return 0
+  else
+    return 1
+  fi
 }
 
 getConfig() {
