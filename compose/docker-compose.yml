@@ -108,7 +108,7 @@ services:
       - --kubeconfig=/home/higress/.kube/config
       - --gatewaySelectorKey=higress
       - --gatewaySelectorValue=higress-system-higress-gateway
-      - --ingressClass=higress
+      - --ingressClass=
     depends_on:
       apiserver:
         condition: service_healthy

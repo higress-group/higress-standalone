@@ -1,6 +1,6 @@
 REGISTRY ?= higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/
 IMAGE_NAME ?= api-server
-IMAGE_VERSION ?= 0.0.8
+IMAGE_VERSION ?= 0.0.9
 BUILD_TIME := $(shell date "+%Y%m%d-%H%M%S")
 COMMIT_ID := $(shell git rev-parse --short HEAD 2>/dev/null)
 IMAGE_TAG = $(if $(strip $(IMAGE_VERSION)),${IMAGE_VERSION},${BUILD_TIME}-${COMMIT_ID})
