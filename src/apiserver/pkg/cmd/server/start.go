@@ -37,6 +37,7 @@ import (
 // HigressServerOptions contains state for master/api server
 type HigressServerOptions struct {
 	RecommendedOptions *genericoptions.RecommendedOptions
+	AuthOptions        *options.AuthOptions
 	StorageOptions     *options.StorageOptions
 
 	SharedInformerFactory informers.SharedInformerFactory
@@ -53,6 +54,7 @@ func NewHigressServerOptions(out, errOut io.Writer) *HigressServerOptions {
 			"",
 			apiserver.Codecs.LegacyCodec(),
 		),
+		AuthOptions:    options.CreateAuthOptions(),
 		StorageOptions: options.CreateStorageOptions(),
 		StdOut:         out,
 		StdErr:         errOut,
@@ -61,9 +63,10 @@ func NewHigressServerOptions(out, errOut io.Writer) *HigressServerOptions {
 }
 
 // Validate validates HigressServerOptions
-func (o HigressServerOptions) Validate(args []string) error {
+func (o *HigressServerOptions) Validate(args []string) error {
 	errors := []error{}
 	errors = append(errors, validate(o.RecommendedOptions)...)
+	errors = append(errors, o.AuthOptions.Validate()...)
 	errors = append(errors, o.StorageOptions.Validate()...)
 	return utilerrors.NewAggregate(errors)
 }
@@ -121,13 +124,14 @@ func (o *HigressServerOptions) Config() (*apiserver.Config, error) {
 	o.RecommendedOptions.Authentication.RemoteKubeConfigFileOptional = true
 	o.RecommendedOptions.Authorization.RemoteKubeConfigFileOptional = true
 
-	if err := applyTo(o.RecommendedOptions, serverConfig); err != nil {
+	if err := applyTo(o.RecommendedOptions, serverConfig, o.AuthOptions); err != nil {
 		return nil, err
 	}
 
 	config := &apiserver.Config{
 		GenericConfig: serverConfig,
 		ExtraConfig: apiserver.ExtraConfig{
+			AuthOptions:    o.AuthOptions,
 			StorageOptions: o.StorageOptions,
 		},
 	}
@@ -153,7 +157,7 @@ func (o *HigressServerOptions) RunHigressServer(stopCh <-chan struct{}) error {
 	return server.GenericAPIServer.PrepareRun().Run(stopCh)
 }
 
-func applyTo(o *genericoptions.RecommendedOptions, config *genericapiserver.RecommendedConfig) error {
+func applyTo(o *genericoptions.RecommendedOptions, config *genericapiserver.RecommendedConfig, authOptions *options.AuthOptions) error {
 	if err := o.EgressSelector.ApplyTo(&config.Config); err != nil {
 		return err
 	}
@@ -163,11 +167,13 @@ func applyTo(o *genericoptions.RecommendedOptions, config *genericapiserver.Reco
 	if err := o.SecureServing.ApplyTo(&config.Config.SecureServing, &config.Config.LoopbackClientConfig); err != nil {
 		return err
 	}
-	if err := o.Authentication.ApplyTo(&config.Config.Authentication, config.SecureServing, config.OpenAPIConfig); err != nil {
-		return err
-	}
-	if err := o.Authorization.ApplyTo(&config.Config.Authorization); err != nil {
-		return err
+	if authOptions != nil && authOptions.Enabled {
+		if err := o.Authentication.ApplyTo(&config.Config.Authentication, config.SecureServing, config.OpenAPIConfig); err != nil {
+			return err
+		}
+		if err := o.Authorization.ApplyTo(&config.Config.Authorization); err != nil {
+			return err
+		}
 	}
 	if err := o.Audit.ApplyTo(&config.Config); err != nil {
 		return err
@@ -213,6 +219,7 @@ func NewCommandStartHigressServer(defaults *HigressServerOptions, stopCh <-chan 
 
 	flags := cmd.Flags()
 	o.RecommendedOptions.AddFlags(flags)
+	o.AuthOptions.AddFlags(flags)
 	o.StorageOptions.AddFlags(flags)
 	utilfeature.DefaultMutableFeatureGate.AddFlag(flags)
 
