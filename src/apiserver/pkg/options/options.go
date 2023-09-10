@@ -20,6 +20,27 @@ const (
 	Storage_Nacos = "nacos"
 )
 
+func CreateAuthOptions() *AuthOptions {
+	return &AuthOptions{}
+}
+
+type AuthOptions struct {
+	Enabled bool
+}
+
+func (o *AuthOptions) AddFlags(fs *pflag.FlagSet) {
+	if o == nil {
+		return
+	}
+
+	fs.BoolVar(&o.Enabled, "auth-enabled", false, "Whether to enable authentication and authorization for Higress API server.")
+}
+
+func (o *AuthOptions) Validate() []error {
+	// Nothing to validate for now
+	return []error{}
+}
+
 func CreateStorageOptions() *StorageOptions {
 	return &StorageOptions{
 		FileOptions:  &FileOptions{},

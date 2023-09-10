@@ -180,7 +180,7 @@ initializeApiServer() {
 
   if [ ! -f ca.key ] || [ ! -f ca.crt ]; then
     echo "  Generating CA certificate...";
-    openssl req -nodes -new -x509 -keyout ca.key -out ca.crt -subj "/CN=higress-root-ca/O=higress" > /dev/null 2>&1
+    openssl req -nodes -new -x509 -days 36500 -keyout ca.key -out ca.crt -subj "/CN=higress-root-ca/O=higress" > /dev/null 2>&1
     checkExitCode "  Generating CA certificate for API server fails with $?";
   else
     echo "  CA certificate already exists.";
@@ -188,7 +188,7 @@ initializeApiServer() {
   if [ ! -f server.key ] || [ ! -f server.crt ]; then
     echo "  Generating server certificate..."
     openssl req -out server.csr -new -newkey rsa:$RSA_KEY_LENGTH -nodes -keyout server.key -subj "/CN=higress-api-server/O=higress" > /dev/null 2>&1 \
-      && openssl x509 -req -days 365 -in server.csr -CA ca.crt -CAkey ca.key -set_serial 01 -sha256 -out server.crt > /dev/null 2>&1
+      && openssl x509 -req -days 36500 -in server.csr -CA ca.crt -CAkey ca.key -set_serial 01 -sha256 -out server.crt > /dev/null 2>&1
     checkExitCode "  Generating server certificate fails with $?";
   else
     echo "  Server certificate already exists.";
@@ -206,7 +206,7 @@ initializeApiServer() {
   if [ ! -f client.key ] || [ ! -f client.crt ]; then
     echo "  Generating client certificate..."
     openssl req -out client.csr -new -newkey rsa:$RSA_KEY_LENGTH -nodes -keyout client.key -subj "/CN=higress/O=system:masters" > /dev/null 2>&1 \
-      && openssl x509 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 02 -sha256 -out client.crt > /dev/null 2>&1
+      && openssl x509 -req -days 36500 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 02 -sha256 -out client.crt > /dev/null 2>&1
     checkExitCode "  Generating client certificate fails with $?";
   else
     echo "  Client certificate already exists.";

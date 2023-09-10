@@ -103,6 +103,7 @@ func init() {
 
 // ExtraConfig holds custom apiserver config
 type ExtraConfig struct {
+	AuthOptions    *options.AuthOptions
 	StorageOptions *options.StorageOptions
 }
 
