@@ -219,3 +219,23 @@ services:
     restart: always
     volumes:
       - ./volumes/kube:/home/higress/.kube:ro
+
+  postcheck:
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/runner:${HIGRESS_RUNNER_TAG}
+    command:
+      - ./postcheck.sh
+    networks:
+      - higress-net
+    depends_on:
+      apiserver:
+        condition: service_healthy
+      controller:
+        condition: service_healthy
+      pilot:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+      console:
+        condition: service_healthy
+    volumes:
+      - ./scripts:/workspace:ro
