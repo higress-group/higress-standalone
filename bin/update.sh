@@ -78,6 +78,9 @@ outputWelcomeMessage() {
   echo ""
   echo "If Higress is running during update, you will need to restart it to use the new version."
   echo ""
+  echo "Restart command:"
+  echo "  $ROOT/bin/shutdown.sh && $ROOT/bin/startup.sh"
+  echo ""
   echo "Happy Higressing!"
 }
 
