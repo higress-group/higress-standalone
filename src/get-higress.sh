@@ -205,7 +205,7 @@ download() {
 install() {
   tar -zx --exclude="docs" --exclude="src" --exclude="test" -f "$HIGRESS_TMP_FILE" -C "$DESTINATION" --strip-components=1
   echo -n "$VERSION" > "$DESTINATION/VERSION"
-  bash "$DESTINATION/bin/configure.sh" --auto-start ${CONFIG_ARGS[@]}
+  bash "$DESTINATION/bin/configure.sh" ${CONFIG_ARGS[@]}
 }
 
 # update updates the product.

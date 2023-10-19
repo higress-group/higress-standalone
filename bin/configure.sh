@@ -22,6 +22,10 @@ DEFAULT_GATEWAY_HTTPS_PORT=443
 DEFAULT_GATEWAY_METRICS_PORT=15020
 DEFAULT_CONSOLE_PORT=8080
 
+COMMAND_PREPARE="prepare"
+COMMAND_INIT="init"
+KNOWN_COMMANDS=($COMMAND_PREPARE, $COMMAND_INIT)
+
 cd "$(dirname -- "$0")"
 ROOT=$(dirname -- "$(pwd -P)")
 COMPOSE_ROOT="$ROOT/compose"
@@ -30,6 +34,8 @@ cd - >/dev/null
 source "$ROOT/bin/base.sh"
 
 source "$COMPOSE_ROOT/.env"
+
+CONFIGURED_MARK="$COMPOSE_ROOT/.configured"
 
 initArch() {
   ARCH=$(uname -m)
@@ -58,7 +64,13 @@ parseArgs() {
 
   POSITIONAL_ARGS=()
 
+  COMMAND=""
   MODE="wizard"
+
+  if [[ $1 != "-"* ]]; then
+    COMMAND="$1"
+    shift
+  fi
 
   while [[ $# -gt 0 ]]; do
     case $1 in
@@ -175,20 +187,42 @@ parseArgs() {
   done
 
   set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+
+  if [ -n "$COMMAND" ] && [[ ! ${KNOWN_COMMANDS[@]} =~ "$COMMAND" ]]; then
+    echo "Unknown command: $COMMAND"
+    exit 1
+  fi
+
+  if [ "$COMMAND" == "$COMMAND_PREPARE" ]; then
+    if [ "$AUTO_START" == "Y" ]; then
+      echo "Auto start flag is not available in \"$COMMAND_PREPARE\" command."
+      exit 1
+    fi
+  elif [ "$COMMAND" == "$COMMAND_INIT" ]; then
+    if [ "$MODE" == "params" ]; then
+      echo "No configuration change is allowed in \"$COMMAND_INIT\" command."
+      exit 1
+    fi
+  fi
 }
 
 configure() {
-  if [ "$MODE" == "params" ]; then
-    configureByArgs
-  else
-    configureStorage
-    configureConsole
-    configurePorts
+  if [ -z "$COMMAND" -o "$COMMAND" == "$COMMAND_PREPARE" ]; then
+    if [ "$MODE" == "params" ]; then
+      configureByArgs
+    else
+      configureStorage
+      configureConsole
+      configurePorts
+    fi
+    writeConfiguration
   fi
 
-  writeConfiguration
-  runInitializer
-  outputWelcomeMessage
+  if [ -z "$COMMAND" -o "$COMMAND" == "$COMMAND_INIT" ]; then
+    runInitializer
+    touch "$CONFIGURED_MARK"
+    outputWelcomeMessage
+  fi
 }
 
 resetEnv() {
@@ -293,7 +327,6 @@ configureFileStorageByArgs() {
     # A user home based path.
     FILE_ROOT_DIR="${HOME}${FILE_ROOT_DIR#\~}"
   fi
-  echo "Root: $FILE_ROOT_DIR"
   mkdir -p "$FILE_ROOT_DIR" && cd "$_"
   if [ $? -ne 0 ]; then
     echo "Unable to create/access the config folder. Please fix it or choose another one."
@@ -595,9 +628,12 @@ EOF
 }
 
 runInitializer() {
+  # Reload the latest env data from file.
+  source "$COMPOSE_ROOT/.env"
+
   echo "==== Build Configurations ==== "
 
-  if [ "$USE_BUILTIN_NACOS" == "Y" ]; then
+  if [ "$COMPOSE_PROFILES" == "nacos" ]; then
     echo "Starting built-in Nacos service..."
     cd "$COMPOSE_ROOT" && runDockerCompose -p higress up -d nacos
     retVal=$?
@@ -614,7 +650,7 @@ runInitializer() {
     exit -1
   fi
 
-  if [ "$USE_BUILTIN_NACOS" == "Y" ] && [ "${AUTO_START}" != "Y" ]; then
+  if [ "$COMPOSE_PROFILES" == "nacos" ] && [ "${AUTO_START}" != "Y" ]; then
     echo "Stopping built-in Nacos service..."
     cd "$COMPOSE_ROOT" && runDockerCompose -p higress down --remove-orphans
     local retVal=$?
@@ -694,7 +730,6 @@ run() {
 initArch
 initOS
 parseArgs "$@"
-CONFIGURED_MARK="$COMPOSE_ROOT/.configured"
 if [ -f "$CONFIGURED_MARK" ]; then
   if [ "$RERUN" == "Y" ]; then
     bash $ROOT/bin/reset.sh
@@ -704,7 +739,6 @@ if [ -f "$CONFIGURED_MARK" ]; then
   fi
 fi
 configure
-touch "$CONFIGURED_MARK"
 if [ "${AUTO_START}" == "Y" ]; then
   echo ""
   run
