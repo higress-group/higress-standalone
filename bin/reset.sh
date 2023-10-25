@@ -20,4 +20,4 @@ COMPOSE_ROOT="$ROOT/compose"
 cd - > /dev/null
 
 bash $ROOT/bin/shutdown.sh
-cd "$COMPOSE_ROOT" && sudo rm -rf ./volumes && rm -f ./.configured
+cd "$COMPOSE_ROOT" && rm -rf ./volumes && rm -f ./.configured
