@@ -29,7 +29,6 @@ declare -A EXPECTED_ENVS=(
   ["COMPOSE_PROFILES"]=''
   ["CONFIG_STORAGE"]='file'
   ["FILE_ROOT_DIR"]="$(cygpath -w "$PWD")\\temp\\data"
-  ["HIGRESS_CONSOLE_PASSWORD"]='admin'
   ["GATEWAY_HTTP_PORT"]='80'
   ["GATEWAY_HTTPS_PORT"]='443'
   ["GATEWAY_METRICS_PORT"]='15020'

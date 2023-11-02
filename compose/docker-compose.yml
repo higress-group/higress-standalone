@@ -36,7 +36,6 @@ services:
       - NACOS_USERNAME
       - NACOS_PASSWORD
       - NACOS_DATA_ENC_KEY
-      - HIGRESS_CONSOLE_PASSWORD
     networks:
       - higress-net
     volumes:
