@@ -69,10 +69,6 @@ docker compose
 
     用于加密敏感配置数据的密钥。长度必须为 32 个字符。若未设置，Higress 将自动生成一个随机的密钥。若需集群部署，此项必须设置。
 
-  * -p, --console-password=CONSOLE-PASSWORD
-
-    后续用户访问 Higress Console 的密码（用户名固定为 `admin`）。若未设置，Higress 将自动生成一个随机的密码。
-
   * --nacos-port=NACOS-PORT
 
     内置 NACOS 服务在服务器本地监听的端口。默认值为 8848。

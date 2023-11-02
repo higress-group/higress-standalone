@@ -41,7 +41,6 @@ declare -A EXPECTED_ENVS=(
   ["NACOS_NS"]='higress-system'
   ["NACOS_USERNAME"]='nacos'
   ["NACOS_PASSWORD"]='nacos'
-  ["HIGRESS_CONSOLE_PASSWORD"]='admin'
   ["NACOS_HTTP_PORT"]='8848'
   ["NACOS_GRPC_PORT"]='9848'
   ["GATEWAY_HTTP_PORT"]='80'

@@ -20,7 +20,6 @@ declare -A EXPECTED_ENVS=(
   ["COMPOSE_PROFILES"]=''
   ["CONFIG_STORAGE"]='file'
   ["FILE_ROOT_DIR"]='/tmp/higress/data'
-  ["HIGRESS_CONSOLE_PASSWORD"]='helloworld'
   ["GATEWAY_HTTP_PORT"]='30002'
   ["GATEWAY_HTTPS_PORT"]='30003'
   ["GATEWAY_METRICS_PORT"]='30004'

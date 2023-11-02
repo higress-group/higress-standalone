@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-CONFIGURE_ARGS="--use-builtin-nacos --data-enc-key=2b9841c866544379bb88ebee3021e341 --nacos-ns=higress-test --console-password=helloworld --nacos-port=30001 --gateway-http-port=30002 --gateway-https-port=30003 --gateway-metrics-port=30004 --console-port=30005"
+CONFIGURE_ARGS="--use-builtin-nacos --data-enc-key=2b9841c866544379bb88ebee3021e341 --nacos-ns=higress-test --nacos-port=30001 --gateway-http-port=30002 --gateway-https-port=30003 --gateway-metrics-port=30004 --console-port=30005"
 
 CONFIGURE_INPUT=""
 
@@ -24,7 +24,6 @@ declare -A EXPECTED_ENVS=(
   ["NACOS_NS"]='higress-test'
   ["NACOS_USERNAME"]=''
   ["NACOS_PASSWORD"]=''
-  ["HIGRESS_CONSOLE_PASSWORD"]='helloworld'
   ["NACOS_DATA_ENC_KEY"]='2b9841c866544379bb88ebee3021e341'
   ["NACOS_HTTP_PORT"]='30001'
   ["NACOS_GRPC_PORT"]='31001'

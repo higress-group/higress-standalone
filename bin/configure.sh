@@ -124,17 +124,6 @@ parseArgs() {
       MODE="params"
       shift
       ;;
-    -p)
-      HIGRESS_CONSOLE_PASSWORD="$2"
-      MODE="params"
-      shift
-      shift
-      ;;
-    --console-password=*)
-      HIGRESS_CONSOLE_PASSWORD="${1#*=}"
-      MODE="params"
-      shift
-      ;;
     --s)
       CONFIG_STORAGE="$2"
       MODE="params"
@@ -234,7 +223,6 @@ resetEnv() {
   NACOS_USERNAME=""
   NACOS_PASSWORD=""
   NACOS_DATA_ENC_KEY=""
-  HIGRESS_CONSOLE_PASSWORD=""
 
   NACOS_HTTP_PORT=$DEFAULT_NACOS_HTTP_PORT
   NACOS_GRPC_PORT=$(($DEFAULT_NACOS_HTTP_PORT + 1000))
@@ -358,9 +346,7 @@ configurePortsByArgs() {
 }
 
 configureConsoleByArgs() {
-  if [ -z "$HIGRESS_CONSOLE_PASSWORD" ]; then
-    HIGRESS_CONSOLE_PASSWORD=$(cat /dev/urandom | head -n 10 | md5sum | head -c32)
-  fi
+  :
 }
 
 configureStorage() {
@@ -485,10 +471,8 @@ configureFileStorage() {
 }
 
 configureConsole() {
-  echo "==== Configure Higress Console ===="
-  echo "Username: admin"
-  readNonEmptySecret "Please set password: "
-  HIGRESS_CONSOLE_PASSWORD=$input
+  # echo "==== Configure Higress Console ===="
+  :
 }
 
 configurePorts() {
@@ -586,10 +570,6 @@ outputWelcomeMessage() {
   echo "  View Logs: $ROOT/bin/logs.sh"
   echo "  Re-configure: $ROOT/bin/configure.sh -r"
   echo ""
-  echo "Note:"
-  echo " Higress Console Username: admin"
-  echo " Higress Console Password: ${HIGRESS_CONSOLE_PASSWORD}"
-  echo ""
   echo "Happy Higressing!"
 }
 
@@ -617,7 +597,6 @@ HIGRESS_CONTROLLER_TAG='${HIGRESS_CONTROLLER_TAG}'
 HIGRESS_PILOT_TAG='${HIGRESS_PILOT_TAG}'
 HIGRESS_GATEWAY_TAG='${HIGRESS_GATEWAY_TAG}'
 HIGRESS_CONSOLE_TAG='${HIGRESS_CONSOLE_TAG}'
-HIGRESS_CONSOLE_PASSWORD='${HIGRESS_CONSOLE_PASSWORD}'
 NACOS_HTTP_PORT='${NACOS_HTTP_PORT}'
 NACOS_GRPC_PORT='${NACOS_GRPC_PORT}'
 GATEWAY_HTTP_PORT='${GATEWAY_HTTP_PORT}'

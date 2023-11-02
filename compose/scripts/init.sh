@@ -439,12 +439,6 @@ EOF
 initializeConsole() {
   echo "Initializing console configurations..."
 
-  LOGIN_PROMPT=""
-  if [ -z "$HIGRESS_CONSOLE_PASSWORD" ]; then
-    HIGRESS_CONSOLE_PASSWORD="admin"
-    LOGIN_PROMPT="Username: admin  Default Password: admin"
-  fi
-
   read -r -d '' content << EOF
 apiVersion: v1 
 kind: ConfigMap
@@ -454,16 +448,12 @@ metadata:
   namespace: higress-system
 data:
   mode: standalone
-  login.prompt: "$LOGIN_PROMPT"
 EOF
   publishConfig "higress-system" "configmaps" "higress-console" "$content"
 
   read -r -d '' content << EOF
 apiVersion: v1
 data:
-  adminDisplayName: QWRtaW4=
-  adminPassword: $(echo -n "$HIGRESS_CONSOLE_PASSWORD" | base64 -w 0)
-  adminUsername: YWRtaW4=
   iv: $(cat /dev/urandom | tr -dc '[:graph:]' | fold -w 16 | head -n 1 | tr -d '\n' | base64 -w 0)
   key: $(cat /dev/urandom | tr -dc '[:graph:]' | fold -w 32 | head -n 1 | tr -d '\n' | base64 -w 0)
 kind: Secret
