@@ -46,7 +46,7 @@ func (o *AuthOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
-	fs.BoolVar(&o.Enabled, "auth-enabled", false, "Whether to enable authentication and authorization for Higress API server.")
+	fs.BoolVar(&o.Enabled, "auth-enabled", false, "Set to enable authentication and authorization for Higress API server.")
 }
 
 func (o *AuthOptions) Validate() []error {

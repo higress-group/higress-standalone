@@ -70,6 +70,7 @@ func NewFileREST(
 	// file REST
 	f := &fileREST{
 		TableConvertor: rest.NewDefaultTableConvertor(groupResource),
+		groupResource:  groupResource,
 		codec:          codec,
 		objRootPath:    filepath.Join(rootPath, strings.ToLower(groupResource.Resource)),
 		objExtension:   extension,
@@ -90,11 +91,12 @@ func NewFileREST(
 
 type fileREST struct {
 	rest.TableConvertor
-	codec        runtime.Codec
-	objRootPath  string
-	objExtension string
-	isNamespaced bool
-	singularName string
+	groupResource schema.GroupResource
+	codec         runtime.Codec
+	objRootPath   string
+	objExtension  string
+	isNamespaced  bool
+	singularName  string
 
 	fileContentCache        map[string]runtime.Object
 	pendingFileChanges      map[string]time.Time
@@ -223,6 +225,8 @@ func (f *fileREST) fileChangeProcessTickerFunc() {
 func (f *fileREST) notifyWatchers(ev watch.Event) {
 	f.fileWatchersMutex.RLock()
 	defer f.fileWatchersMutex.RUnlock()
+	accessor, _ := meta.Accessor(ev.Object)
+	klog.Infof("event %s %s %s/%s count(watcher)=%d", ev.Type, ev.Object.GetObjectKind(), accessor.GetNamespace(), accessor.GetName(), len(f.fileWatchers))
 	for _, w := range f.fileWatchers {
 		w.ch <- ev
 	}
@@ -255,7 +259,12 @@ func (f *fileREST) Get(
 		}
 		return nil, apierrors.NewNotFound(groupResource, name)
 	}
+	klog.Infof("[%s] %s got", f.groupResource, name)
 	return obj, err
+}
+
+func (f *fileREST) normalizeObject() {
+
 }
 
 func (f *fileREST) List(
@@ -279,14 +288,18 @@ func (f *fileREST) List(
 		return nil, err
 	}
 
+	count := 0
 	if err := f.visitDir(f.objRootPath, f.objExtension, f.newFunc, f.codec, func(path string, obj runtime.Object) {
 		if ok, err := predicate.Matches(obj); err == nil && ok {
+			count++
 			appendItem(v, obj)
 		}
 	}); err != nil {
-		//return nil, fmt.Errorf("failed walking filepath %v", dirname)
 		return newListObj, nil
 	}
+
+	klog.Infof("[%s] list count=%d", f.groupResource, count)
+
 	return newListObj, nil
 }
 
@@ -318,10 +331,12 @@ func (f *fileREST) Create(
 		return nil, err
 	}
 
-	filename := f.objectFileName(ctx, accessor.GetName())
+	name := accessor.GetName()
+
+	filename := f.objectFileName(ctx, name)
 
 	if utils.Exists(filename) {
-		return nil, ErrFileNotExists
+		return nil, apierrors.NewConflict(f.groupResource, name, ErrItemAlreadyExists)
 	}
 
 	accessor.SetCreationTimestamp(metav1.NewTime(time.Now()))
@@ -532,7 +547,11 @@ func (f *fileREST) normalizeObjectMeta(obj runtime.Object, path string) {
 	if err != nil {
 		return
 	}
-	accessor.SetNamespace(defaultNamespace)
+	if f.isNamespaced {
+		accessor.SetNamespace(defaultNamespace)
+	} else {
+		accessor.SetNamespace("")
+	}
 	accessor.SetName(strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)))
 }
 

@@ -108,6 +108,8 @@ services:
       - --gatewaySelectorKey=higress
       - --gatewaySelectorValue=higress-system-higress-gateway
       - --ingressClass=
+    env_file:
+      - ./env/controller.env
     depends_on:
       apiserver:
         condition: service_healthy

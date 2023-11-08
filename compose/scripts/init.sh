@@ -371,6 +371,7 @@ initializeGateway() {
   cp $VOLUMES_ROOT/pilot/cacerts/root-cert.pem ./root-cert.pem
   cp $VOLUMES_ROOT/pilot/cacerts/gateway-cert.pem ./cert-chain.pem
   cp $VOLUMES_ROOT/pilot/cacerts/gateway-key.pem ./key.pem
+  cat $VOLUMES_ROOT/pilot/cacerts/ca-cert.pem >> ./cert-chain.pem
 
   mkdir -p $VOLUMES_ROOT/gateway/podinfo && cd "$_"
   echo 'higress="higress-system-higress-gateway"' > ./labels
