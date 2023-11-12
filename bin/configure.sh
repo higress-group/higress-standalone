@@ -520,9 +520,6 @@ outputUsage() {
  -k, --data-enc-key=KEY     the key used to encrypt sensitive configurations
                             MUST contain 32 characters
                             A random key will be generated if unspecified
- -p, --console-password=CONSOLE-PASSWORD
-                            the password to be used to visit Higress Console
-                            default to random string if unspecified
      --nacos-port=NACOS-PORT
                             the HTTP port used to access the built-in Nacos
                             default to 8848 if unspecified
