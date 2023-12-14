@@ -8,6 +8,10 @@
 
 提到了云原生，大家就会想到 Kubernetes（K8s）。那么 Higress 能否脱离 K8s 独立部署呢？本项目就针对这一需求提出了一种相应的解决方案。
 
+## 注意
+
+Standalone 模式没有大规模生产使用过，目前主要用于本地部署测试的场景，如果生产部署更建议云原生模式部署：https://higress.io/zh-cn/docs/ops/deploy-by-helm
+
 ## 前置需求
 
 为了拉平不同操作系统的运行时差异，当前版本的部署方案是基于 Docker Compose 设计的。所以在使用这一方案进行部署之前，请先在本机安装好 Docker Compose，随后确认以下命令可以正常运行并输出 Docker Compose CLI 的帮助信息：
