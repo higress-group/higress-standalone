@@ -450,6 +450,20 @@ data:
   mode: standalone
 EOF
   publishConfig "higress-system" "configmaps" "higress-console" "$content"
+
+  read -r -d '' content << EOF
+apiVersion: v1
+data:
+  iv: $(cat /dev/urandom | tr -dc '[:graph:]' | fold -w 16 | head -n 1 | tr -d '\n' | base64 -w 0)
+  key: $(cat /dev/urandom | tr -dc '[:graph:]' | fold -w 32 | head -n 1 | tr -d '\n' | base64 -w 0)
+kind: Secret
+metadata:
+  creationTimestamp: "$(now)"
+  name: higress-console
+  namespace: higress-system
+type: Opaque
+EOF
+  publishConfig "higress-system" "secrets" "higress-console" "$content"
 }
 
 initializeConfigStorage

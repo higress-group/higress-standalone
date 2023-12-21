@@ -289,6 +289,11 @@ checkConsole() {
     echo "  The ConfigMap resource of Higress Console doesn't exist."
     exit -1
   fi
+  checkConfigExists "higress-system" "secrets" "higress-console"
+  if [ $? -ne 0 ]; then
+    echo "  The Secret resource of Higress Console doesn't exist."
+    exit -1
+  fi
 }
 
 checkStorage
