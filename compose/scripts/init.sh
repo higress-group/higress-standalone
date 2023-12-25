@@ -417,7 +417,7 @@ data:
   nacosPassword: $(echo -n "${NACOS_PASSWORD}" | base64 -w 0)
 type: Opaque
 EOF
-      publishConfig "higress-system" "secrets" "${nacosAuthSecretName}" "$nacosAuthSecretContent"
+      publishConfig "higress-system" "secrets" "${nacosAuthSecretName}" "$nacosAuthSecretContent" true
     fi
 
     read -r -d '' mcpbridgeContent << EOF
@@ -433,7 +433,7 @@ ${mcpbridgeContent}
 EOF
   fi
 
-  publishConfig "higress-system" "mcpbridges" "default" "$mcpbridgeContent"
+  publishConfig "higress-system" "mcpbridges" "default" "$mcpbridgeContent" true
 }
 
 initializeConsole() {
@@ -449,7 +449,7 @@ metadata:
 data:
   mode: standalone
 EOF
-  publishConfig "higress-system" "configmaps" "higress-console" "$content"
+  publishConfig "higress-system" "configmaps" "higress-console" "$content" true
 
   read -r -d '' content << EOF
 apiVersion: v1
@@ -463,7 +463,7 @@ metadata:
   namespace: higress-system
 type: Opaque
 EOF
-  publishConfig "higress-system" "secrets" "higress-console" "$content"
+  publishConfig "higress-system" "secrets" "higress-console" "$content" true
 }
 
 initializeConfigStorage
