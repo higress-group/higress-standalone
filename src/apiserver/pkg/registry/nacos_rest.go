@@ -239,6 +239,7 @@ func (n *nacosREST) List(
 	err = n.enumerateConfigs(&searchConfigParam, func(item *model.ConfigItem) {
 		obj, err := n.decodeConfig(n.codec, item.Content, n.newFunc)
 		if obj == nil || err != nil {
+			klog.Errorf("failed to decode config %s/%s: %v", item.Group, item.DataId, err)
 			return
 		}
 		if ok, err := predicate.Matches(obj); err == nil && ok {
@@ -532,6 +533,7 @@ func (n *nacosREST) read(decoder runtime.Decoder, group, dataId string, newFunc 
 	}
 	obj, err := n.decodeConfig(decoder, config, newFunc)
 	if err != nil {
+		klog.Errorf("failed to decode config %s: %v", dataId, err)
 		return nil, config, err
 	}
 	return obj, config, nil
@@ -642,6 +644,7 @@ func (n *nacosREST) refreshConfigList() {
 		configItem := configItems[key]
 		obj, err := n.decodeConfig(n.codec, configItem.Content, n.newFunc)
 		if err != nil {
+			klog.Errorf("failed to decode config %s: %v", configItem.DataId, err)
 			delete(configItems, key)
 			continue
 		}
@@ -656,6 +659,7 @@ func (n *nacosREST) refreshConfigList() {
 			OnChange: func(namespace, group, dataId, data string) {
 				obj, err := n.decodeConfig(n.codec, data, n.newFunc)
 				if err != nil {
+					klog.Errorf("failed to decode config %s: %v", dataId, err)
 					return
 				}
 				klog.Infof("%s/%s is changed", group, dataId)
@@ -673,6 +677,7 @@ func (n *nacosREST) refreshConfigList() {
 		configItem := n.configItems[key]
 		obj, err := n.decodeConfig(n.codec, configItem.Content, n.newFunc)
 		if err != nil {
+			klog.Errorf("failed to decode config %s: %v", configItem.DataId, err)
 			continue
 		}
 		_ = n.configClient.CancelListenConfig(vo.ConfigParam{
