@@ -9,6 +9,7 @@ import (
 	"github.com/nacos-group/nacos-sdk-go/v2/common/constant"
 	"github.com/nacos-group/nacos-sdk-go/v2/vo"
 	"github.com/spf13/pflag"
+	"k8s.io/klog/v2"
 	"net/url"
 	"os"
 	"strconv"
@@ -19,6 +20,18 @@ const (
 	Storage_File  = "file"
 	Storage_Nacos = "nacos"
 )
+
+var (
+	NacosDisableUseSnapShot      = utils.GetBoolFromEnv("NACOS_DISABLE_USE_SNAPSHOT", false)
+	NacosListRefreshIntervalSecs = utils.GetIntFromEnv("NACOS_LIST_REFRESH_INTERVAL_SECS", 10)
+	NacosConfigSearchPageSize    = utils.GetIntFromEnv("NACOS_CONFIG_SEARCH_PAGE_SIZE", 50)
+)
+
+func init() {
+	klog.Infof("NacosDisableUseSnapShot: %v", NacosDisableUseSnapShot)
+	klog.Infof("NacosListRefreshIntervalSecs: %v", NacosListRefreshIntervalSecs)
+	klog.Infof("NacosConfigSearchPageSize: %v", NacosConfigSearchPageSize)
+}
 
 func CreateAuthOptions() *AuthOptions {
 	return &AuthOptions{}
@@ -225,8 +238,7 @@ func (o *NacosOptions) CreateConfigClient() (config_client.IConfigClient, error)
 		constant.WithLogDir(o.LogDir),
 		constant.WithCacheDir(o.CacheDir),
 		constant.WithLogLevel("info"),
-		// Ignore snapshot so we can get the latest config right after making any change.
-		constant.WithDisableUseSnapShot(true),
+		constant.WithDisableUseSnapShot(NacosDisableUseSnapShot),
 	)
 
 	var serverConfigs []constant.ServerConfig

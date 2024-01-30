@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/alibaba/higress/api-server/pkg/options"
 	"github.com/alibaba/higress/api-server/pkg/utils"
 	"github.com/nacos-group/nacos-sdk-go/v2/clients/config_client"
 	"github.com/nacos-group/nacos-sdk-go/v2/common/constant"
@@ -38,8 +39,6 @@ import (
 
 const dataIdSeparator = "."
 const wildcardSuffix = dataIdSeparator + "*"
-const searchPageSize = 50
-const listRefreshInterval = 10 * time.Second
 const encryptionMark = "enc|"
 const namesSuffix = "__names__"
 const namesGroup = constant.DEFAULT_GROUP
@@ -133,7 +132,7 @@ func (n *nacosREST) startBackgroundWatcher() {
 		return
 	}
 
-	n.listRefreshTicker = time.NewTicker(listRefreshInterval)
+	n.listRefreshTicker = time.NewTicker(time.Duration(options.NacosListRefreshIntervalSecs) * time.Second)
 	go func(n *nacosREST) {
 		for {
 			<-n.listRefreshTicker.C
@@ -229,17 +228,16 @@ func (n *nacosREST) List(
 	ns, _ := genericapirequest.NamespaceFrom(ctx)
 
 	searchConfigParam := vo.SearchConfigParam{
-		Search:   "blur",
-		DataId:   n.dataIdPrefix + wildcardSuffix,
-		Group:    ns,
-		PageSize: searchPageSize,
+		Search: "blur",
+		DataId: n.dataIdPrefix + wildcardSuffix,
+		Group:  ns,
 	}
 	predicate := n.buildListPredicate(options)
 	count := 0
 	err = n.enumerateConfigs(&searchConfigParam, func(item *model.ConfigItem) {
 		obj, err := n.decodeConfig(n.codec, item.Content, n.newFunc)
 		if obj == nil || err != nil {
-			klog.Errorf("failed to decode config %s/%s: %v", item.Group, item.DataId, err)
+			klog.Errorf("failed to decode config [#3] %s/%s: %v", item.Group, item.DataId, err)
 			return
 		}
 		if ok, err := predicate.Matches(obj); err == nil && ok {
@@ -499,6 +497,9 @@ func (n *nacosREST) buildListPredicate(options *metainternalversion.ListOptions)
 func (n *nacosREST) enumerateConfigs(param *vo.SearchConfigParam, action func(*model.ConfigItem)) error {
 	searchConfigParam := *param
 	searchConfigParam.PageNo = 1
+	if searchConfigParam.PageSize < options.NacosConfigSearchPageSize {
+		searchConfigParam.PageSize = options.NacosConfigSearchPageSize
+	}
 	for {
 		page, err := n.configClient.SearchConfig(searchConfigParam)
 		if err != nil {
@@ -510,6 +511,9 @@ func (n *nacosREST) enumerateConfigs(param *vo.SearchConfigParam, action func(*m
 		}
 
 		for _, item := range page.PageItems {
+			if item.Group == namesGroup && item.DataId == n.namesDataId {
+				continue
+			}
 			localItem := *(&item)
 			action(&localItem)
 		}
@@ -533,7 +537,7 @@ func (n *nacosREST) read(decoder runtime.Decoder, group, dataId string, newFunc 
 	}
 	obj, err := n.decodeConfig(decoder, config, newFunc)
 	if err != nil {
-		klog.Errorf("failed to decode config %s: %v", dataId, err)
+		klog.Errorf("failed to decode config #4 %s: %v", dataId, err)
 		return nil, config, err
 	}
 	return obj, config, nil
@@ -549,10 +553,12 @@ func (n *nacosREST) readRaw(group, dataId string) (string, error) {
 func (n *nacosREST) decodeConfig(decoder runtime.Decoder, config string, newFunc func() runtime.Object) (runtime.Object, error) {
 	decryptedConfig, err := n.decryptConfig(config)
 	if err != nil {
+		klog.Infof("failed to decoded config #1: %v\n%s", err, config)
 		return nil, err
 	}
 	obj, _, err := decoder.Decode([]byte(decryptedConfig), nil, newFunc())
 	if err != nil {
+		klog.Infof("failed to decoded config #2: %v\n%s", err, config)
 		return nil, err
 	}
 	accessor, err := meta.Accessor(obj)
@@ -606,9 +612,6 @@ func (n *nacosREST) refreshConfigList() {
 		Search: "blur",
 		DataId: n.dataIdPrefix + wildcardSuffix,
 	}, func(item *model.ConfigItem) {
-		if item.Group == namesGroup && item.DataId == n.namesDataId {
-			return
-		}
 		key := item.Group + "/" + item.DataId
 		allConfigKeys = append(allConfigKeys, key)
 		if _, ok := n.configItems[key]; !ok {
@@ -644,7 +647,7 @@ func (n *nacosREST) refreshConfigList() {
 		configItem := configItems[key]
 		obj, err := n.decodeConfig(n.codec, configItem.Content, n.newFunc)
 		if err != nil {
-			klog.Errorf("failed to decode config %s: %v", configItem.DataId, err)
+			klog.Errorf("failed to decode config #5 %s: %v", configItem.DataId, err)
 			delete(configItems, key)
 			continue
 		}
@@ -659,7 +662,7 @@ func (n *nacosREST) refreshConfigList() {
 			OnChange: func(namespace, group, dataId, data string) {
 				obj, err := n.decodeConfig(n.codec, data, n.newFunc)
 				if err != nil {
-					klog.Errorf("failed to decode config %s: %v", dataId, err)
+					klog.Errorf("failed to decode config #6 %s: %v", dataId, err)
 					return
 				}
 				klog.Infof("%s/%s is changed", group, dataId)
@@ -677,7 +680,7 @@ func (n *nacosREST) refreshConfigList() {
 		configItem := n.configItems[key]
 		obj, err := n.decodeConfig(n.codec, configItem.Content, n.newFunc)
 		if err != nil {
-			klog.Errorf("failed to decode config %s: %v", configItem.DataId, err)
+			klog.Errorf("failed to decode config #7 %s: %v", configItem.DataId, err)
 			continue
 		}
 		_ = n.configClient.CancelListenConfig(vo.ConfigParam{
