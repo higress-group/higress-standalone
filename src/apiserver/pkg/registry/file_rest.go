@@ -53,7 +53,7 @@ func NewFileREST(
 	newFunc func() runtime.Object,
 	newListFunc func() runtime.Object,
 	attrFunc storage.AttrFunc,
-) (rest.Storage, error) {
+) (REST, error) {
 	if attrFunc == nil {
 		if isNamespaced {
 			if isNamespaced {
