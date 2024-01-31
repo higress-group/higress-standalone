@@ -62,7 +62,7 @@ func NewNacosREST(
 	newListFunc func() runtime.Object,
 	attrFunc storage.AttrFunc,
 	dataEncryptionKey []byte,
-) rest.Storage {
+) REST {
 	if attrFunc == nil {
 		if isNamespaced {
 			if isNamespaced {

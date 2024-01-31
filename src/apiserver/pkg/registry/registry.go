@@ -21,9 +21,13 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 )
 
-// REST implements a RESTStorage for API services against etcd
-type REST struct {
+// REST defines a storage interface for integrating different storage backends with api server.
+type REST interface {
 	rest.Storage
+	rest.StandardStorage
+	rest.SingularNameProvider
+	rest.Scoper
+	rest.TableConvertor
 }
 
 // RESTInPeace is just a simple function that panics on error.
