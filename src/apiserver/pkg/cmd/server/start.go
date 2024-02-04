@@ -18,10 +18,10 @@ package server
 
 import (
 	"fmt"
-	"github.com/alibaba/higress/api-server/pkg/apiserver"
-	"github.com/alibaba/higress/api-server/pkg/options"
-	"github.com/spf13/cobra"
 	"io"
+	"net"
+
+	"github.com/spf13/cobra"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/endpoints/openapi"
 	"k8s.io/apiserver/pkg/features"
@@ -31,7 +31,9 @@ import (
 	"k8s.io/client-go/informers"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	netutils "k8s.io/utils/net"
-	"net"
+
+	"github.com/alibaba/higress/api-server/pkg/apiserver"
+	"github.com/alibaba/higress/api-server/pkg/options"
 )
 
 // HigressServerOptions contains state for master/api server
@@ -86,10 +88,14 @@ func getOpenAPIDefinitions(openapicommon.ReferenceCallback) map[string]openapico
 		"k8s.io/api/core/v1.Node":      {},
 		"k8s.io/api/core/v1.Namespace": {},
 
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceDefinition": {},
+
 		"k8s.io/api/admissionregistration/v1.MutatingWebhookConfiguration":   {},
 		"k8s.io/api/admissionregistration/v1.ValidatingWebhookConfiguration": {},
 
 		"k8s.io/api/authorization/v1.SubjectAccessReview": {},
+
+		"k8s.io/api/discovery/v1.EndpointSlice": {},
 
 		"k8s.io/api/networking/v1.Ingress":      {},
 		"k8s.io/api/networking/v1.IngressClass": {},
@@ -97,6 +103,15 @@ func getOpenAPIDefinitions(openapicommon.ReferenceCallback) map[string]openapico
 		"github.com/alibaba/higress/client/pkg/apis/extensions/v1alpha1.WasmPlugin": {},
 		"github.com/alibaba/higress/client/pkg/apis/networking/v1.McpBridge":        {},
 		"github.com/alibaba/higress/client/pkg/apis/networking/v1.Http2Rpc":         {},
+
+		"sigs.k8s.io/gateway-api/apis/v1beta1.GatewayClass":    {},
+		"sigs.k8s.io/gateway-api/apis/v1beta1.Gateway":         {},
+		"sigs.k8s.io/gateway-api/apis/v1beta1.HTTPRoute":       {},
+		"sigs.k8s.io/gateway-api/apis/v1beta1.ReferenceGrant":  {},
+		"sigs.k8s.io/gateway-api/apis/v1alpha2.GatewayClass":   {},
+		"sigs.k8s.io/gateway-api/apis/v1alpha2.Gateway":        {},
+		"sigs.k8s.io/gateway-api/apis/v1alpha2.HTTPRoute":      {},
+		"sigs.k8s.io/gateway-api/apis/v1alpha2.ReferenceGrant": {},
 	}
 }
 

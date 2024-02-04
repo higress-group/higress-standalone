@@ -211,7 +211,7 @@ func (n *nacosREST) Get(
 		klog.Warningf("%s %s/%s not found", n.groupResource, ns, name)
 		return nil, apierrors.NewNotFound(groupResource, name)
 	}
-	klog.Infof("%s %s/%s got", n.groupResource, ns, name)
+	klog.Infof("[%s] %s/%s got", n.groupResource, ns, name)
 	return obj, err
 }
 
@@ -249,7 +249,7 @@ func (n *nacosREST) List(
 		return nil, err
 	}
 
-	klog.Infof("%s %s list count=%d", n.groupResource, ns, count)
+	klog.Infof("[%s] %s list count=%d", n.groupResource, ns, count)
 	return newListObj, nil
 }
 
