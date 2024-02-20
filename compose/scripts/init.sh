@@ -26,78 +26,6 @@ checkExitCode() {
   fi
 }
 
-publishConfig() {
-  # $1 namespace
-  # $2 configType: plural
-  # $3 configName
-  # $4 content
-  # $5 skipWhenExisted
-  case $CONFIG_STORAGE in
-    nacos)
-      publishNacosConfig "$@"
-      ;;
-    file)
-      publishFileConfig "$@"
-      ;;
-    *)
-      printf "  Unknown storage type: %s\n" "$CONFIG_STORAGE"
-      exit -1
-      ;;
-  esac
-}
-
-publishNacosConfig() {
-  # $1 namespace
-  # $2 configType: plural
-  # $3 configName
-  # $4 content
-  # $5 skipWhenExisted
-  local group="$1"
-  local dataId="$2.$3"
-  local content="$4"
-  local skipWhenExisted=$5
-
-  if [ "$skipWhenExisted" == true ]; then
-    statusCode=$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v1/cs/configs?accessToken=${NACOS_ACCESS_TOKEN}&tenant=${NACOS_NS}&dataId=${dataId}&group=${group}")
-    if [ $statusCode -eq 200 ]; then
-      echo "  Config $group/$dataId already exists in namespace ${NACOS_NS}"
-      return 0
-    elif [ $statusCode -ne 404 ]; then
-      echo "  Checking config $group/$dataId in tenant ${NACOS_NS} failed with $statusCode"
-      exit -1
-    fi
-  fi
-
-  statusCode="$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v1/cs/configs?accessToken=${NACOS_ACCESS_TOKEN}" --data-urlencode "tenant=${NACOS_NS}" --data-urlencode "dataId=${dataId}" --data-urlencode "group=${group}" --data-urlencode "content=${content}")"
-  if [ $statusCode -ne 200 ]; then
-    echo "  Publishing config ${group}/${dataId} in tenant ${NACOS_NS} failed with $statusCode"
-    exit -1 
-  fi
-  return 0
-}
-
-publishFileConfig() {
-  # $1 namespace: ignored. only for alignment
-  # $2 configType: plural
-  # $3 configName
-  # $4 content
-  # $5 skipWhenExisted
-  local configDir="${FILE_ROOT_DIR}/$2"
-  local configFile="${configDir}/$3.yaml"
-  local content="$4"
-  local skipWhenExisted=$5
-
-  if [ "$skipWhenExisted" == true ] && [ -f "$configFile" ]; then
-      echo "  Config file [$configFile] already exists"
-      return 0
-  fi
-
-  mkdir -p "$configDir"
-  checkExitCode "  Creating config directory [$configDir] fails with $?"
-  echo "$content" > "$configFile"
-  return 0
-}
-
 initializeConfigStorage() {
   CONFIG_STORAGE=${CONFIG_STORAGE:-nacos}
 
@@ -249,8 +177,10 @@ initializeController() {
 
   mkdir -p $VOLUMES_ROOT/controller && cd "$_"
 
-  mkdir -p ./log/nacos
-  chmod a+w ./log/nacos
+  if [ "$CONFIG_STORAGE" == "nacos" ]; then
+    mkdir -p ./log/nacos
+    chmod a+w ./log/nacos
+  fi
 }
 
 initializePilot() {
@@ -328,40 +258,6 @@ EOF
     checkExitCode "Generating certificate for gateway fails with $?"
     chmod a+r gateway-key.pem
   fi
-
-  read -r -d '' content << EOF
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  labels:
-    app: higress-gateway
-    higress: higress-system-higress-gateway
-  name: higress-config
-  namespace: higress-system
-data:
-  mesh: |-
-    accessLogEncoding: TEXT
-    accessLogFile: /dev/stdout
-    accessLogFormat: |
-      {"authority":"%REQ(:AUTHORITY)%","bytes_received":"%BYTES_RECEIVED%","bytes_sent":"%BYTES_SENT%","downstream_local_address":"%DOWNSTREAM_LOCAL_ADDRESS%","downstream_remote_address":"%DOWNSTREAM_REMOTE_ADDRESS%","duration":"%DURATION%","istio_policy_status":"%DYNAMIC_METADATA(istio.mixer:status)%","method":"%REQ(:METHOD)%","path":"%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%","protocol":"%PROTOCOL%","request_id":"%REQ(X-REQUEST-ID)%","requested_server_name":"%REQUESTED_SERVER_NAME%","response_code":"%RESPONSE_CODE%","response_flags":"%RESPONSE_FLAGS%","route_name":"%ROUTE_NAME%","start_time":"%START_TIME%","trace_id":"%REQ(X-B3-TRACEID)%","upstream_cluster":"%UPSTREAM_CLUSTER%","upstream_host":"%UPSTREAM_HOST%","upstream_local_address":"%UPSTREAM_LOCAL_ADDRESS%","upstream_service_time":"%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%","upstream_transport_failure_reason":"%UPSTREAM_TRANSPORT_FAILURE_REASON%","user_agent":"%REQ(USER-AGENT)%","x_forwarded_for":"%REQ(X-FORWARDED-FOR)%"}
-    configSources:
-    - address: xds://controller:15051
-    defaultConfig:
-      disableAlpnH2: true
-      discoveryAddress: pilot:15012
-      proxyStatsMatcher:
-        inclusionRegexps:
-        - .*
-    dnsRefreshRate: 200s
-    enableAutoMtls: false
-    enablePrometheusMerge: true
-    ingressControllerMode: "OFF"
-    protocolDetectionTimeout: 100ms
-    rootNamespace: higress-system
-    trustDomain: cluster.local
-  meshNetworks: 'networks: {}'
-EOF
-  publishConfig "higress-system" "configmaps" "higress-config" "$content" true
 }
 
 initializeGateway() {
@@ -379,98 +275,8 @@ initializeGateway() {
   mkdir -p $VOLUMES_ROOT/gateway/istio/data
 }
 
-initializeMcpBridge() {
-  echo "Initializing McpBridge resource..."
-
-  read -r -d '' mcpbridgeContent << EOF
-apiVersion: networking.higress.io/v1
-kind: McpBridge
-metadata:
-  creationTimestamp: "$(now)"
-  name: default
-  namespace: higress-system
-spec:
-  registries:
-EOF
-
-  if [ "$CONFIG_STORAGE" == "nacos" ]; then
-    if [[ "$NACOS_SERVER_URL" =~ ^http://([a-zA-Z0-9.]+?)(:([0-9]+))/nacos$ ]]; then
-      NACOS_SERVER_DOMAIN="${BASH_REMATCH[1]}"
-      NACOS_SERVER_PORT="${BASH_REMATCH[3]}"
-    else
-      echo "  Unable to parse Nacos server URL. Skip creating the McpBridge resource"
-      return
-    fi
-
-    nacosAuthSecretName=""
-
-    if [ -n "$NACOS_USERNAME" ] && [ -n "$NACOS_PASSWORD" ]; then
-      nacosAuthSecretName="nacos-auth-default"
-      read -r -d '' nacosAuthSecretContent << EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  creationTimestamp: "$(now)"
-  name: ${nacosAuthSecretName}
-  namespace: higress-system
-data:
-  nacosUsername: $(echo -n "${NACOS_USERNAME}" | base64 -w 0)
-  nacosPassword: $(echo -n "${NACOS_PASSWORD}" | base64 -w 0)
-type: Opaque
-EOF
-      publishConfig "higress-system" "secrets" "${nacosAuthSecretName}" "$nacosAuthSecretContent" true
-    fi
-
-    read -r -d '' mcpbridgeContent << EOF
-${mcpbridgeContent}
-  - domain: ${NACOS_SERVER_DOMAIN}
-    nacosGroups:
-    - DEFAULT_GROUP
-    nacosNamespaceId: ""
-    name: nacos
-    port: ${NACOS_SERVER_PORT:-80}
-    type: nacos2
-    authSecretName: "${nacosAuthSecretName}"
-EOF
-  fi
-
-  publishConfig "higress-system" "mcpbridges" "default" "$mcpbridgeContent" true
-}
-
-initializeConsole() {
-  echo "Initializing console configurations..."
-
-  read -r -d '' content << EOF
-apiVersion: v1 
-kind: ConfigMap
-metadata:
-  creationTimestamp: "$(now)"
-  name: higress-console
-  namespace: higress-system
-data:
-  mode: standalone
-EOF
-  publishConfig "higress-system" "configmaps" "higress-console" "$content" true
-
-  read -r -d '' content << EOF
-apiVersion: v1
-data:
-  iv: $(cat /dev/urandom | tr -dc '[:graph:]' | fold -w 16 | head -n 1 | tr -d '\n' | base64 -w 0)
-  key: $(cat /dev/urandom | tr -dc '[:graph:]' | fold -w 32 | head -n 1 | tr -d '\n' | base64 -w 0)
-kind: Secret
-metadata:
-  creationTimestamp: "$(now)"
-  name: higress-console
-  namespace: higress-system
-type: Opaque
-EOF
-  publishConfig "higress-system" "secrets" "higress-console" "$content" true
-}
-
 initializeConfigStorage
 initializeApiServer
 initializeController
 initializePilot
 initializeGateway
-initializeMcpBridge
-initializeConsole

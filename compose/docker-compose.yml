@@ -28,14 +28,9 @@ services:
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/runner:${HIGRESS_RUNNER_TAG}
     command:
       - ./init.sh
+    env_file:
+      - ./.env
     profiles: [ "init" ]
-    environment:
-      - CONFIG_STORAGE
-      - NACOS_SERVER_URL
-      - NACOS_NS
-      - NACOS_USERNAME
-      - NACOS_PASSWORD
-      - NACOS_DATA_ENC_KEY
     networks:
       - higress-net
     volumes:
@@ -47,14 +42,11 @@ services:
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/runner:${HIGRESS_RUNNER_TAG}
     command:
       - ./precheck.sh
-    environment:
-      - CONFIG_STORAGE
-      - NACOS_SERVER_URL
-      - NACOS_NS
-      - NACOS_USERNAME
-      - NACOS_PASSWORD
+    env_file:
+      - ./.env
     networks:
       - higress-net
+    restart: on-failure
     volumes:
       - ./volumes:/mnt/volumes:rw
       - ./scripts:/workspace:ro
@@ -100,6 +92,23 @@ services:
       - ./volumes/api:/etc/api:ro
       - ${FILE_ROOT_DIR:-./volumes/dummy}:/opt/data/:rw
 
+  prepare:
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/runner:${HIGRESS_RUNNER_TAG}
+    command:
+      - ./prepare.sh
+    env_file:
+      - ./.env
+    depends_on:
+      apiserver:
+        condition: service_healthy
+    networks:
+      - higress-net
+    restart: on-failure
+    volumes:
+      - ./volumes:/mnt/volumes:rw
+      - ./scripts:/workspace:ro
+      - ${FILE_ROOT_DIR:-./volumes/dummy}:/opt/data/:ro
+
   controller:
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress:${HIGRESS_CONTROLLER_TAG}
     command:
@@ -111,8 +120,8 @@ services:
     env_file:
       - ./env/controller.env
     depends_on:
-      apiserver:
-        condition: service_healthy
+      prepare:
+        condition: service_completed_successfully
     networks:
       - higress-net
     restart: always
