@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -73,38 +72,8 @@ var (
 	// Codecs provides methods for retrieving codecs and serializers for specific
 	// versions and content types.
 	Codecs                     = serializer.NewCodecFactory(Scheme)
-	LegacyNegotiatedSerializer = createLegacyNegotiatedSerializer(Scheme)
+	LegacyNegotiatedSerializer = codec.CreateLegacyNegotiatedSerializer(Scheme)
 )
-
-func createLegacyNegotiatedSerializer(scheme *runtime.Scheme) runtime.NegotiatedSerializer {
-	mf := json.DefaultMetaFactory
-	jsonSerializer := json.NewSerializerWithOptions(
-		mf, scheme, scheme,
-		json.SerializerOptions{Yaml: false, Pretty: false, Strict: false},
-	)
-	prettyJsonSerializer := json.NewSerializerWithOptions(
-		mf, scheme, scheme,
-		json.SerializerOptions{Yaml: false, Pretty: true, Strict: false},
-	)
-	strictJsonSerializer := json.NewSerializerWithOptions(
-		mf, scheme, scheme,
-		json.SerializerOptions{Yaml: false, Pretty: false, Strict: true},
-	)
-	return runtime.NewSimpleNegotiatedSerializer(runtime.SerializerInfo{
-		MediaType:        "application/json",
-		MediaTypeType:    "application",
-		MediaTypeSubType: "json",
-		EncodesAsText:    true,
-		Serializer:       jsonSerializer,
-		PrettySerializer: prettyJsonSerializer,
-		StrictSerializer: strictJsonSerializer,
-		StreamSerializer: &runtime.StreamSerializerInfo{
-			Serializer:    jsonSerializer,
-			EncodesAsText: true,
-			Framer:        json.Framer,
-		},
-	})
-}
 
 func init() {
 	_ = corev1.AddToScheme(Scheme)
