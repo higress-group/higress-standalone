@@ -33,7 +33,12 @@ checkConfigExists() {
   if [[ "$configGroupVersion" == *"/"* ]]; then
     uriPrefix="/apis"
   fi
-  local url="${API_SERVER_BASE_URL}{$uriPrefix}/${configGroupVersion}/namespaces/${namespace}/${configType}/${configName}"
+  local url;
+  if [ -z "$namespace" ]; then
+    url="${API_SERVER_BASE_URL}${uriPrefix}/${configGroupVersion}/${configType}/${configName}"
+  else
+    url="${API_SERVER_BASE_URL}${uriPrefix}/${configGroupVersion}/namespaces/${namespace}/${configType}/${configName}"
+  fi
   statusCode=$(curl -s -o /dev/null -w "%{http_code}" "${url}" -k)
   if [ $statusCode -eq 200 ]; then
     return 0
@@ -60,7 +65,12 @@ getConfig() {
   if [[ "$configGroupVersion" == *"/"* ]]; then
     uriPrefix="/apis"
   fi
-  local url="${API_SERVER_BASE_URL}{$uriPrefix}/${configGroupVersion}/namespaces/${namespace}/${configType}/${configName}"
+  local url;
+  if [ -z "$namespace" ]; then
+    url="${API_SERVER_BASE_URL}${uriPrefix}/${configGroupVersion}/${configType}/${configName}"
+  else
+    url="${API_SERVER_BASE_URL}${uriPrefix}/${configGroupVersion}/namespaces/${namespace}/${configType}/${configName}"
+  fi
   local tmpFile=$(mktemp /tmp/higress-precheck-config.XXXXXXXXX.cfg)
   local statusCode=$(curl -s -o "$tmpFile" -w "%{http_code}" "${url}" -k -H "Accept: application/yaml")
   if [ $statusCode -eq 200 ]; then
@@ -92,7 +102,12 @@ publishConfig() {
   if [[ "$configGroupVersion" == *"/"* ]]; then
     uriPrefix="/apis"
   fi
-  local url="${API_SERVER_BASE_URL}{$uriPrefix}/${configGroupVersion}/namespaces/${namespace}/${configType}"
+  local url;
+  if [ -z "$namespace" ]; then
+    url="${API_SERVER_BASE_URL}${uriPrefix}/${configGroupVersion}/${configType}"
+  else
+    url="${API_SERVER_BASE_URL}${uriPrefix}/${configGroupVersion}/namespaces/${namespace}/${configType}"
+  fi
   statusCode="$(curl -s -o /dev/null -w "%{http_code}" "$url" -k -X POST -H "Content-Type: application/yaml" -d "$content")"
   if [ $statusCode -ne 201 ]; then
     echo "  Publishing config ${configType}.${configName} to namespace ${namespace} failed with ${statusCode}"
@@ -218,6 +233,7 @@ data:
       {"authority":"%REQ(:AUTHORITY)%","bytes_received":"%BYTES_RECEIVED%","bytes_sent":"%BYTES_SENT%","downstream_local_address":"%DOWNSTREAM_LOCAL_ADDRESS%","downstream_remote_address":"%DOWNSTREAM_REMOTE_ADDRESS%","duration":"%DURATION%","istio_policy_status":"%DYNAMIC_METADATA(istio.mixer:status)%","method":"%REQ(:METHOD)%","path":"%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%","protocol":"%PROTOCOL%","request_id":"%REQ(X-REQUEST-ID)%","requested_server_name":"%REQUESTED_SERVER_NAME%","response_code":"%RESPONSE_CODE%","response_flags":"%RESPONSE_FLAGS%","route_name":"%ROUTE_NAME%","start_time":"%START_TIME%","trace_id":"%REQ(X-B3-TRACEID)%","upstream_cluster":"%UPSTREAM_CLUSTER%","upstream_host":"%UPSTREAM_HOST%","upstream_local_address":"%UPSTREAM_LOCAL_ADDRESS%","upstream_service_time":"%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%","upstream_transport_failure_reason":"%UPSTREAM_TRANSPORT_FAILURE_REASON%","user_agent":"%REQ(USER-AGENT)%","x_forwarded_for":"%REQ(X-FORWARDED-FOR)%"}
     configSources:
     - address: xds://controller:15051
+    - address: k8s://
     defaultConfig:
       disableAlpnH2: true
       discoveryAddress: pilot:15012
@@ -310,7 +326,82 @@ EOF
   fi
 }
 
+checkGatewayApi() {
+  echo "Checking Gateway API configurations..."
+
+  checkConfigExists "higress-system" "v1" "services" "higress-gateway"
+  if [ $? -ne 0 ]; then
+    echo "  The Service resource \"higress-gateway\" doesn't exist. Create it now..."
+    read -r -d '' content <<EOF
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    higress: higress-system-higress-gateway
+  name: higress-gateway
+  namespace: higress-system
+spec:
+  ports:
+  - name: http2
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 443
+  selector:
+    higress: higress-system-higress-gateway
+  type: LoadBalancer
+EOF
+    publishConfig "higress-system" "v1" "services" "higress-gateway" "$content"
+  fi
+
+  checkConfigExists "" "gateway.networking.k8s.io/v1beta1" "gatewayclasses" "higress-gateway"
+  if [ $? -ne 0 ]; then
+    echo "  The GatewayClass resource \"higress-gateway\" doesn't exist. Create it now..."
+    read -r -d '' content <<EOF
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: GatewayClass
+metadata:
+  name: higress-gateway
+spec:
+  controllerName: "higress.io/gateway-controller"
+EOF
+    publishConfig "" "gateway.networking.k8s.io/v1beta1" "gatewayclasses" "higress-gateway" "$content"
+  fi
+
+  checkConfigExists "higress-system" "gateway.networking.k8s.io/v1beta1" "gateways" "higress-gateway"
+  if [ $? -ne 0 ]; then
+    echo "  The Gateway resource \"higress-gateway\" doesn't exist. Create it now..."
+    read -r -d '' content <<EOF
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: higress-gateway
+  namespace: higress-system
+spec:
+  gatewayClassName: higress-gateway
+  listeners:
+  - name: http
+    port: 80
+    protocol: HTTP
+    allowedRoutes:
+      namespaces:
+        from: All
+  - name: https
+    port: 443
+    protocol: HTTPS
+    allowedRoutes:
+      namespaces:
+        from: All
+EOF
+    publishConfig "higress-system" "gateway.networking.k8s.io/v1beta1" "gateways" "higress-gateway" "$content"
+  fi
+}
+
 checkStorage
 checkPilot
 checkGateway
 checkConsole
+checkGatewayApi

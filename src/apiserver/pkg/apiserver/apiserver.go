@@ -381,24 +381,7 @@ func (c completedConfig) New() (*HigressServer, error) {
 			func() runtime.Object { return &gwapiv1beta1.ReferenceGrantList{} },
 			nil, false)
 		gwapiApiGroupInfo.VersionedResourcesStorageMap[gwapiv1beta1.SchemeGroupVersion.Version] = gwapiv1beta1Storages
-		gwapiv1alpha2Storages := map[string]rest.Storage{}
-		appendStorage(gwapiv1alpha2Storages, storageCreateFunc, gwapiv1alpha2.SchemeGroupVersion, false, "gatewayclass", "gatewayclasses",
-			func() runtime.Object { return &gwapiv1alpha2.GatewayClass{} },
-			func() runtime.Object { return &gwapiv1alpha2.GatewayClassList{} },
-			nil, false)
-		appendStorage(gwapiv1alpha2Storages, storageCreateFunc, gwapiv1alpha2.SchemeGroupVersion, true, "gateway", "gateways",
-			func() runtime.Object { return &gwapiv1alpha2.Gateway{} },
-			func() runtime.Object { return &gwapiv1alpha2.GatewayList{} },
-			nil, false)
-		appendStorage(gwapiv1alpha2Storages, storageCreateFunc, gwapiv1alpha2.SchemeGroupVersion, true, "httproute", "httproutes",
-			func() runtime.Object { return &gwapiv1alpha2.HTTPRoute{} },
-			func() runtime.Object { return &gwapiv1alpha2.HTTPRouteList{} },
-			nil, false)
-		appendStorage(gwapiv1alpha2Storages, storageCreateFunc, gwapiv1alpha2.SchemeGroupVersion, true, "referencegrant", "referencegrants",
-			func() runtime.Object { return &gwapiv1alpha2.ReferenceGrant{} },
-			func() runtime.Object { return &gwapiv1alpha2.ReferenceGrantList{} },
-			nil, false)
-		gwapiApiGroupInfo.VersionedResourcesStorageMap[gwapiv1alpha2.SchemeGroupVersion.Version] = gwapiv1alpha2Storages
+		gwapiApiGroupInfo.VersionedResourcesStorageMap[gwapiv1alpha2.SchemeGroupVersion.Version] = gwapiv1beta1Storages
 		if err := s.GenericAPIServer.InstallAPIGroup(&gwapiApiGroupInfo); err != nil {
 			return nil, err
 		}
