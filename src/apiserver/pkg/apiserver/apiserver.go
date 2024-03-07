@@ -40,6 +40,7 @@ import (
 	gwapiv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwapiv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	gwapiv1 "github.com/alibaba/higress/api-server/pkg/apis/gatewayapi/v1"
 	"github.com/alibaba/higress/api-server/pkg/codec"
 	"github.com/alibaba/higress/api-server/pkg/converter"
 	"github.com/alibaba/higress/api-server/pkg/options"
@@ -77,7 +78,6 @@ var (
 
 func init() {
 	_ = corev1.AddToScheme(Scheme)
-	metav1.AddToGroupVersion(Scheme, corev1.SchemeGroupVersion)
 	_ = admregv1.AddToScheme(Scheme)
 	_ = Scheme.AddFieldLabelConversionFunc(corev1.SchemeGroupVersion.WithKind("Secret"),
 		func(label, value string) (internalLabel, internalValue string, err error) {
@@ -88,23 +88,15 @@ func init() {
 				return runtime.DefaultMetaV1FieldSelectorConversion(label, value)
 			}
 		})
-	metav1.AddToGroupVersion(Scheme, apiextensionsv1.SchemeGroupVersion)
 	_ = apiextensionsv1.AddToScheme(Scheme)
-	metav1.AddToGroupVersion(Scheme, admregv1.SchemeGroupVersion)
 	_ = authzv1.AddToScheme(Scheme)
-	metav1.AddToGroupVersion(Scheme, authzv1.SchemeGroupVersion)
 	_ = networkingv1.AddToScheme(Scheme)
-	metav1.AddToGroupVersion(Scheme, discoveryv1.SchemeGroupVersion)
 	_ = discoveryv1.AddToScheme(Scheme)
-	metav1.AddToGroupVersion(Scheme, networkingv1.SchemeGroupVersion)
 	_ = hiextensionsv1alpha1.AddToScheme(Scheme)
-	metav1.AddToGroupVersion(Scheme, hiextensionsv1alpha1.SchemeGroupVersion)
 	_ = hinetworkingv1.AddToScheme(Scheme)
-	metav1.AddToGroupVersion(Scheme, hinetworkingv1.SchemeGroupVersion)
-	_ = gwapiv1alpha2.AddToScheme(Scheme)
-	metav1.AddToGroupVersion(Scheme, gwapiv1alpha2.SchemeGroupVersion)
 	_ = gwapiv1beta1.AddToScheme(Scheme)
-	metav1.AddToGroupVersion(Scheme, gwapiv1beta1.SchemeGroupVersion)
+	_ = gwapiv1.AddToScheme(Scheme)
+	_ = gwapiv1alpha2.AddToScheme(Scheme)
 
 	// TODO: keep the generic API server from wanting this
 	unversioned := schema.GroupVersion{Group: "", Version: "v1"}
@@ -382,6 +374,7 @@ func (c completedConfig) New() (*HigressServer, error) {
 			nil, false)
 		gwapiApiGroupInfo.VersionedResourcesStorageMap[gwapiv1beta1.SchemeGroupVersion.Version] = gwapiv1beta1Storages
 		gwapiApiGroupInfo.VersionedResourcesStorageMap[gwapiv1alpha2.SchemeGroupVersion.Version] = gwapiv1beta1Storages
+		gwapiApiGroupInfo.VersionedResourcesStorageMap[gwapiv1.SchemeGroupVersion.Version] = gwapiv1beta1Storages
 		if err := s.GenericAPIServer.InstallAPIGroup(&gwapiApiGroupInfo); err != nil {
 			return nil, err
 		}

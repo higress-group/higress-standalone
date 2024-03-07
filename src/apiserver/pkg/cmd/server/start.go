@@ -104,6 +104,11 @@ func getOpenAPIDefinitions(openapicommon.ReferenceCallback) map[string]openapico
 		"github.com/alibaba/higress/client/pkg/apis/networking/v1.McpBridge":        {},
 		"github.com/alibaba/higress/client/pkg/apis/networking/v1.Http2Rpc":         {},
 
+		"github.com/alibaba/higress/api-server/pkg/apis/gatewayapi/v1.GatewayClass":   {},
+		"github.com/alibaba/higress/api-server/pkg/apis/gatewayapi/v1.Gateway":        {},
+		"github.com/alibaba/higress/api-server/pkg/apis/gatewayapi/v1.HTTPRoute":      {},
+		"github.com/alibaba/higress/api-server/pkg/apis/gatewayapi/v1.ReferenceGrant": {},
+
 		"sigs.k8s.io/gateway-api/apis/v1beta1.GatewayClass":    {},
 		"sigs.k8s.io/gateway-api/apis/v1beta1.Gateway":         {},
 		"sigs.k8s.io/gateway-api/apis/v1beta1.HTTPRoute":       {},
