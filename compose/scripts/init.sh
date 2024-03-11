@@ -270,7 +270,10 @@ initializeGateway() {
   cat $VOLUMES_ROOT/pilot/cacerts/ca-cert.pem >> ./cert-chain.pem
 
   mkdir -p $VOLUMES_ROOT/gateway/podinfo && cd "$_"
-  echo 'higress="higress-system-higress-gateway"' > ./labels
+  cat <<EOF > ./labels
+app="higress-gateway"
+higress="higress-system-higress-gateway"
+EOF
 
   mkdir -p $VOLUMES_ROOT/gateway/istio/data
 }
