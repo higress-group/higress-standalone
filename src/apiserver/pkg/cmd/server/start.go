@@ -104,6 +104,8 @@ func getOpenAPIDefinitions(openapicommon.ReferenceCallback) map[string]openapico
 		"github.com/alibaba/higress/client/pkg/apis/networking/v1.McpBridge":        {},
 		"github.com/alibaba/higress/client/pkg/apis/networking/v1.Http2Rpc":         {},
 
+		"istio.io/client-go/pkg/apis/networking/v1alpha3.EnvoyFilter": {},
+
 		"github.com/alibaba/higress/api-server/pkg/apis/gatewayapi/v1.GatewayClass":   {},
 		"github.com/alibaba/higress/api-server/pkg/apis/gatewayapi/v1.Gateway":        {},
 		"github.com/alibaba/higress/api-server/pkg/apis/gatewayapi/v1.HTTPRoute":      {},

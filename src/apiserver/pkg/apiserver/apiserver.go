@@ -19,6 +19,7 @@ package apiserver
 import (
 	"fmt"
 
+	istiov1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	admregv1 "k8s.io/api/admissionregistration/v1"
 	authzv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -97,6 +98,7 @@ func init() {
 	_ = gwapiv1beta1.AddToScheme(Scheme)
 	_ = gwapiv1.AddToScheme(Scheme)
 	_ = gwapiv1alpha2.AddToScheme(Scheme)
+	_ = istiov1alpha3.AddToScheme(Scheme)
 
 	// TODO: keep the generic API server from wanting this
 	unversioned := schema.GroupVersion{Group: "", Version: "v1"}
@@ -376,6 +378,19 @@ func (c completedConfig) New() (*HigressServer, error) {
 		gwapiApiGroupInfo.VersionedResourcesStorageMap[gwapiv1alpha2.SchemeGroupVersion.Version] = gwapiv1beta1Storages
 		gwapiApiGroupInfo.VersionedResourcesStorageMap[gwapiv1.SchemeGroupVersion.Version] = gwapiv1beta1Storages
 		if err := s.GenericAPIServer.InstallAPIGroup(&gwapiApiGroupInfo); err != nil {
+			return nil, err
+		}
+	}
+
+	{
+		istioApiGroupInfo := newLegacyAPIGroupInfo(istiov1alpha3.SchemeGroupVersion.Group, Scheme, metav1.ParameterCodec)
+		istioApiv1alpha3Storages := map[string]rest.Storage{}
+		appendStorage(istioApiv1alpha3Storages, storageCreateFunc, istiov1alpha3.SchemeGroupVersion, true, "envoyfilter", "envoyfilters",
+			func() runtime.Object { return &istiov1alpha3.EnvoyFilter{} },
+			func() runtime.Object { return &istiov1alpha3.EnvoyFilterList{} },
+			nil, false)
+		istioApiGroupInfo.VersionedResourcesStorageMap[istiov1alpha3.SchemeGroupVersion.Version] = istioApiv1alpha3Storages
+		if err := s.GenericAPIServer.InstallAPIGroup(&istioApiGroupInfo); err != nil {
 			return nil, err
 		}
 	}
