@@ -254,7 +254,7 @@ subjectAltName = URI:spiffe://cluster.local/ns/higress-system/sa/higress-gateway
 EOF
     openssl genrsa -out gateway-key.pem $RSA_KEY_LENGTH > /dev/null \
       && openssl req -new -key gateway-key.pem -out gateway-cert.csr -config gateway.cfg -batch -sha256 > /dev/null 2>&1 \
-      && openssl x509 -req -days 365 -in gateway-cert.csr -sha256 -CA ca-cert.pem -CAkey ca-key.pem -CAcreateserial -out gateway-cert.pem -extensions v3_req -extfile gateway.cfg > /dev/null 2>&1
+      && openssl x509 -req -days 36500 -in gateway-cert.csr -sha256 -CA ca-cert.pem -CAkey ca-key.pem -CAcreateserial -out gateway-cert.pem -extensions v3_req -extfile gateway.cfg > /dev/null 2>&1
     checkExitCode "Generating certificate for gateway fails with $?"
     chmod a+r gateway-key.pem
   fi
