@@ -346,10 +346,6 @@ spec:
     port: 80
     protocol: TCP
     targetPort: 80
-  - name: https
-    port: 443
-    protocol: TCP
-    targetPort: 443
   selector:
     higress: higress-system-higress-gateway
   type: LoadBalancer
