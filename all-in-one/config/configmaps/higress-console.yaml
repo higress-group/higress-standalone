@@ -1,0 +1,11 @@
+apiVersion: v1
+data:
+  mode: standalone
+  system.initialized: "false"
+kind: ConfigMap
+metadata:
+  labels:
+    higress.io/resource-definer: higress
+  name: higress-console
+  namespace: higress-system
+  resourceVersion: "2"
