@@ -1,0 +1,8 @@
+apiVersion: networking.higress.io/v1
+kind: McpBridge
+metadata:
+  name: default
+  namespace: higress-system
+  resourceVersion: "1"
+spec: {}
+status: {}

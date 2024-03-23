@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Config
+clusters:
+  - name: higress
+    cluster:
+      server: https://localhost:8443
+      insecure-skip-tls-verify: true
+users:
+  - name: higress-admin
+contexts:
+  - name: higress
+    context:
+      cluster: higress
+      user: higress-admin
+preferences: {}
+current-context: higress
