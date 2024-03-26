@@ -3,6 +3,7 @@ kind: Gateway
 metadata:
   name: higress-gateway
   namespace: higress-system
+  creationTimestamp: "2000-01-01T00:00:00Z"
   resourceVersion: "1"
 spec:
   gatewayClassName: higress-gateway

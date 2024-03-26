@@ -2,6 +2,7 @@ apiVersion: gateway.networking.k8s.io/v1beta1
 kind: GatewayClass
 metadata:
   name: higress-gateway
+  creationTimestamp: "2000-01-01T00:00:00Z"
   resourceVersion: "1"
 spec:
   controllerName: higress.io/gateway-controller

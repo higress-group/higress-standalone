@@ -3,6 +3,12 @@ kind: McpBridge
 metadata:
   name: default
   namespace: higress-system
+  creationTimestamp: "2000-01-01T00:00:00Z"
   resourceVersion: "1"
-spec: {}
+spec:
+  registries:
+  - domain: 127.0.0.1:8080
+    name: higress-console
+    port: 80
+    type: static
 status: {}

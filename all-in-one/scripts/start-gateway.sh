@@ -7,6 +7,7 @@ source $ROOT/base.sh
 
 if [ "$MODE" != "gateway" -a "$MODE" != "full" ]; then
     echo "Gateway won't run in mode $MODE."
+    sleep 2
     exit 0
 fi
 

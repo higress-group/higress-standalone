@@ -8,4 +8,5 @@ metadata:
     higress.io/resource-definer: higress
   name: higress-console
   namespace: higress-system
-  resourceVersion: "2"
+  creationTimestamp: "2000-01-01T00:00:00Z"
+  resourceVersion: "1"
