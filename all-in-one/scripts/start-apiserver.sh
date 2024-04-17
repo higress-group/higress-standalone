@@ -8,7 +8,7 @@ source $ROOT/base.sh
 set -e
 
 if [ "$ENABLE_CONSOLE_ROUTE" != "1" ]; then
-    sudo rm /opt/data/defaultConfig/ingresses/higress-console.yaml
+    sudo rm -f /opt/data/defaultConfig/ingresses/higress-console.yaml
 fi
 cp -rn /opt/data/defaultConfig/* /data
 
