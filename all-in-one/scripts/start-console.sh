@@ -11,10 +11,16 @@ if [ "$MODE" != "console" -a "$MODE" != "full" ]; then
     exit 0
 fi
 
+if [ -z "$CONSOLE_PORT" ] || [[ ! "$CONSOLE_PORT" =~ ^[0-9]+$ ]] || ((CONSOLE_PORT < 1 || CONSOLE_PORT > 65535)); then
+    CONSOLE_PORT=8001
+fi
+
+echo "CONSOLE_PORT=$CONSOLE_PORT"
+
 waitForApiServer
 waitForController
 
 set -e
 
-HIGRESS_CONSOLE_KUBE_CONFIG="/app/kubeconfig" \
+HIGRESS_CONSOLE_KUBE_CONFIG="/app/kubeconfig" SERVER_PORT="$CONSOLE_PORT" \
     bash /app/start.sh

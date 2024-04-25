@@ -3,7 +3,7 @@ kind: Config
 clusters:
   - name: higress
     cluster:
-      server: https://localhost:8443
+      server: https://localhost:18443
       insecure-skip-tls-verify: true
 users:
   - name: higress-admin

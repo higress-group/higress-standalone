@@ -12,4 +12,4 @@ if [ "$ENABLE_CONSOLE_ROUTE" != "1" ]; then
 fi
 cp -rn /opt/data/defaultConfig/* /data
 
-apiserver --bind-address 127.0.0.1 --secure-port 8443 --storage file --file-root-dir /data --cert-dir /tmp
+apiserver --bind-address 127.0.0.1 --secure-port 18443 --storage file --file-root-dir /data --cert-dir /tmp

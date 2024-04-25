@@ -1,7 +1,7 @@
 #!/bin/bash
 
 function waitForApiServer() {
-    readinessCheck "Higress API Server" 8443
+    readinessCheck "Higress API Server" 18443
 }
 
 function waitForController() {
