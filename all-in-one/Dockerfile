@@ -57,4 +57,4 @@ COPY ./config /opt/data/defaultConfig
 
 EXPOSE 8080 8443 8001
 
-ENTRYPOINT ["supervisord"]
+ENTRYPOINT ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
