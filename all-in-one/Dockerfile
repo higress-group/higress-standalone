@@ -55,7 +55,6 @@ COPY ./scripts/*.* /usr/local/bin
 COPY ./apiserver/config /app/kubeconfig
 COPY ./config /opt/data/defaultConfig
 
-USER 1337:1337
-EXPOSE 80 443 8080
+EXPOSE 8080 8443 8001
 
 ENTRYPOINT ["supervisord"]
