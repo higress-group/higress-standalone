@@ -7,8 +7,9 @@ metadata:
   resourceVersion: "1"
 spec:
   registries:
-  - domain: 127.0.0.1:8080
+  - domain: 127.0.0.1:8001
     name: higress-console
     port: 80
     type: static
+  # INSERTION_POINT
 status: {}

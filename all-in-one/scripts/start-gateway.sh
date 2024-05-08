@@ -20,7 +20,7 @@ createDir /var/lib/istio/data
 
 /usr/local/bin/pilot-agent proxy router \
     --domain=higress-system.svc.cluster.local \
-    --proxyLogLevel=warning \
-    --proxyComponentLogLevel=misc:error \
+    --proxyLogLevel=${GATEWAY_LOG_LEVEL:-warning} \
+    --proxyComponentLogLevel=${GATEWAY_COMPONENT_LOG_LEVEL:-misc:error} \
     --log_output_level=all:info \
     --serviceCluster=higress-gateway
