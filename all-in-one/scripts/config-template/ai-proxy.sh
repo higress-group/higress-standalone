@@ -16,7 +16,39 @@ function initializeWasmPlugins() {
         return
     fi
 
-    cat <<EOF > "$WASM_PLUGIN_CONFIG_FILE"
+    DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-YOUR_DASHSCOPE_API_KEY}
+    DASHSCOPE_API_KEYS=(${DASHSCOPE_API_KEY//,/ })
+    DASHSCOPE_API_KEY_CONFIG=""
+    for key in "${DASHSCOPE_API_KEYS[@]}"
+    do
+      DASHSCOPE_API_KEY_CONFIG="${DASHSCOPE_API_KEY_CONFIG}\n        - \"${key}\""
+    done
+
+    AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY:-YOUR_AZURE_OPENAI_API_KEY}
+    AZURE_OPENAI_API_KEYS=(${AZURE_OPENAI_API_KEY//,/ })
+    AZURE_OPENAI_API_KEY_CONFIG=""
+    for key in "${AZURE_OPENAI_API_KEYS[@]}"
+    do
+      AZURE_OPENAI_API_KEY_CONFIG="${AZURE_OPENAI_API_KEY_CONFIG}\n        - \"${key}\""
+    done
+
+    OPENAI_API_KEY=${OPENAI_API_KEY:-YOUR_OPENAI_API_KEY}
+    OPENAI_API_KEYS=(${OPENAI_API_KEY//,/ })
+    OPENAI_API_KEY_CONFIG=""
+    for key in "${OPENAI_API_KEYS[@]}"
+    do
+      OPENAI_API_KEY_CONFIG="${OPENAI_API_KEY_CONFIG}\n        - \"${key}\""
+    done
+
+    MOONSHOT_API_KEY=${MOONSHOT_API_KEY:-YOUR_MOONSHOT_API_KEY}
+    MOONSHOT_API_KEYS=(${MOONSHOT_API_KEY//,/ })
+    MOONSHOT_API_KEY_CONFIG=""
+    for key in "${MOONSHOT_API_KEYS[@]}"
+    do
+      MOONSHOT_API_KEY_CONFIG="${MOONSHOT_API_KEY_CONFIG}\n        - \"${key}\""
+    done
+
+    echo -e "\
 apiVersion: extensions.higress.io/v1alpha1
 kind: WasmPlugin
 metadata:
@@ -24,7 +56,7 @@ metadata:
     higress.io/wasm-plugin-title: AI Proxy
   labels:
     higress.io/resource-definer: higress
-    higress.io/wasm-plugin-built-in: "false"
+    higress.io/wasm-plugin-built-in: \"false\"
     higress.io/wasm-plugin-category: custom
     higress.io/wasm-plugin-name: ai-proxy
     higress.io/wasm-plugin-version: $AZ_PROXY_VERSION
@@ -37,19 +69,19 @@ spec:
   - config:
       provider:
         type: qwen
-        apiToken: "${DASHSCOPE_API_KEY:-YOUR_DASHSCOPE_API_KEY}"
+        apiTokens:${DASHSCOPE_API_KEY_CONFIG}
         modelMapping:
-          '*': "qwen-turbo"
-          'gpt-3': "qwen-turbo"
-          'gpt-35-turbo': "qwen-plus"
-          'gpt-4-turbo': "qwen-max"
+          '*': \"qwen-turbo\"
+          'gpt-3': \"qwen-turbo\"
+          'gpt-35-turbo': \"qwen-plus\"
+          'gpt-4-turbo': \"qwen-max\"
     configDisable: false
     ingress:
     - qwen
   - config:
       provider:
         type: azure
-        apiToken: "${AZURE_OPENAI_API_KEY:-YOUR_AZURE_OPENAI_API_KEY}"
+        apiTokens:${AZURE_OPENAI_API_KEY_CONFIG}
         azureServiceUrl: "${AZURE_OPENAI_SERVICE_URL:-https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=2024-02-01}"
     configDisable: false
     ingress:
@@ -57,27 +89,26 @@ spec:
   - config:
       provider:
         type: openai
-        apiToken: "${OPENAI_API_KEY:-YOUR_OPENAI_API_KEY}"
+        apiTokens:${OPENAI_API_KEY_CONFIG}
     configDisable: false
     ingress:
     - openai
   - config:
       provider:
         type: moonshot
-        apiToken: "${MOONSHOT_API_KEY:-YOUR_MOONSHOT_API_KEY}"
+        apiTokens:${MOONSHOT_API_KEY_CONFIG}
         modelMapping:
-          '*': "moonshot-v1-8k"
-          'gpt-3': "moonshot-v1-8k"
-          'gpt-35-turbo': "moonshot-v1-32k"
-          'gpt-4-turbo': "moonshot-v1-128k"
+          '*': \"moonshot-v1-8k\"
+          'gpt-3': \"moonshot-v1-8k\"
+          'gpt-35-turbo': \"moonshot-v1-32k\"
+          'gpt-4-turbo': \"moonshot-v1-128k\"
     configDisable: false
     ingress:
     - moonshot
   phase: UNSPECIFIED_PHASE
-  priority: "100"
+  priority: \"100\"
   #url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/ai-proxy:$AZ_PROXY_VERSION
-  url: oci://docker.io/ch3cho/ai-proxy:$AZ_PROXY_VERSION
-EOF
+  url: oci://docker.io/ch3cho/ai-proxy:$AZ_PROXY_VERSION" > "$WASM_PLUGIN_CONFIG_FILE"
 }
 
 function initializeMcpBridge() {
