@@ -51,7 +51,7 @@ COPY ./supervisord/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 # Initialize configurations
 COPY ./meshConfig /etc/istio/config
 COPY ./gateway/podinfo /etc/istio/pod
-COPY ./scripts/*.* /usr/local/bin
+COPY ./scripts /usr/local/bin
 COPY ./apiserver/config /app/kubeconfig
 COPY ./config /opt/data/defaultConfig
 
