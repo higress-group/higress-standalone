@@ -139,15 +139,14 @@ EOF
 function initializeIngresses() {
     mkdir -p /data/ingresses
 
-    if [ ! -f /data/ingresses/qwen.yaml ]; then
-        cat <<EOF > /data/ingresses/qwen.yaml
+    cat <<EOF > /data/ingresses/qwen.yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   annotations:
     higress.io/backend-protocol: HTTPS
     higress.io/destination: qwen.dns
-    higress.io/exact-match-header-Authorization: Bearer qwen
+    $([ "$DEFAULT_AI_SERVICE" == "qwen" ] && echo -n "disabled." || echo -n "")higress.io/exact-match-header-Authorization: Bearer qwen
     higress.io/ignore-path-case: "false"
     higress.io/proxy-ssl-name: dashscope.aliyuncs.com
     higress.io/proxy-ssl-server-name: "on"
@@ -168,17 +167,15 @@ spec:
         path: /
         pathType: Prefix
 EOF
-    fi
 
-    if [ ! -f /data/ingresses/moonshot.yaml ]; then
-        cat <<EOF > /data/ingresses/moonshot.yaml
+    cat <<EOF > /data/ingresses/moonshot.yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   annotations:
     higress.io/backend-protocol: HTTPS
     higress.io/destination: moonshot.dns
-    higress.io/exact-match-header-Authorization: Bearer moonshot
+    $([ "$DEFAULT_AI_SERVICE" == "moonshot" ] && echo -n "disabled." || echo -n "")higress.io/exact-match-header-Authorization: Bearer moonshot
     higress.io/ignore-path-case: "false"
     higress.io/proxy-ssl-name: api.moonshot.cn
     higress.io/proxy-ssl-server-name: "on"
@@ -199,17 +196,15 @@ spec:
         path: /
         pathType: Prefix
 EOF
-    fi
 
-    if [ ! -f /data/ingresses/azure-openai.yaml ]; then
-        cat <<EOF > /data/ingresses/azure-openai.yaml
+    cat <<EOF > /data/ingresses/azure-openai.yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   annotations:
     higress.io/backend-protocol: HTTPS
     higress.io/destination: azure-openai.dns
-    higress.io/exact-match-header-Authorization: Bearer azure-openai
+    $([ "$DEFAULT_AI_SERVICE" == "azure-openai" ] && echo -n "disabled." || echo -n "")higress.io/exact-match-header-Authorization: Bearer azure-openai
     higress.io/ignore-path-case: "false"
     higress.io/proxy-ssl-name: $AZURE_OPENAI_SERVICE_DOMAIN
     higress.io/proxy-ssl-server-name: "on"
@@ -230,17 +225,15 @@ spec:
         path: /
         pathType: Prefix
 EOF
-    fi
 
-    if [ ! -f /data/ingresses/openai.yaml ]; then
-        cat <<EOF > /data/ingresses/openai.yaml
+    cat <<EOF > /data/ingresses/openai.yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   annotations:
     higress.io/backend-protocol: HTTPS
     higress.io/destination: openai.dns
-    higress.io/exact-match-header-Authorization: Bearer openai
+    $([ "$DEFAULT_AI_SERVICE" == "openai" ] && echo -n "disabled." || echo -n "")higress.io/exact-match-header-Authorization: Bearer openai
     higress.io/ignore-path-case: "false"
     higress.io/proxy-ssl-name: api.openai.com
     higress.io/proxy-ssl-server-name: "on"
@@ -261,7 +254,6 @@ spec:
         path: /
         pathType: Prefix
 EOF
-    fi
 }
 
 initializeWasmPlugins
