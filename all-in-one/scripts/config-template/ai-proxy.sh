@@ -71,7 +71,7 @@ spec:
         type: qwen
         apiTokens:${DASHSCOPE_API_KEY_CONFIG}
         modelMapping:
-          '*': \"qwen-turbo\"
+          '*': \"qwen-max\"
           'gpt-3': \"qwen-turbo\"
           'gpt-35-turbo': \"qwen-plus\"
           'gpt-4-turbo': \"qwen-max\"
@@ -98,7 +98,7 @@ spec:
         type: moonshot
         apiTokens:${MOONSHOT_API_KEY_CONFIG}
         modelMapping:
-          '*': \"moonshot-v1-8k\"
+          '*': \"moonshot-v1-128k\"
           'gpt-3': \"moonshot-v1-8k\"
           'gpt-35-turbo': \"moonshot-v1-32k\"
           'gpt-4-turbo': \"moonshot-v1-128k\"
