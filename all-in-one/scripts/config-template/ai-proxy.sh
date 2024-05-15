@@ -1,6 +1,6 @@
 #!/bin/bash
 
-AZ_PROXY_VERSION=${AI_PROXY_VERSION:-0.0.1}
+AZ_PROXY_VERSION=${AI_PROXY_VERSION:-1.0.0}
 
 if [ -n "$AZURE_OPENAI_SERVICE_URL" ]; then
     AZURE_OPENAI_SERVICE_DOMAIN=$(echo "$AZURE_OPENAI_SERVICE_URL" | awk -F[/:] '{print $4}')
@@ -107,8 +107,7 @@ spec:
     - moonshot
   phase: UNSPECIFIED_PHASE
   priority: \"100\"
-  #url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/ai-proxy:$AZ_PROXY_VERSION
-  url: oci://docker.io/ch3cho/ai-proxy:$AZ_PROXY_VERSION" > "$WASM_PLUGIN_CONFIG_FILE"
+  url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/ai-proxy:$AZ_PROXY_VERSION" > "$WASM_PLUGIN_CONFIG_FILE"
 }
 
 function initializeMcpBridge() {
