@@ -1,7 +1,7 @@
 ARG HUB=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress
 ARG BASE_VERSION=2022-10-27T19-02-22
-ARG CORE_VERSION=1.3.6
-ARG CONSOLE_VERSION=1.3.3
+ARG CORE_VERSION=1.4.0-rc.1
+ARG CONSOLE_VERSION=1.4.0
 ARG APISERVER_VERSION=0.0.14
 
 FROM ${HUB}/api-server:${APISERVER_VERSION} as apiserver
@@ -36,10 +36,18 @@ ENV JAVA_HOME=/opt/java/openjdk
 COPY --from=jdk $JAVA_HOME $JAVA_HOME
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
+RUN apt-get update && apt-get install --no-install-recommends -y gpg
+
+RUN curl -fsSL https://packages.redis.io/gpg | gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
+RUN chmod 644 /usr/share/keyrings/redis-archive-keyring.gpg
+RUN echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb jammy main" | tee /etc/apt/sources.list.d/redis.list
+
+
 # Install supervisord and initialize related folders
 RUN apt-get update && \
   apt-get install --no-install-recommends -y \
   supervisor \
+  redis-stack-server \
   && apt-get clean \
   && rm -rf /var/log/*log /var/lib/apt/lists/* /var/log/apt/* /var/lib/dpkg/*-old /var/cache/debconf/*-old \
   && mkdir -p /var/log/higress \
