@@ -20,6 +20,8 @@ echo "CONSOLE_PORT=$CONSOLE_PORT"
 waitForApiServer
 waitForController
 
+touch "$CONSOLE_USED_MARKER"
+
 set -e
 
 HIGRESS_CONSOLE_KUBE_CONFIG="/app/kubeconfig" SERVER_PORT="$CONSOLE_PORT" \

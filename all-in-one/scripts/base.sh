@@ -41,3 +41,9 @@ case $MODE in
 esac
 
 echo "Mode=$MODE"
+
+CONSOLE_USED_MARKER='/data/.console-used'
+CONSOLE_USED='false'
+if [ -f "$CONSOLE_USED_MARKER" ]; then
+  CONSOLE_USED='true'
+fi

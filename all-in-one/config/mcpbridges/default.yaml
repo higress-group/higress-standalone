@@ -11,5 +11,6 @@ spec:
     name: higress-console
     port: 80
     type: static
-  # INSERTION_POINT
+  # AI_REGISTRIES_START
+  # AI_REGISTRIES_END
 status: {}
