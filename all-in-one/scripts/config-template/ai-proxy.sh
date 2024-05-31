@@ -3,7 +3,7 @@
 cd "$(dirname -- "$0")"
 ROOT=$(pwd)
 cd - >/dev/null
-source $ROOT/base.sh
+source $ROOT/../base.sh
 
 AZ_PROXY_VERSION=${AI_PROXY_VERSION:-1.0.0}
 
