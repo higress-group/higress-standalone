@@ -76,9 +76,9 @@ spec:
         type: qwen
         apiTokens:${DASHSCOPE_API_KEY_CONFIG}
         modelMapping:
-          '*': \"qwen-max\"
-          'gpt-3': \"qwen-turbo\"
-          'gpt-35-turbo': \"qwen-plus\"
+          '*': \"qwen-long\"
+          'gpt-4': \"qwen-max\"
+          'gpt-4o': \"qwen-max\"
           'gpt-4-turbo': \"qwen-max\"
     configDisable: false
     ingress:
