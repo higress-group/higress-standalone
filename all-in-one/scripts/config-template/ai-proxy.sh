@@ -161,7 +161,7 @@ function generateAiIngress() {
   PROVIDER_NAME="$1"
   SERVICE_DOMAIN="$2"
 
-  INGRESS_FILE="/data/ingresses/$PROVIDER_NAME.xml"
+  INGRESS_FILE="/data/ingresses/$PROVIDER_NAME.yaml"
   if [ "$CONSOLE_USED" == 'true' -a -f "$INGRESS_FILE" ]; then
     return
   fi
