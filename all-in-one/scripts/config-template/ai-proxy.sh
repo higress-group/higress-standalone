@@ -143,7 +143,8 @@ EOF
     return
   fi
 
-    awk -v r="$AI_REGISTRIES" '{gsub(/# AI_REGISTRIES_START.*# AI_REGISTRIES_END/,r)}1' default.yaml > default-new.yaml
+  sed -i -z -E 's|# AI_REGISTRIES_START.+# AI_REGISTRIES_END|# AI_REGISTRIES_PLACEHOLDER|' default.yaml
+  awk -v r="$AI_REGISTRIES" '{gsub(/# AI_REGISTRIES_PLACEHOLDER/,r)}1' default.yaml > default-new.yaml
   mv default-new.yaml default.yaml
   cd -
 }
@@ -179,7 +180,7 @@ metadata:
     higress.io/proxy-ssl-server-name: "on"
   labels:
     higress.io/resource-definer: higress
-  name: moonshot
+  name: $PROVIDER_NAME
   namespace: higress-system
 spec:
   ingressClassName: higress
