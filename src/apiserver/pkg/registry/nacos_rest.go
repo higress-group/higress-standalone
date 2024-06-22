@@ -212,7 +212,10 @@ func (n *nacosREST) Get(
 		return nil, apierrors.NewNotFound(groupResource, name)
 	}
 	klog.Infof("[%s] %s/%s got", n.groupResource, ns, name)
-	return obj, err
+	if err == nil {
+		return obj, nil
+	}
+	return obj, apierrors.NewInternalError(err)
 }
 
 func (n *nacosREST) List(
@@ -246,7 +249,7 @@ func (n *nacosREST) List(
 		}
 	})
 	if err != nil {
-		return nil, err
+		return nil, apierrors.NewInternalError(err)
 	}
 
 	klog.Infof("[%s] %s list count=%d", n.groupResource, ns, count)
@@ -261,13 +264,13 @@ func (n *nacosREST) Create(
 ) (runtime.Object, error) {
 	if createValidation != nil {
 		if err := createValidation(ctx, obj); err != nil {
-			return nil, err
+			return nil, apierrors.NewInternalError(err)
 		}
 	}
 
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return nil, err
+		return nil, apierrors.NewInternalError(err)
 	}
 
 	ns, _ := genericapirequest.NamespaceFrom(ctx)
@@ -283,7 +286,7 @@ func (n *nacosREST) Create(
 
 	accessor.SetCreationTimestamp(metav1.NewTime(time.Now()))
 	if err := n.write(n.codec, ns, dataId, "", obj); err != nil {
-		return nil, err
+		return nil, apierrors.NewInternalError(err)
 	}
 
 	nameKey := ns + "/" + name
@@ -316,38 +319,38 @@ func (n *nacosREST) Update(
 	isCreate := false
 	oldObj, oldConfig, err := n.read(n.codec, ns, dataId, n.newFunc)
 	if err != nil {
-		return nil, false, err
+		return nil, false, apierrors.NewInternalError(err)
 	}
-	if oldConfig == "" && err == nil {
+	if oldConfig == "" {
 		if !forceAllowCreate {
-			return nil, false, err
+			return nil, false, apierrors.NewNotFound(n.groupResource, name)
 		}
 		isCreate = true
 	}
 
 	updatedObj, err := objInfo.UpdatedObject(ctx, oldObj)
 	if err != nil {
-		return nil, false, err
+		return nil, false, apierrors.NewInternalError(err)
 	}
 
 	oldAccessor, err := meta.Accessor(oldObj)
 	if err != nil {
-		return nil, false, err
+		return nil, false, apierrors.NewInternalError(err)
 	}
 
 	updatedAccessor, err := meta.Accessor(updatedObj)
 	if err != nil {
-		return nil, false, err
+		return nil, false, apierrors.NewInternalError(err)
 	}
 
 	if isCreate {
 		obj, err := n.Create(ctx, updatedObj, createValidation, nil)
-		return obj, err == nil, err
+		return obj, err == nil, apierrors.NewInternalError(err)
 	}
 
 	if updateValidation != nil {
 		if err := updateValidation(ctx, updatedObj, oldObj); err != nil {
-			return nil, false, err
+			return nil, false, apierrors.NewInternalError(err)
 		}
 	}
 
@@ -356,7 +359,7 @@ func (n *nacosREST) Update(
 	}
 
 	if err := n.write(n.codec, ns, dataId, oldAccessor.GetResourceVersion(), updatedObj); err != nil {
-		return nil, false, err
+		return nil, false, apierrors.NewInternalError(err)
 	}
 
 	return updatedObj, false, nil
@@ -371,11 +374,11 @@ func (n *nacosREST) Delete(
 
 	oldObj, err := n.Get(ctx, name, nil)
 	if err != nil {
-		return nil, false, err
+		return nil, false, apierrors.NewInternalError(err)
 	}
 	if deleteValidation != nil {
 		if err := deleteValidation(ctx, oldObj); err != nil {
-			return nil, false, err
+			return nil, false, apierrors.NewInternalError(err)
 		}
 	}
 
@@ -385,7 +388,7 @@ func (n *nacosREST) Delete(
 		Group:  ns,
 	})
 	if err != nil {
-		return nil, false, err
+		return nil, false, apierrors.NewInternalError(err)
 	}
 	if !deleted {
 		return nil, false, errors.New("delete config failed: " + dataId)
@@ -424,7 +427,7 @@ func (n *nacosREST) DeleteCollection(
 	deletedItems := n.NewList()
 	v, err := getListPrt(deletedItems)
 	if err != nil {
-		return nil, err
+		return nil, apierrors.NewInternalError(err)
 	}
 
 	for _, obj := range list.(*unstructured.UnstructuredList).Items {

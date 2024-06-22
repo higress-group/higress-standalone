@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"k8s.io/klog/v2"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -26,13 +25,11 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/klog/v2"
 
 	"github.com/alibaba/higress/api-server/pkg/utils"
 	"github.com/fsnotify/fsnotify"
 )
-
-// ErrFileNotExists means the file doesn't actually exist.
-var ErrFileNotExists = fmt.Errorf("file doesn't exist")
 
 const fileChangeProcessInterval = 100 * time.Millisecond
 const fileChangeProcessDelay = 250 * time.Millisecond
@@ -260,7 +257,10 @@ func (f *fileREST) Get(
 		return nil, apierrors.NewNotFound(groupResource, name)
 	}
 	klog.Infof("[%s] %s got", f.groupResource, name)
-	return obj, err
+	if err == nil {
+		return obj, nil
+	}
+	return obj, apierrors.NewInternalError(err)
 }
 
 func (f *fileREST) normalizeObject() {
@@ -285,7 +285,7 @@ func (f *fileREST) List(
 	newListObj := f.NewList()
 	v, err := getListPrt(newListObj)
 	if err != nil {
-		return nil, err
+		return nil, apierrors.NewInternalError(err)
 	}
 
 	count := 0
@@ -295,7 +295,7 @@ func (f *fileREST) List(
 			appendItem(v, obj)
 		}
 	}); err != nil {
-		return newListObj, nil
+		return nil, apierrors.NewInternalError(err)
 	}
 
 	klog.Infof("[%s] list count=%d", f.groupResource, count)
@@ -311,7 +311,7 @@ func (f *fileREST) Create(
 ) (runtime.Object, error) {
 	if createValidation != nil {
 		if err := createValidation(ctx, obj); err != nil {
-			return nil, err
+			return nil, apierrors.NewInternalError(err)
 		}
 	}
 
@@ -328,7 +328,7 @@ func (f *fileREST) Create(
 
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return nil, err
+		return nil, apierrors.NewInternalError(err)
 	}
 
 	name := accessor.GetName()
@@ -346,7 +346,7 @@ func (f *fileREST) Create(
 		panic(fmt.Sprintf("unable to create data dir: %s", err))
 	}
 	if err := f.write(f.codec, filename, obj); err != nil {
-		return nil, err
+		return nil, apierrors.NewInternalError(err)
 	}
 
 	f.notifyWatchers(watch.Event{
@@ -377,24 +377,24 @@ func (f *fileREST) Update(
 
 	updatedObj, err := objInfo.UpdatedObject(ctx, oldObj)
 	if err != nil {
-		return nil, false, err
+		return nil, false, apierrors.NewInternalError(err)
 	}
 	filename := f.objectFileName(ctx, name)
 
 	oldAccessor, err := meta.Accessor(oldObj)
 	if err != nil {
-		return nil, false, err
+		return nil, false, apierrors.NewInternalError(err)
 	}
 
 	updatedAccessor, err := meta.Accessor(updatedObj)
 	if err != nil {
-		return nil, false, err
+		return nil, false, apierrors.NewInternalError(err)
 	}
 
 	if isCreate {
 		if createValidation != nil {
 			if err := createValidation(ctx, updatedObj); err != nil {
-				return nil, false, err
+				return nil, false, apierrors.NewInternalError(err)
 			}
 		}
 
@@ -402,7 +402,7 @@ func (f *fileREST) Update(
 		updatedAccessor.SetResourceVersion("1")
 
 		if err := f.write(f.codec, filename, updatedObj); err != nil {
-			return nil, false, err
+			return nil, false, apierrors.NewInternalError(err)
 		}
 		f.notifyWatchers(watch.Event{
 			Type:   watch.Added,
@@ -413,7 +413,7 @@ func (f *fileREST) Update(
 
 	if updateValidation != nil {
 		if err := updateValidation(ctx, updatedObj, oldObj); err != nil {
-			return nil, false, err
+			return nil, false, apierrors.NewInternalError(err)
 		}
 	}
 
@@ -434,14 +434,14 @@ func (f *fileREST) Update(
 	} else {
 		newResourceVersion, err = strconv.ParseUint(currentResourceVersion, 10, 64)
 		if err != nil {
-			return nil, false, err
+			return nil, false, apierrors.NewInternalError(err)
 		}
 		newResourceVersion++
 	}
 	updatedAccessor.SetResourceVersion(strconv.FormatUint(newResourceVersion, 10))
 
 	if err := f.write(f.codec, filename, updatedObj); err != nil {
-		return nil, false, err
+		return nil, false, apierrors.NewInternalError(err)
 	}
 
 	f.notifyWatchers(watch.Event{
@@ -458,21 +458,21 @@ func (f *fileREST) Delete(
 	options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	filename := f.objectFileName(ctx, name)
 	if !utils.Exists(filename) {
-		return nil, false, ErrFileNotExists
+		return nil, false, apierrors.NewNotFound(f.groupResource, name)
 	}
 
 	oldObj, err := f.Get(ctx, name, nil)
 	if err != nil {
-		return nil, false, err
+		return nil, false, apierrors.NewInternalError(err)
 	}
 	if deleteValidation != nil {
 		if err := deleteValidation(ctx, oldObj); err != nil {
-			return nil, false, err
+			return nil, false, apierrors.NewInternalError(err)
 		}
 	}
 
 	if err := os.Remove(filename); err != nil {
-		return nil, false, err
+		return nil, false, apierrors.NewInternalError(err)
 	}
 	f.notifyWatchers(watch.Event{
 		Type:   watch.Deleted,
@@ -490,13 +490,13 @@ func (f *fileREST) DeleteCollection(
 	newListObj := f.NewList()
 	v, err := getListPrt(newListObj)
 	if err != nil {
-		return nil, err
+		return nil, apierrors.NewInternalError(err)
 	}
 	if err := f.visitDir(f.objRootPath, f.objExtension, f.newFunc, f.codec, func(path string, obj runtime.Object) {
 		_ = os.Remove(path)
 		appendItem(v, obj)
 	}); err != nil {
-		return nil, fmt.Errorf("failed walking filepath %v", f.objRootPath)
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed walking filepath %v: %v", f.objRootPath, err))
 	}
 	return newListObj, nil
 }
@@ -526,17 +526,17 @@ func (f *fileREST) read(decoder runtime.Decoder, path string, newFunc func() run
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, nil
 		} else {
-			return nil, err
+			return nil, fmt.Errorf("failed to stat file [%s]: %v", path, err)
 		}
 	}
 	content, err := os.ReadFile(cleanedPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read file [%s]: %v", path, err)
 	}
 	newObj := newFunc()
 	decodedObj, _, err := decoder.Decode(content, nil, newObj)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode data read from file [%s]: %v\n%s", path, err, content)
 	}
 	f.normalizeObjectMeta(decodedObj, cleanedPath)
 	return decodedObj, nil
@@ -568,7 +568,7 @@ func (f *fileREST) visitDir(dirname string, extension string, newFunc func() run
 		}
 		newObj, err := f.read(codec, path, newFunc)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to load data from file [%s]: %v", path, err)
 		}
 		visitFunc(path, newObj)
 		return nil
