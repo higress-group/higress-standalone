@@ -76,10 +76,22 @@ spec:
         type: qwen
         apiTokens:${DASHSCOPE_API_KEY_CONFIG}
         modelMapping:
-          '*': \"qwen-long\"
+          '*': \"qwen-plus\"
+          'gpt-3.5-turbo': \"qwen-long\",
+          'gpt-3.5-turbo-0125': \"qwen-long\",
+          'gpt-3.5-turbo-1106': \"qwen-long\",
+          'gpt-3.5-turbo-0613': \"qwen-long\",
+          'gpt-3.5-turbo-16k-0613': \"qwen-long\",
+          'gpt-3.5-turbo-0301': \"qwen-long\",
+          'gpt-3.5-turbo-instruct': \"qwen-long\",
           'gpt-4': \"qwen-max\"
-          'gpt-4o': \"qwen-max\"
-          'gpt-4-turbo': \"qwen-max\"
+          'gpt-4-32k': \"qwen-max\"
+          'gpt-4-0125-preview': \"qwen-turbo\"
+          'gpt-4-1106-preview': \"qwen-turbo\"
+          'gpt-4-vision-preview': \"qwen-turbo\"
+          'gpt-4-turbo': \"qwen-turbo\"
+          'gpt-4o': \"qwen-plus\"
+          'gpt-4o-2024-05-13': \"qwen-plus\"
     configDisable: false
     ingress:
     - qwen
