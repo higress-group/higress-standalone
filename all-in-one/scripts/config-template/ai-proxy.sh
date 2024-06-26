@@ -77,13 +77,13 @@ spec:
         apiTokens:${DASHSCOPE_API_KEY_CONFIG}
         modelMapping:
           '*': \"qwen-plus\"
-          'gpt-3.5-turbo': \"qwen-long\",
-          'gpt-3.5-turbo-0125': \"qwen-long\",
-          'gpt-3.5-turbo-1106': \"qwen-long\",
-          'gpt-3.5-turbo-0613': \"qwen-long\",
-          'gpt-3.5-turbo-16k-0613': \"qwen-long\",
-          'gpt-3.5-turbo-0301': \"qwen-long\",
-          'gpt-3.5-turbo-instruct': \"qwen-long\",
+          'gpt-3.5-turbo': \"qwen-long\"
+          'gpt-3.5-turbo-0125': \"qwen-long\"
+          'gpt-3.5-turbo-1106': \"qwen-long\"
+          'gpt-3.5-turbo-0613': \"qwen-long\"
+          'gpt-3.5-turbo-16k-0613': \"qwen-long\"
+          'gpt-3.5-turbo-0301': \"qwen-long\"
+          'gpt-3.5-turbo-instruct': \"qwen-long\"
           'gpt-4': \"qwen-max\"
           'gpt-4-32k': \"qwen-max\"
           'gpt-4-0125-preview': \"qwen-turbo\"
