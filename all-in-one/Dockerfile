@@ -9,7 +9,7 @@ FROM ${HUB}/higress:${CORE_VERSION} as controller
 FROM ${HUB}/pilot:${CORE_VERSION} as pilot
 FROM ${HUB}/gateway:${CORE_VERSION} as gateway
 FROM ${HUB}/console:${CONSOLE_VERSION} as console
-FROM higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/eclipse-temurin:21-jre as jdk
+FROM eclipse-temurin:21-jre as jdk
 
 FROM ${HUB}/base:${BASE_VERSION}
 
