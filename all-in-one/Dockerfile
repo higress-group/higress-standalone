@@ -2,7 +2,7 @@ ARG HUB=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress
 ARG BASE_VERSION=2022-10-27T19-02-22
 ARG CORE_VERSION=1.4.1
 ARG CONSOLE_VERSION=1.4.1
-ARG APISERVER_VERSION=0.0.14
+ARG APISERVER_VERSION=0.0.15
 
 FROM ${HUB}/api-server:${APISERVER_VERSION} as apiserver
 FROM ${HUB}/higress:${CORE_VERSION} as controller
