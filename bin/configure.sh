@@ -222,7 +222,8 @@ resetEnv() {
   NACOS_NS=""
   NACOS_USERNAME=""
   NACOS_PASSWORD=""
-  NACOS_DATA_ENC_KEY=""
+  # Not to reset the encryption key to avoid accidental key losts.
+  # NACOS_DATA_ENC_KEY=""
 
   NACOS_HTTP_PORT=$DEFAULT_NACOS_HTTP_PORT
   NACOS_GRPC_PORT=$(($DEFAULT_NACOS_HTTP_PORT + 1000))
@@ -369,8 +370,8 @@ configureStorage() {
 configureNacos() {
   while true; do
     readNonEmpty "Use built-in Nacos service (Y/N): "
-    enableBuiltInNacos=$input
-    if [ "$enableBuiltInNacos" == "Y" ] || [ "$enableBuiltInNacos" == "y" ]; then
+    useCurrentKey=$input
+    if [ "$useCurrentKey" == "Y" ] || [ "$useCurrentKey" == "y" ]; then
       if [ "$ARCH" != "amd64" ]; then
         echo "Sorry, built-in Nacos service doesn't support your platform."
         continue
@@ -381,12 +382,12 @@ configureNacos() {
       NACOS_USERNAME=""
       NACOS_PASSWORD=""
       break
-    elif [ "$enableBuiltInNacos" == "N" ] || [ "$enableBuiltInNacos" == "n" ]; then
+    elif [ "$useCurrentKey" == "N" ] || [ "$useCurrentKey" == "n" ]; then
       COMPOSE_PROFILES=""
       configureStandaloneNacosServer
       break
     else
-      echo "Unknown input: $enableBuiltInNacos"
+      echo "Unknown input: $useCurrentKey"
     fi
   done
 }
@@ -428,6 +429,22 @@ configureStandaloneNacosServer() {
   NACOS_NS=$input
 
   while true; do
+    CURRENT_KEY_LENGTH=${#NACOS_DATA_ENC_KEY}
+    if [ $CURRENT_KEY_LENGTH != 0 ]; then
+      useCurrentKey=''
+      while true; do
+        readNonEmpty "Data encryption key found in the env file. Do you want to keep using the current key? (Y/N): "
+        useCurrentKey=$input
+        if [ "$useCurrentKey" == "Y" ] || [ "$useCurrentKey" == "y" ] ||  [ "$useCurrentKey" == "N" ] || [ "$useCurrentKey" == "n" ]; then
+          break
+        else
+          echo "Unknown input: $useCurrentKey"
+        fi
+      done
+      if [ "$useCurrentKey" == "Y" ] || [ "$useCurrentKey" == "y" ]; then
+        break
+      fi
+    fi
     readWithDefault "Please input a 32-char long string for data encryption (Enter to generate a random one): " ""
     NACOS_DATA_ENC_KEY=$input
     KEY_LENGTH=${#NACOS_DATA_ENC_KEY}
