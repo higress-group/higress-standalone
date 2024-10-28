@@ -27,3 +27,13 @@ func getListPrt(listObj runtime.Object) (reflect.Value, error) {
 	}
 	return v, nil
 }
+
+func listItemToRuntimeObject(item reflect.Value) runtime.Object {
+	if item.Kind() == reflect.Ptr {
+		if item.IsNil() {
+			return nil
+		}
+		return item.Interface().(runtime.Object)
+	}
+	return item.Addr().Interface().(runtime.Object)
+}

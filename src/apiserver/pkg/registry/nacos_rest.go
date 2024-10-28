@@ -465,10 +465,9 @@ func (n *nacosREST) Watch(ctx context.Context, options *metainternalversion.List
 	items := danger.FieldByName("Items")
 
 	for i := 0; i < items.Len(); i++ {
-		obj := items.Index(i).Addr().Interface().(runtime.Object)
 		nw.SendEvent(watch.Event{
 			Type:   watch.Added,
-			Object: obj,
+			Object: listItemToRuntimeObject(items.Index(i)),
 		}, true)
 	}
 

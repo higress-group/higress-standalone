@@ -657,10 +657,9 @@ func (f *fileREST) Watch(ctx context.Context, options *metainternalversion.ListO
 	items := danger.FieldByName("Items")
 
 	for i := 0; i < items.Len(); i++ {
-		obj := items.Index(i).Addr().Interface().(runtime.Object)
 		fw.ch <- watch.Event{
 			Type:   watch.Added,
-			Object: obj,
+			Object: listItemToRuntimeObject(items.Index(i)),
 		}
 	}
 
