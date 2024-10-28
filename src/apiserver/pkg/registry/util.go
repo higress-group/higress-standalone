@@ -9,7 +9,11 @@ import (
 )
 
 func appendItem(v reflect.Value, obj runtime.Object) {
-	v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
+	value := reflect.ValueOf(obj)
+	if v.Type().Elem().Kind() != reflect.Ptr {
+		value = reflect.ValueOf(obj).Elem()
+	}
+	v.Set(reflect.Append(v, value))
 }
 
 func getListPrt(listObj runtime.Object) (reflect.Value, error) {

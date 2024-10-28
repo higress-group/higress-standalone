@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericserverstorage "k8s.io/apiserver/pkg/server/storage"
@@ -143,13 +142,6 @@ func (cfg *Config) Complete() CompletedConfig {
 	c := completedConfig{
 		cfg.GenericConfig.Complete(),
 		&cfg.ExtraConfig,
-	}
-
-	// Set version to 1.19.0 so client can use networking.k8s.io/v1 instead of networking.k8s.io/v1beta1
-	c.GenericConfig.Version = &version.Info{
-		Major:      "1",
-		Minor:      "19",
-		GitVersion: "v1.19.0",
 	}
 
 	return CompletedConfig{&c}

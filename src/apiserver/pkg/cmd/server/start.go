@@ -24,10 +24,10 @@ import (
 	"github.com/spf13/cobra"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/endpoints/openapi"
-	"k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/informers"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	netutils "k8s.io/utils/net"
@@ -137,14 +137,16 @@ func (o *HigressServerOptions) Config() (*apiserver.Config, error) {
 	serverConfig.OpenAPIConfig.Info.Title = "Higress"
 	serverConfig.OpenAPIConfig.Info.Version = "0.1"
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.OpenAPIV3) {
-		serverConfig.OpenAPIV3Config = genericapiserver.DefaultOpenAPIV3Config(getOpenAPIDefinitions, openapi.NewDefinitionNamer(apiserver.Scheme))
-		serverConfig.OpenAPIV3Config.Info.Title = "Higress"
-		serverConfig.OpenAPIV3Config.Info.Version = "0.1"
-	}
+	serverConfig.OpenAPIV3Config = genericapiserver.DefaultOpenAPIV3Config(getOpenAPIDefinitions, openapi.NewDefinitionNamer(apiserver.Scheme))
+	serverConfig.OpenAPIV3Config.Info.Title = "Higress"
+	serverConfig.OpenAPIV3Config.Info.Version = "0.1"
+
+	// Set version to 1.19.0 so client can use networking.k8s.io/v1 instead of networking.k8s.io/v1beta1
+	serverConfig.EffectiveVersion = utilversion.NewEffectiveVersion("1.19.0")
 
 	o.RecommendedOptions.Authentication.RemoteKubeConfigFileOptional = true
 	o.RecommendedOptions.Authorization.RemoteKubeConfigFileOptional = true
+	o.RecommendedOptions.Features.EnablePriorityAndFairness = false
 
 	if err := applyTo(o.RecommendedOptions, serverConfig, o.AuthOptions); err != nil {
 		return nil, err
@@ -200,7 +202,7 @@ func applyTo(o *genericoptions.RecommendedOptions, config *genericapiserver.Reco
 	if err := o.Audit.ApplyTo(&config.Config); err != nil {
 		return err
 	}
-	if err := o.Features.ApplyTo(&config.Config); err != nil {
+	if err := o.Features.ApplyTo(&config.Config, nil, nil); err != nil {
 		return err
 	}
 	return nil
