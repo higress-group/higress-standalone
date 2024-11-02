@@ -138,13 +138,13 @@ runConfigWizard() {
   echo "Provide a key for each LLM provider you want to enable, then press Enter."
   echo "If no key is provided and Enter is pressed, configuration for that provider will be skipped."
 
-  echo ""
+  echo
 
   read -r -p "→ Enter API Key for OpenAI: " OPENAI_API_KEY
   read -r -p "→ Enter API Key for Aliyun Dashscope: " DASHSCOPE_API_KEY
   read -r -p "→ Enter API Key for Moonshot: " MOONSHOT_API_KEY
 
-  echo ""
+  echo
 }
 
 configureStorage() {
@@ -189,13 +189,52 @@ outputWelcomeMessage() {
                                                 \|_________\|_________|
 '
   echo "Higress AI Gateway is started successfully."
-  echo ""
+
+  echo
+  echo "======================================================="
+  echo "               Using Higress AI Gateway                "
+  echo "======================================================="
+  echo
+  echo "Higress AI Gateway Data Plane endpoints:"
+  echo "    HTTP  = http://localhost:$GATEWAY_HTTP_PORT"
+  echo "    HTTPS = https://localhost:$GATEWAY_HTTPS_PORT}"
+  echo
+  echo "Higress AI Gateway chat completion endpoint:"
+  echo "    http://localhost:$GATEWAY_HTTP_PORT/v1/chat/completions"
+  echo
+  echo "You can try it with cURL directly:"
+  echo "    curl 'http://localhost:$GATEWAY_HTTP_PORT/v1/chat/completions' \\"
+  echo "      -H 'Content-Type: application/json' \\"
+  echo "      -d '{"
+  echo "        \"model\": \"aliyun/qwen-turbo\","
+  echo '        "messages": ['
+  echo "          {"
+  echo '            "role": "user",'
+  echo '            "content": "Hello!"'
+  echo "          }"
+  echo "        ]"
+  echo "      }'"
+
+  echo
+  echo "======================================================="
+  echo "             Administer Higress AI Gateway             "
+  echo "======================================================="
+  echo
+  echo "Higress Console URL (open with browser):"
+  echo "   http://localhost:$CONSOLE_PORT"
+
+  echo
+  echo "To stop the gateway run:"
+  echo
+  echo "  $DOCKER_COMMAND stop $CONTAINER_NAME"
+
+  echo
   echo "Happy Higressing!"
 }
 
 start() {
   echo "Starting Higress AI Gateway..."
-  echo ""
+  echo
 
   NORMALIZED_DATA_FOLDER_PATH="$(normalizePath "${DATA_FOLDER}")"
   NORMALIZED_CONFIG_FILE_PATH="$(normalizePath "${DATA_FOLDER}/${CONFIG_FILENAME}")"
@@ -214,7 +253,7 @@ start() {
 
 stop() {
   echo "Stopping Higress AI Gateway..."
-  echo ""
+  echo
 
   $DOCKER_COMMAND stop $CONTAINER_NAME >/dev/null
 
