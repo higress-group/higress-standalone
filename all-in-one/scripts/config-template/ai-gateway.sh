@@ -97,6 +97,7 @@ spec:
     configDisable: false
     service:
     - llm-moonshot.internal.dns
+  failStrategy: FAIL_OPEN
   phase: UNSPECIFIED_PHASE
   priority: 100
   url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/ai-proxy:$AI_PROXY_VERSION" > "$WASM_PLUGIN_CONFIG_FOLDER/ai-proxy.internal.yaml"
@@ -121,6 +122,7 @@ spec:
     enable: true
     add_header_key: x-higress-llm-provider
   defaultConfigDisable: false
+  failStrategy: FAIL_OPEN
   phase: UNSPECIFIED_PHASE
   priority: 260
   url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/model-router:$MODEL_ROUTER_VERSION" > "$WASM_PLUGIN_CONFIG_FOLDER/model-router.internal.yaml"
