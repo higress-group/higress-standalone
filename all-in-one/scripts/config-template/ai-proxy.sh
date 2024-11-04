@@ -5,7 +5,7 @@ ROOT=$(pwd)
 cd - >/dev/null
 source $ROOT/../base.sh
 
-AZ_PROXY_VERSION=${AI_PROXY_VERSION:-1.0.0}
+AI_PROXY_VERSION=${AI_PROXY_VERSION:-1.0.0}
 
 if [ -n "$AZURE_OPENAI_SERVICE_URL" ]; then
   AZURE_OPENAI_SERVICE_DOMAIN=$(echo "$AZURE_OPENAI_SERVICE_URL" | awk -F[/:] '{print $4}')
@@ -15,7 +15,7 @@ fi
 
 function initializeWasmPlugins() {
   mkdir -p /data/wasmplugins
-  WASM_PLUGIN_CONFIG_FILE="/data/wasmplugins/ai-proxy-$AZ_PROXY_VERSION.yaml"
+  WASM_PLUGIN_CONFIG_FILE="/data/wasmplugins/ai-proxy-$AI_PROXY_VERSION.yaml"
 
   if [ "$CONSOLE_USED" == 'true' -a -f "$WASM_PLUGIN_CONFIG_FILE" ]; then
     return
@@ -64,8 +64,8 @@ metadata:
     higress.io/wasm-plugin-built-in: \"true\"
     higress.io/wasm-plugin-category: custom
     higress.io/wasm-plugin-name: ai-proxy
-    higress.io/wasm-plugin-version: $AZ_PROXY_VERSION
-  name: ai-proxy-$AZ_PROXY_VERSION
+    higress.io/wasm-plugin-version: $AI_PROXY_VERSION
+  name: ai-proxy-$AI_PROXY_VERSION
   namespace: higress-system
 spec:
   defaultConfig: {}
@@ -124,7 +124,7 @@ spec:
     - moonshot
   phase: UNSPECIFIED_PHASE
   priority: \"100\"
-  url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/ai-proxy:$AZ_PROXY_VERSION" > "$WASM_PLUGIN_CONFIG_FILE"
+  url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/ai-proxy:$AI_PROXY_VERSION" > "$WASM_PLUGIN_CONFIG_FILE"
 }
 
 function initializeMcpBridge() {
