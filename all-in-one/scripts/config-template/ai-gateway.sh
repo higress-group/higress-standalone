@@ -127,25 +127,12 @@ spec:
 }
 
 function initializeMcpBridge() {
-  read -r -d '' AI_REGISTRIES <<EOF
-  # AI_REGISTRIES_START
-  - domain: api.moonshot.cn
-    name: llm-moonshot.internal
-    port: 443
-    type: dns
-    protocol: https
-  - domain: dashscope.aliyuncs.com
-    name: llm-aliyun.internal
-    port: 443
-    type: dns
-    protocol: https
-  - domain: api.openai.com
-    name: llm-openai.internal
-    port: 443
-    type: dns
-    protocol: https
-  # AI_REGISTRIES_END
-EOF
+  AI_REGISTRIES="# AI_REGISTRIES_START"
+  appendAiRegistry "moonshot" "api.moonshot.cn"
+  appendAiRegistry "aliyun" "dashscope.aliyuncs.com"
+  appendAiRegistry "openai" "api.openai.com"
+  AI_REGISTRIES="${AI_REGISTRIES}
+  # AI_REGISTRIES_END"
 
   cd /data/mcpbridges
 
@@ -153,6 +140,20 @@ EOF
   awk -v r="$AI_REGISTRIES" '{gsub(/# AI_REGISTRIES_PLACEHOLDER/,r)}1' default.yaml > default-new.yaml
   mv default-new.yaml default.yaml
   cd -
+}
+
+function appendAiRegistry() {
+  PROVIDER_NAME="$1"
+  DOMAIN="$2"
+  PORT="${3-443}"
+  PROTOCOL="${4-https}"
+
+  AI_REGISTRIES="${AI_REGISTRIES}  
+  - name: llm-$PROVIDER_NAME.internal
+    type: dns
+    protocol: $PROTOCOL
+    domain: $DOMAIN
+    port: $PORT"
 }
 
 function initializeIngresses() {
