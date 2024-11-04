@@ -122,6 +122,7 @@ spec:
     configDisable: false
     ingress:
     - moonshot
+  failStrategy: FAIL_OPEN
   phase: UNSPECIFIED_PHASE
   priority: \"100\"
   url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/ai-proxy:$AI_PROXY_VERSION" > "$WASM_PLUGIN_CONFIG_FILE"
