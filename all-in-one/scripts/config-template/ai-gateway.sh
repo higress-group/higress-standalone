@@ -8,50 +8,35 @@ source $ROOT/../base.sh
 AI_PROXY_VERSION=${AI_PROXY_VERSION:-latest}
 MODEL_ROUTER_VERSION=${MODEL_ROUTER_VERSION:-latest}
 
-DEFAULT_AI_SERVICE=${DEFAULT_AI_SERVICE:-}
+function initializeLlmProviderConfigs() {
+  # Aliyun
+  appendAiRegistry aliyun dashscope.aliyuncs.com
+  appendAiProxyConfigs aliyun qwen DASHSCOPE
+  generateAiIngress aliyun
+  generateAiRoute aliyun
+
+  # Moonshot
+  appendAiRegistry moonshot api.moonshot.cn
+  appendAiProxyConfigs moonshot moonshot MOONSHOT
+  generateAiIngress moonshot
+  generateAiRoute moonshot
+
+  # OpenAI
+  appendAiRegistry openai api.openai.com
+  appendAiProxyConfigs openai openai OPENAI
+  generateAiIngress openai
+  generateAiRoute openai
+}
+
+function initializeSharedConfigs() {
+  initializeWasmPlugins
+  initializeMcpBridge
+}
 
 function initializeWasmPlugins() {
-  mkdir -p /data/wasmplugins
   WASM_PLUGIN_CONFIG_FOLDER="/data/wasmplugins"
 
-  DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-YOUR_DASHSCOPE_API_KEY}
-  DASHSCOPE_API_KEYS=(${DASHSCOPE_API_KEY//,/ })
-  DASHSCOPE_API_KEY_CONFIG=""
-  if [ "${#DASHSCOPE_API_KEYS[@]}" != "0" ]; then
-    if [ -z "$DEFAULT_AI_SERVICE"]; then
-      DEFAULT_AI_SERVICE="aliyun"
-    fi
-    for key in "${DASHSCOPE_API_KEYS[@]}"
-    do
-      DASHSCOPE_API_KEY_CONFIG="${DASHSCOPE_API_KEY_CONFIG}\n        - \"${key}\""
-    done
-  fi
-
-  OPENAI_API_KEY=${OPENAI_API_KEY:-YOUR_OPENAI_API_KEY}
-  OPENAI_API_KEYS=(${OPENAI_API_KEY//,/ })
-  OPENAI_API_KEY_CONFIG=""
-  if [ "${#OPENAI_API_KEYS[@]}" != "0" ]; then
-    if [ -z "$DEFAULT_AI_SERVICE"]; then
-      DEFAULT_AI_SERVICE="openai"
-    fi
-    for key in "${OPENAI_API_KEYS[@]}"
-    do
-      OPENAI_API_KEY_CONFIG="${OPENAI_API_KEY_CONFIG}\n        - \"${key}\""
-    done
-  fi
-
-  MOONSHOT_API_KEY=${MOONSHOT_API_KEY:-YOUR_MOONSHOT_API_KEY}
-  MOONSHOT_API_KEYS=(${MOONSHOT_API_KEY//,/ })
-  MOONSHOT_API_KEY_CONFIG=""
-  if [ "${#MOONSHOT_API_KEYS[@]}" != "0" ]; then
-    if [ -z "$DEFAULT_AI_SERVICE"]; then
-      DEFAULT_AI_SERVICE="moonshot"
-    fi
-    for key in "${MOONSHOT_API_KEYS[@]}"
-    do
-      MOONSHOT_API_KEY_CONFIG="${MOONSHOT_API_KEY_CONFIG}\n        - \"${key}\""
-    done
-  fi
+  mkdir -p "${WASM_PLUGIN_CONFIG_FOLDER}"
 
   echo -e "\
 apiVersion: extensions.higress.io/v1alpha1
@@ -70,37 +55,13 @@ metadata:
   resourceVersion: \"1\"
 spec:
   defaultConfig:
-    providers:
-    - id: aliyun
-      type: qwen
-      apiTokens:${DASHSCOPE_API_KEY_CONFIG}
-    - id: openai
-      type: openai
-      apiTokens:${OPENAI_API_KEY_CONFIG}
-    - id: moonshot
-      type: moonshot
-      apiTokens:${MOONSHOT_API_KEY_CONFIG}
+    providers:${AI_PROXY_PROVIDERS}
   defaultConfigDisable: false
-  matchRules:
-  - config:
-      activeProviderId: aliyun
-    configDisable: false
-    service:
-    - llm-aliyun.internal.dns
-  - config:
-      activeProviderId: openai
-    configDisable: false
-    service:
-    - llm-openai.internal.dns
-  - config:
-      activeProviderId: moonshot
-    configDisable: false
-    service:
-    - llm-moonshot.internal.dns
+  matchRules:${AI_PROXY_MATCH_RULES}
   failStrategy: FAIL_OPEN
   phase: UNSPECIFIED_PHASE
   priority: 100
-  url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/ai-proxy:$AI_PROXY_VERSION" > "$WASM_PLUGIN_CONFIG_FOLDER/ai-proxy.internal.yaml"
+  url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/ai-proxy:$AI_PROXY_VERSION" >"$WASM_PLUGIN_CONFIG_FOLDER/ai-proxy.internal.yaml"
 
   echo -e "\
 apiVersion: extensions.higress.io/v1alpha1
@@ -125,21 +86,44 @@ spec:
   failStrategy: FAIL_OPEN
   phase: UNSPECIFIED_PHASE
   priority: 260
-  url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/model-router:$MODEL_ROUTER_VERSION" > "$WASM_PLUGIN_CONFIG_FOLDER/model-router.internal.yaml"
+  url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/model-router:$MODEL_ROUTER_VERSION" >"$WASM_PLUGIN_CONFIG_FOLDER/model-router.internal.yaml"
+}
+
+function appendAiProxyConfigs() {
+  PROVIDER_ID="$1"
+  PROVIDER_TYPE="$2"
+  TOKEN_KEY_PREFIX="$3"
+  DEFAULT_TOKEN_VALUE="${4-YOUR_$3_API_KEY}"
+
+  API_TOKENS_KEY="${TOKEN_KEY_PREFIX}_API_KEY"
+  API_TOKENS_RAW=${!API_TOKENS_KEY:-${DEFAULT_TOKEN_VALUE}}
+  API_TOKENS_ARRAY=(${API_TOKENS_RAW//,/ })
+  API_TOKENS_CONFIG=""
+  for key in "${API_TOKENS_ARRAY[@]}"; do
+    API_TOKENS_CONFIG="${API_TOKENS_CONFIG}
+      - \"${key}\""
+  done
+
+  AI_PROXY_PROVIDERS="$AI_PROXY_PROVIDERS
+    - id: ${PROVIDER_ID}
+      type: ${PROVIDER_TYPE}
+      apiTokens:${API_TOKENS_CONFIG}"
+
+  AI_PROXY_MATCH_RULES="$AI_PROXY_MATCH_RULES
+  - config:
+      activeProviderId: ${PROVIDER_ID}
+    configDisable: false
+    service:
+    - llm-${PROVIDER_ID}.internal.dns"
 }
 
 function initializeMcpBridge() {
-  AI_REGISTRIES="# AI_REGISTRIES_START"
-  appendAiRegistry "moonshot" "api.moonshot.cn"
-  appendAiRegistry "aliyun" "dashscope.aliyuncs.com"
-  appendAiRegistry "openai" "api.openai.com"
-  AI_REGISTRIES="${AI_REGISTRIES}
-  # AI_REGISTRIES_END"
-
+  mkdir -p /data/mcpbridges
   cd /data/mcpbridges
 
   sed -i -z -E 's|# AI_REGISTRIES_START.+# AI_REGISTRIES_END|# AI_REGISTRIES_PLACEHOLDER|' default.yaml
-  awk -v r="$AI_REGISTRIES" '{gsub(/# AI_REGISTRIES_PLACEHOLDER/,r)}1' default.yaml > default-new.yaml
+  awk -v r="# AI_REGISTRIES_START${AI_REGISTRIES}
+  # AI_REGISTRIES_END" '{gsub(/# AI_REGISTRIES_PLACEHOLDER/,r)}1' default.yaml >default-new.yaml
   mv default-new.yaml default.yaml
   cd -
 }
@@ -158,22 +142,15 @@ function appendAiRegistry() {
     port: $PORT"
 }
 
-function initializeIngresses() {
-  mkdir -p /data/ingresses
-
-  generateAiIngress "aliyun"
-  generateAiIngress "openai"
-  generateAiIngress "moonshot"
-}
-
 function generateAiIngress() {
   PROVIDER_NAME="$1"
 
   INGRESS_NAME="ai-route-$PROVIDER_NAME.internal"
-
   INGRESS_FILE="/data/ingresses/$INGRESS_NAME.yaml"
 
-  cat <<EOF > "$INGRESS_FILE" 
+  mkdir -p /data/ingresses
+
+  cat <<EOF >"$INGRESS_FILE"
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -201,19 +178,15 @@ spec:
 EOF
 }
 
-function initializeAiRoutes() {
-  generateAiRoute "aliyun"
-  generateAiRoute "openai"
-  generateAiRoute "moonshot"
-}
-
 function generateAiRoute() {
   ROUTE_NAME="$1"
 
   CONFIG_MAP_NAME="ai-route-$ROUTE_NAME.internal"
   CONFIG_MAP_FILE="/data/configmaps/$CONFIG_MAP_NAME.yaml"
 
-  cat <<EOF > "$CONFIG_MAP_FILE" 
+  mkdir -p /data/configmaps
+
+  cat <<EOF >"$CONFIG_MAP_FILE"
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -250,9 +223,7 @@ if [ -f "$CONFIGURED_MARKER" ]; then
   exit 0
 fi
 
-initializeWasmPlugins
-initializeMcpBridge
-initializeIngresses
-initializeAiRoutes
+initializeLlmProviderConfigs
+initializeSharedConfigs
 
 touch "$CONFIGURED_MARKER"
