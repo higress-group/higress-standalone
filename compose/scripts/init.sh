@@ -1,6 +1,6 @@
 #! /bin/bash
 
-BASE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 VOLUMES_ROOT="/mnt/volumes"
 RSA_KEY_LENGTH=4096
@@ -30,11 +30,11 @@ initializeConfigStorage() {
   CONFIG_STORAGE=${CONFIG_STORAGE:-nacos}
 
   case $CONFIG_STORAGE in
-    nacos)
-      initializeNacos
-      ;;
-    file)
-      initializeConfigDir
+  nacos)
+    initializeNacos
+    ;;
+  file)
+    initializeConfigDir
       ;;
     *)
       printf "Unsupported storage type: %s\n" "$CONFIG_STORAGE"
@@ -55,7 +55,7 @@ initializeNacos() {
       break
     fi
     echo "Waiting for Nacos to get ready..."
-    sleep 1 
+    sleep 1
   done
 
   if [ "${nacosReady}" != "true" ]; then
@@ -74,8 +74,31 @@ initializeNacos() {
     fi
   fi
 
-  if grep -q "\"namespace\":\"${NACOS_NS}\"" <<< "$(curl -s "${NACOS_SERVER_URL}/v1/console/namespaces?accessToken=${NACOS_ACCESS_TOKEN}")"; then
+  if grep -q "\"namespace\":\"${NACOS_NS}\"" <<<"$(curl -s "${NACOS_SERVER_URL}/v1/console/namespaces?accessToken=${NACOS_ACCESS_TOKEN}")"; then
     echo "  Namespace ${NACOS_NS} already exists in Nacos."
+
+    if [ "$NACOS_USE_RANDOM_DATA_ENC_KEY" != "Y" ]; then
+      echo "  Fixed data encryption key is used. Skip config overwriting check."
+    else
+      echo "  Checking existed configs in namespace ${NACOS_NS}..."
+      statusCode="$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v2/cs/config?accessToken=${NACOS_ACCESS_TOKEN}&namespaceId=${NACOS_NS}&dataId=secrets.__names__&group=DEFAULT_GROUP")"
+      if [ $statusCode -eq 200 ]; then
+        echo "  ERROR: Higress configs are found in nacos namespace ${NACOS_NS}."
+        echo
+        echo "  Using a random data encyption key in a configured nacos namespace is incorrect, and will cause Higress unable to start."
+        echo "  You can:"
+        echo "  1. Remove all the configurations in nacos namespace ${NACOS_NS} and try again."
+        echo "  2. Install Higress to another nacos namespace."
+        echo "  3. Specify the same data encryption key generated/used in the previous installation."
+        exit -1
+      elif [ $statusCode -eq 404 ]; then
+        echo "  No Higress config is found in nacos namespace ${NACOS_NS}."
+      else
+        echo "  Checking existed configs in nacos namespace ${NACOS_NS} failed with $statusCode."
+        exit -1
+      fi
+    fi
+
     return 0
   fi
 
@@ -267,10 +290,10 @@ initializeGateway() {
   cp $VOLUMES_ROOT/pilot/cacerts/root-cert.pem ./root-cert.pem
   cp $VOLUMES_ROOT/pilot/cacerts/gateway-cert.pem ./cert-chain.pem
   cp $VOLUMES_ROOT/pilot/cacerts/gateway-key.pem ./key.pem
-  cat $VOLUMES_ROOT/pilot/cacerts/ca-cert.pem >> ./cert-chain.pem
+  cat $VOLUMES_ROOT/pilot/cacerts/ca-cert.pem >>./cert-chain.pem
 
   mkdir -p $VOLUMES_ROOT/gateway/podinfo && cd "$_"
-  cat <<EOF > ./labels
+  cat <<EOF >./labels
 app="higress-gateway"
 higress="higress-system-higress-gateway"
 EOF
