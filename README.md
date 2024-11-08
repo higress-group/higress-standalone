@@ -12,7 +12,7 @@
 
 Standalone 模式没有大规模生产使用过，目前主要用于本地部署测试的场景，如果生产部署更建议云原生模式部署：https://higress.io/zh-cn/docs/ops/deploy-by-helm
 
-如果使部署在阿里云上，也可以考虑使用 [Higress 企业版](https://higress.cn/cloud/)，这是完全托管的模式，也可以视作是独立部署，不依赖 K8s。
+如果是部署在阿里云上，也可以考虑使用 [Higress 企业版](https://higress.cn/cloud/)，这是完全托管的模式，也可以视作是独立部署，不依赖 K8s。
 
 ## 前置需求
 
