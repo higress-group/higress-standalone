@@ -461,15 +461,17 @@ func (n *nacosREST) Watch(ctx context.Context, options *metainternalversion.List
 		return nil, err
 	}
 
-	danger := reflect.ValueOf(list).Elem()
-	items := danger.FieldByName("Items")
+	func() {
+		danger := reflect.ValueOf(list).Elem()
+		items := danger.FieldByName("Items")
 
-	for i := 0; i < items.Len(); i++ {
-		nw.SendEvent(watch.Event{
-			Type:   watch.Added,
-			Object: listItemToRuntimeObject(items.Index(i)),
-		}, true)
-	}
+		for i := 0; i < items.Len(); i++ {
+			nw.SendEvent(watch.Event{
+				Type:   watch.Added,
+				Object: listItemToRuntimeObject(items.Index(i)),
+			}, true)
+		}
+	}()
 
 	n.watchersMutex.Lock()
 	defer n.watchersMutex.Unlock()
