@@ -156,7 +156,7 @@ runConfigWizard() {
     "Zhipu AI|ZHIPUAI"
     "Ollama|OLLAMA|configureOllamaProvider"
     "Claude|CLAUDE|configureClaudeProvider"
-    "Baidu AI Cloud|BAIDU"
+    # "Baidu AI Cloud|BAIDU"
     # "Tencent Hunyuan|HUNYUAN"
     "Stepfun|STEPFUN"
     "Minimax|MINIMAX|configureMinimaxProvider"

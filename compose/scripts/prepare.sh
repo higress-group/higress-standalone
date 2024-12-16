@@ -33,7 +33,7 @@ checkConfigExists() {
   if [[ "$configGroupVersion" == *"/"* ]]; then
     uriPrefix="/apis"
   fi
-  local url;
+  local url
   if [ -z "$namespace" ]; then
     url="${API_SERVER_BASE_URL}${uriPrefix}/${configGroupVersion}/${configType}/${configName}"
   else
@@ -65,7 +65,7 @@ getConfig() {
   if [[ "$configGroupVersion" == *"/"* ]]; then
     uriPrefix="/apis"
   fi
-  local url;
+  local url
   if [ -z "$namespace" ]; then
     url="${API_SERVER_BASE_URL}${uriPrefix}/${configGroupVersion}/${configType}/${configName}"
   else
@@ -102,7 +102,7 @@ publishConfig() {
   if [[ "$configGroupVersion" == *"/"* ]]; then
     uriPrefix="/apis"
   fi
-  local url;
+  local url
   if [ -z "$namespace" ]; then
     url="${API_SERVER_BASE_URL}${uriPrefix}/${configGroupVersion}/${configType}"
   else
@@ -226,9 +226,22 @@ metadata:
   name: higress-config
   namespace: higress-system
 data:
+  higress: |-
+    downstream:
+      connectionBufferLimits: 32768
+      http2:
+        initialConnectionWindowSize: 1048576
+        initialStreamWindowSize: 65535
+        maxConcurrentStreams: 100
+      idleTimeout: 180
+      maxRequestHeadersKb: 60
+      routeTimeout: 0
+    upstream:
+      connectionBufferLimits: 10485760
+      idleTimeout: 10
   mesh: |-
     accessLogEncoding: TEXT
-    accessLogFile: /dev/stdout
+    accessLogFile: /var/log/proxy/access.log
     accessLogFormat: |
       {"authority":"%REQ(X-ENVOY-ORIGINAL-HOST?:AUTHORITY)%","bytes_received":"%BYTES_RECEIVED%","bytes_sent":"%BYTES_SENT%","downstream_local_address":"%DOWNSTREAM_LOCAL_ADDRESS%","downstream_remote_address":"%DOWNSTREAM_REMOTE_ADDRESS%","duration":"%DURATION%","istio_policy_status":"%DYNAMIC_METADATA(istio.mixer:status)%","method":"%REQ(:METHOD)%","path":"%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%","protocol":"%PROTOCOL%","request_id":"%REQ(X-REQUEST-ID)%","requested_server_name":"%REQUESTED_SERVER_NAME%","response_code":"%RESPONSE_CODE%","response_flags":"%RESPONSE_FLAGS%","route_name":"%ROUTE_NAME%","start_time":"%START_TIME%","trace_id":"%REQ(X-B3-TRACEID)%","upstream_cluster":"%UPSTREAM_CLUSTER%","upstream_host":"%UPSTREAM_HOST%","upstream_local_address":"%UPSTREAM_LOCAL_ADDRESS%","upstream_service_time":"%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%","upstream_transport_failure_reason":"%UPSTREAM_TRANSPORT_FAILURE_REASON%","user_agent":"%REQ(USER-AGENT)%","x_forwarded_for":"%REQ(X-FORWARDED-FOR)%"}
     configSources:
@@ -244,6 +257,9 @@ data:
     enableAutoMtls: false
     enablePrometheusMerge: true
     ingressControllerMode: "OFF"
+    mseIngressGlobalConfig:
+      enableH3: false
+      enableProxyProtocol: false
     protocolDetectionTimeout: 100ms
     rootNamespace: higress-system
     trustDomain: cluster.local
@@ -396,8 +412,72 @@ EOF
   fi
 }
 
+checkPrometheus() {
+  echo "Checking Prometheus configurations..."
+
+  if [ ! -d "$VOLUMES_ROOT/prometheus/config/" ]; then
+    echo "  The config folder of Prometheus is missing."
+    exit -1
+  fi
+  if [ ! -f "$VOLUMES_ROOT/prometheus/config/prometheus.yaml" ] ; then
+    echo "  Prometheus config file prometheus.yaml is missing."
+    exit -1
+  fi
+}
+
+checkPromtail() {
+  echo "Checking Promtail configurations..."
+
+  if [ ! -d "$VOLUMES_ROOT/promtail/config/" ]; then
+    echo "  The config folder of Promtail is missing."
+    exit -1
+  fi
+  if [ ! -f "$VOLUMES_ROOT/promtail/config/promtail.yaml" ] ; then
+    echo "  Promtail config file promtail.yaml is missing."
+    exit -1
+  fi
+}
+
+checkLoki() {
+  echo "Checking Loki configurations..."
+
+  if [ ! -d "$VOLUMES_ROOT/loki/config/" ]; then
+    echo "  The config folder of Loki is missing."
+    exit -1
+  fi
+  if [ ! -f "$VOLUMES_ROOT/loki/config/config.yaml" ] ; then
+    echo "  Loki config file config.yaml is missing."
+    exit -1
+  fi
+  if [ ! -f "$VOLUMES_ROOT/loki/config/runtime-config.yaml" ] ; then
+    echo "  Loki config file runtime-config.yaml is missing."
+    exit -1
+  fi
+}
+
+checkGrafana() {
+  echo "Checking Grafana configurations..."
+
+  if [ ! -d "$VOLUMES_ROOT/grafana/config/" ]; then
+    echo "  The config folder of Grafana is missing."
+    exit -1
+  fi
+  if [ ! -f "$VOLUMES_ROOT/grafana/config/grafana.ini" ] ; then
+    echo "  Grafana config file grafana.ini is missing."
+    exit -1
+  fi
+}
+
+checkO11y() {
+  checkPrometheus
+  checkPromtail
+  checkLoki
+  checkGrafana
+}
+
 checkStorage
 checkPilot
 checkGateway
 checkConsole
 checkGatewayApi
+checkO11y

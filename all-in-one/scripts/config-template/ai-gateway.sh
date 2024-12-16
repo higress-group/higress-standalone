@@ -21,7 +21,7 @@ function initializeLlmProviderConfigs() {
   initializeLlmProviderConfig yi yi YI api.lingyiwanwu.com
   initializeLlmProviderConfig deepseek deepseek DEEPSEEK api.deepseek.com
   initializeLlmProviderConfig zhipuai zhipuai ZHIPUAI open.bigmodel.cn
-  initializeLlmProviderConfig baidu baidu BAIDU aip.baidubce.com
+  # initializeLlmProviderConfig baidu baidu BAIDU aip.baidubce.com
   # initializeLlmProviderConfig hunyuan hunyuan HUNYUAN hunyuan.tencentcloudapi.com 443 "https" "" "${EXTRA_CONFIGS[@]}"
   initializeLlmProviderConfig stepfun stepfun STEPFUN api.stepfun.com
   # initializeLlmProviderConfig cloudflare cloudflare CLOUDFLARE api.cloudflare.com 443 "https" "" "${EXTRA_CONFIGS[@]}"
