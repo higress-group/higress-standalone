@@ -138,6 +138,10 @@ type NacosOptions struct {
 	Password          string
 	TimeoutMs         uint64
 	LogDir            string
+	LogLevel          string
+	LogMaxSize        int
+	LogMaxAge         int
+	LogMaxBackups     int
 	CacheDir          string
 	PrivateKeyFile    string
 	EncryptionKeyFile string
@@ -166,6 +170,14 @@ func (o *NacosOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&o.LogDir, "nacos-log-dir", "/tmp/nacos/log", ""+
 		"Directory to store Nacos logs.")
+	fs.StringVar(&o.LogLevel, "nacos-log-level", "info", ""+
+		"The level of Nacos logs. It must be debug, info, warn, error. The default value is info.")
+	fs.IntVar(&o.LogMaxSize, "nacos-log-max-size-mb", 30, ""+
+		"The maximum size in megabytes of the Nacos log file before it gets rotated. The default value is 30.")
+	fs.IntVar(&o.LogMaxAge, "nacos-log-max-age", 3, ""+
+		"The maximum number of days to retain old Nacos log files based on the timestamp encoded in their filename. The default value is 3.")
+	fs.IntVar(&o.LogMaxBackups, "nacos-log-max-backups", 3, ""+
+		"The maximum number of old Nacos log files to retain.  The default value is 3.")
 	fs.StringVar(&o.CacheDir, "nacos-cache-dir", "/tmp/nacos/cache", ""+
 		"Directory to store Nacos cache data.")
 }
@@ -236,8 +248,9 @@ func (o *NacosOptions) CreateConfigClient() (config_client.IConfigClient, error)
 		constant.WithPassword(o.Password),
 		constant.WithTimeoutMs(o.TimeoutMs),
 		constant.WithLogDir(o.LogDir),
+		constant.WithLogLevel(o.LogLevel),
+		constant.WithLogRollingConfig(&constant.ClientLogRollingConfig{MaxSize: o.LogMaxSize, MaxAge: o.LogMaxAge, MaxBackups: o.LogMaxBackups}),
 		constant.WithCacheDir(o.CacheDir),
-		constant.WithLogLevel("info"),
 		constant.WithDisableUseSnapShot(NacosDisableUseSnapShot),
 	)
 
