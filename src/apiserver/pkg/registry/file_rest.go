@@ -653,15 +653,17 @@ func (f *fileREST) Watch(ctx context.Context, options *metainternalversion.ListO
 		return nil, err
 	}
 
-	danger := reflect.ValueOf(list).Elem()
-	items := danger.FieldByName("Items")
+	go func() {
+		danger := reflect.ValueOf(list).Elem()
+		items := danger.FieldByName("Items")
 
-	for i := 0; i < items.Len(); i++ {
-		fw.ch <- watch.Event{
-			Type:   watch.Added,
-			Object: listItemToRuntimeObject(items.Index(i)),
+		for i := 0; i < items.Len(); i++ {
+			fw.ch <- watch.Event{
+				Type:   watch.Added,
+				Object: listItemToRuntimeObject(items.Index(i)),
+			}
 		}
-	}
+	}()
 
 	f.fileWatchersMutex.Lock()
 	f.fileWatchers[fw.id] = fw
