@@ -461,7 +461,7 @@ func (n *nacosREST) Watch(ctx context.Context, options *metainternalversion.List
 		return nil, err
 	}
 
-	func() {
+	go func() {
 		danger := reflect.ValueOf(list).Elem()
 		items := danger.FieldByName("Items")
 
