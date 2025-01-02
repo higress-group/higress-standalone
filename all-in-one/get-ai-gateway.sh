@@ -156,7 +156,7 @@ runConfigWizard() {
     "Zhipu AI|ZHIPUAI"
     "Ollama|OLLAMA|configureOllamaProvider"
     "Claude|CLAUDE|configureClaudeProvider"
-    "Baidu AI Cloud|BAIDU"
+    # "Baidu AI Cloud|BAIDU"
     # "Tencent Hunyuan|HUNYUAN"
     "Stepfun|STEPFUN"
     "Minimax|MINIMAX|configureMinimaxProvider"
@@ -324,6 +324,7 @@ ${env}=${!env}"
   done
   cat <<EOF >$DATA_FOLDER/$CONFIG_FILENAME
 MODE=full
+o11y=on
 CONFIG_TEMPLATE=ai-gateway
 GATEWAY_HTTP_PORT=${GATEWAY_HTTP_PORT}
 GATEWAY_HTTPS_PORT=${GATEWAY_HTTPS_PORT}

@@ -17,8 +17,16 @@ set -e
 
 createDir /etc/istio/proxy
 createDir /var/lib/istio/data
+createDir /var/log/proxy
+touch /var/log/proxy/access.log
 
-/usr/local/bin/pilot-agent proxy router \
+if [ "$O11Y" == "on" ]; then
+    sed -i -E 's/^accessLogFile: .+$/accessLogFile: \/var\/log\/proxy\/access.log/' /etc/istio/config/mesh
+else
+    sed -i -E 's/^accessLogFile: .+$/accessLogFile: \/dev\/stdout/' /etc/istio/config/mesh
+fi
+
+/usr/local/bin/higress-proxy-start.sh proxy router \
     --domain=higress-system.svc.cluster.local \
     --proxyLogLevel=${GATEWAY_LOG_LEVEL:-warning} \
     --proxyComponentLogLevel=${GATEWAY_COMPONENT_LOG_LEVEL:-misc:error} \

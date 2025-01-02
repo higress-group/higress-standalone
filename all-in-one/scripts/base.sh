@@ -27,7 +27,6 @@ function readinessCheck() {
 
 function createDir() {
     sudo mkdir -p "$1"
-    sudo chown 1337:1337 "$1"
 }
 
 case $MODE in
@@ -39,8 +38,18 @@ case $MODE in
         MODE=full
         ;;
 esac
-
 echo "Mode=$MODE"
+
+case $O11Y in
+    true|TRUE|on|ON|yes|YES)
+        O11Y=on
+        ;;
+    *)
+        # Default to full mode
+        O11Y=off
+        ;;
+esac
+echo "O11Y=$O11Y"
 
 CONSOLE_USED_MARKER='/data/.console-used'
 CONSOLE_USED='false'

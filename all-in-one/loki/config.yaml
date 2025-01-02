@@ -1,0 +1,49 @@
+auth_enabled: false
+common:
+  compactor_address: 'loki'
+  path_prefix: /var/loki
+  replication_factor: 1
+  storage:
+    filesystem:
+      chunks_directory: /var/loki/chunks
+      rules_directory: /var/loki/rules
+frontend:
+  scheduler_address: ""
+frontend_worker:
+  scheduler_address: ""
+index_gateway:
+  mode: simple
+limits_config:
+  max_cache_freshness_per_query: 10m
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+  split_queries_by_interval: 15m
+memberlist:
+  join_members:
+  - localhost
+query_range:
+  align_queries_with_step: true
+ruler:
+  storage:
+    type: local
+runtime_config:
+  file: /etc/loki/runtime-config.yaml
+schema_config:
+  configs:
+  - from: "2022-01-11"
+    index:
+      period: 24h
+      prefix: loki_index_
+    object_store: filesystem
+    schema: v12
+    store: boltdb-shipper
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9095
+storage_config:
+  hedging:
+    at: 250ms
+    max_per_second: 20
+    up_to: 3
+tracing:
+  enabled: false

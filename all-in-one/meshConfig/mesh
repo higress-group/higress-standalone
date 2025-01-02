@@ -16,6 +16,9 @@ dnsRefreshRate: 200s
 enableAutoMtls: false
 enablePrometheusMerge: true
 ingressControllerMode: "OFF"
+mseIngressGlobalConfig:
+  enableH3: false
+  enableProxyProtocol: false
 protocolDetectionTimeout: 100ms
 rootNamespace: higress-system
 trustDomain: cluster.local

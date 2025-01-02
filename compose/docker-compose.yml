@@ -203,6 +203,7 @@ services:
       - ./volumes/gateway/certs:/etc/certs:ro
       - ./volumes/gateway/podinfo:/etc/istio/pod:ro
       - ./volumes/gateway/istio/data:/var/lib/istio/data:rw
+      - ./volumes/gateway/log:/var/log/proxy:rw
 
   console:
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/console:${HIGRESS_CONSOLE_TAG}
@@ -230,6 +231,126 @@ services:
     volumes:
       - ./volumes/kube:/home/higress/.kube:ro
 
+  prometheus:
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/prometheus:${PROMETHEUS_TAG}
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yaml"
+      - "--web.external-url=/prometheus"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention=6h"
+    depends_on:
+      gateway:
+        condition: service_healthy
+    networks:
+      - higress-net
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://127.0.0.1:9090/prometheus/-/healthy/"
+        ]
+      interval: 1s
+      timeout: 3s
+      retries: 60
+    restart: always
+    volumes:
+      - ./volumes/prometheus/config:/etc/prometheus:ro
+      - ./volumes/prometheus/data:/prometheus:rw
+
+  promtail:
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/promtail:${PROMTAIL_TAG}
+    command:
+      - -config.file=/etc/promtail/promtail.yaml
+    env_file:
+      - ./env/promtail.env
+    depends_on:
+      gateway:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+    networks:
+      - higress-net
+    ports:
+      - "3101:3101/tcp"
+    healthcheck:
+      disable: true
+      # There is no curl or wget in the promtail image. We need to find another way to perform health check.
+      # test:
+      #   [
+      #     "CMD",
+      #     "curl",
+      #     "-fk",
+      #     "http://127.0.0.1:3101/ready"
+      #   ]
+      # interval: 1s
+      # timeout: 3s
+      # retries: 60
+    restart: always
+    volumes:
+      - ./volumes/promtail/config:/etc/promtail:ro
+      - ./volumes/promtail/data:/var/promtail:rw
+      - ./volumes/gateway/log:/var/log/proxy:ro
+
+  loki:
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/loki:${LOKI_TAG}
+    command:
+      - -config.file=/etc/loki/config/config.yaml
+      - -target=all
+    networks:
+      - higress-net
+    ports:
+      - "3100:3100/tcp"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://127.0.0.1:3100/ready"
+        ]
+      interval: 1s
+      timeout: 3s
+      retries: 60
+    restart: always
+    volumes:
+      - ./volumes/loki/config:/etc/loki/config:ro
+      - ./volumes/loki/data:/var/loki:rw
+
+  grafana:
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/grafana:${GRAFANA_TAG}
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+    networks:
+      - higress-net
+    ports:
+      - "3000:3000/tcp" 
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://127.0.0.1:3000/api/health"
+        ]
+      interval: 1s
+      timeout: 3s
+      retries: 60
+    restart: always
+    volumes:
+      - ./volumes/grafana/config:/etc/grafana:ro
+      - ./volumes/grafana/lib:/var/lib/grafana:rw
+
   postcheck:
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/runner:${HIGRESS_RUNNER_TAG}
     command:
@@ -246,6 +367,15 @@ services:
       gateway:
         condition: service_healthy
       console:
+        condition: service_healthy
+      # promtail doesn't support health check at the moment.
+      # promtail:
+      #   condition: service_healthy
+      prometheus:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+      grafana:
         condition: service_healthy
     volumes:
       - ./scripts:/workspace:ro

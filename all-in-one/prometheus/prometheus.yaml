@@ -1,0 +1,17 @@
+global:
+  scrape_interval:     15s 
+  evaluation_interval: 15s
+scrape_configs:
+  - job_name: 'prometheus'
+    metrics_path: /prometheus/metrics
+    static_configs:
+    - targets: ['localhost:9090']
+  - job_name: 'gateway'
+    metrics_path: /stats/prometheus
+    static_configs:
+    - targets: ['localhost:15020']
+      labels:
+        container: 'higress-gateway'
+        namespace: 'higress-system'
+        higress: 'higress-system-higress-gateway'
+        pod: 'higress'

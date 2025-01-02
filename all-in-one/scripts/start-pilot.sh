@@ -95,4 +95,6 @@ initCerts
     --log_output_level=default:info \
     --domain=cluster.local \
     --keepaliveMaxServerConnectionAge=30m \
-    --caCertFile=/etc/certs/ca-cert.pem
+    --caCertFile=/etc/certs/ca-cert.pem \
+    --meshConfig=/etc/istio/config/mesh \
+    --networksConfig=/etc/istio/config/meshNetworks

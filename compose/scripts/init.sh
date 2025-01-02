@@ -299,6 +299,203 @@ higress="higress-system-higress-gateway"
 EOF
 
   mkdir -p $VOLUMES_ROOT/gateway/istio/data
+
+  mkdir -p $VOLUMES_ROOT/gateway/log
+  touch $VOLUMES_ROOT/gateway/log/access.log
+}
+
+initializePrometheus() {
+  echo "Initializing Prometheus configurations..."
+
+  mkdir -p $VOLUMES_ROOT/prometheus/config && cd "$_"
+  cat <<EOF >./prometheus.yaml
+global:
+  scrape_interval:     15s 
+  evaluation_interval: 15s
+scrape_configs:
+  - job_name: 'prometheus'
+    metrics_path: /prometheus/metrics
+    static_configs:
+    - targets: ['localhost:9090']
+  - job_name: 'gateway'
+    metrics_path: /stats/prometheus
+    static_configs:
+    - targets: ['gateway:15020']
+      labels:
+        container: 'higress-gateway'
+        namespace: 'higress-system'
+        higress: 'higress-system-higress-gateway'
+        pod: 'higress'
+EOF
+
+  mkdir -p $VOLUMES_ROOT/prometheus/data
+  chmod a+rwx $VOLUMES_ROOT/prometheus/data
+}
+
+initializePromtail() {
+  echo "Initializing Promtail configurations..."
+
+  mkdir -p $VOLUMES_ROOT/promtail/config && cd "$_"
+  cat <<EOF >./promtail.yaml
+server:
+  log_level: info
+  http_listen_port: 3101
+
+clients:
+- url: http://loki:3100/loki/api/v1/push
+
+positions:
+  filename: /var/promtail/promtail-positions.yaml
+target_config:
+  sync_period: 10s
+scrape_configs:
+- job_name: access-logs
+  static_configs:
+  - targets:
+    - localhost
+    labels:
+      __path__: /var/log/proxy/access.log
+  pipeline_stages:
+  - json:
+      expressions:
+        authority:
+        method:
+        path:
+        protocol:
+        request_id:
+        response_code:
+        response_flags:
+        route_name:
+        trace_id:
+        upstream_cluster:
+        upstream_host:
+        upstream_transport_failure_reason:
+        user_agent:
+        x_forwarded_for:
+  - labels:
+      authority:
+      method:
+      path:
+      protocol:
+      request_id:
+      response_code:
+      response_flags:
+      route_name:
+      trace_id:
+      upstream_cluster:
+      upstream_host:
+      upstream_transport_failure_reason:
+      user_agent:
+      x_forwarded_for:
+  - timestamp:
+      source: timestamp
+      format: RFC3339Nano
+EOF
+  
+  mkdir -p $VOLUMES_ROOT/promtail/data
+  chmod a+rwx $VOLUMES_ROOT/promtail/data
+}
+
+initializeLoki() {
+  echo "Initializing Loki configurations..."
+
+  mkdir -p $VOLUMES_ROOT/loki/config && cd "$_"
+  cat <<EOF >./config.yaml
+auth_enabled: false
+common:
+  compactor_address: 'loki'
+  path_prefix: /var/loki
+  replication_factor: 1
+  storage:
+    filesystem:
+      chunks_directory: /var/loki/chunks
+      rules_directory: /var/loki/rules
+frontend:
+  scheduler_address: ""
+frontend_worker:
+  scheduler_address: ""
+index_gateway:
+  mode: ring
+limits_config:
+  max_cache_freshness_per_query: 10m
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+  split_queries_by_interval: 15m
+memberlist:
+  join_members:
+  - loki
+query_range:
+  align_queries_with_step: true
+ruler:
+  storage:
+    type: local
+runtime_config:
+  file: /etc/loki/config/runtime-config.yaml
+schema_config:
+  configs:
+  - from: "2022-01-11"
+    index:
+      period: 24h
+      prefix: loki_index_
+    object_store: filesystem
+    schema: v12
+    store: boltdb-shipper
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9095
+storage_config:
+  hedging:
+    at: 250ms
+    max_per_second: 20
+    up_to: 3
+tracing:
+  enabled: false
+EOF
+  cat <<EOF >./runtime-config.yaml
+{}
+EOF
+
+  mkdir -p $VOLUMES_ROOT/loki/data/
+  chmod a+rwx $VOLUMES_ROOT/loki/data/
+}
+
+initializeGrafana() {
+  echo "Initializing Grafana configurations..."
+
+  mkdir -p $VOLUMES_ROOT/grafana/config && cd "$_"
+  cat <<EOF >./grafana.ini
+[server]
+protocol=http
+domain=localhost
+root_url="%(protocol)s://%(domain)s/grafana"
+serve_from_sub_path=true
+
+[auth]
+disable_login_form=true
+disable_signout_menu=true
+
+[auth.anonymous]
+enabled=true
+org_name=Main Org.
+org_role=Viewer
+
+[users]
+default_theme=light
+viewers_can_edit=true
+
+[security]
+allow_embedding=true
+EOF
+
+  mkdir -p $VOLUMES_ROOT/grafana/lib
+  chmod a+rwx $VOLUMES_ROOT/grafana/lib
+}
+
+initializeO11y() {
+  initializePrometheus
+  initializePromtail
+  initializeLoki
+  initializeGrafana
 }
 
 initializeConfigStorage
@@ -306,3 +503,4 @@ initializeApiServer
 initializeController
 initializePilot
 initializeGateway
+initializeO11y
