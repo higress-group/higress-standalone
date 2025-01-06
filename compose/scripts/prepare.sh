@@ -127,6 +127,10 @@ metadata:
   namespace: higress-system
 spec:
   registries:
+  - domain: console.svc
+    name: higress-console
+    port: 8080
+    type: dns
 EOF
 
   if [ "$CONFIG_STORAGE" == "nacos" ]; then
