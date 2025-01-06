@@ -31,5 +31,7 @@ if [ "$O11Y" == "on" ]; then
 fi
 
 HIGRESS_CONSOLE_KUBE_CONFIG="/app/kubeconfig" \
+    HIGRESS_CONSOLE_SERVICE_HOST="higress-console.static" \
+    HIGRESS_CONSOLE_SERVICE_PORT=80 \
     SERVER_PORT="$CONSOLE_PORT" \
     bash /app/start.sh

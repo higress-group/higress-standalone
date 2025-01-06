@@ -11,7 +11,9 @@ services:
     env_file:
       - ./env/nacos.env
     networks:
-      - higress-net
+      higress-net:
+        aliases:
+          - nacos.svc
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://127.0.0.1:8848/nacos" ]
       interval: 1s
@@ -81,7 +83,9 @@ services:
       precheck:
         condition: service_completed_successfully
     networks:
-      - higress-net
+      higress-net:
+        aliases:
+          - apiserver.svc
     restart: always
     healthcheck:
       test: [ "CMD", "curl", "-fk", "https://127.0.0.1:8443/readyz" ]
@@ -123,7 +127,9 @@ services:
       prepare:
         condition: service_completed_successfully
     networks:
-      - higress-net
+      higress-net:
+        aliases:
+          - higress.svc
     restart: always
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://127.0.0.1:8888/ready" ]
@@ -152,7 +158,9 @@ services:
     env_file:
       - ./env/pilot.env
     networks:
-      - higress-net
+      higress-net:
+        aliases:
+          - pilot.svc
     restart: always
     healthcheck:
       test: [ "CMD", "curl", "-fk", "http://127.0.0.1:8080/ready" ]
@@ -181,7 +189,9 @@ services:
       pilot:
         condition: service_healthy
     networks:
-      - higress-net
+      higress-net:
+        aliases:
+          - gateway.svc
     restart: always
     ports:
       - "${GATEWAY_HTTP_PORT:-80}:80/tcp"
@@ -213,7 +223,9 @@ services:
       controller:
         condition: service_healthy
     networks:
-      - higress-net
+      higress-net:
+        aliases:
+          - console.svc
     ports:
       - "${CONSOLE_PORT:-8080}:8080/tcp"
     healthcheck:
@@ -242,7 +254,9 @@ services:
       gateway:
         condition: service_healthy
     networks:
-      - higress-net
+      higress-net:
+        aliases:
+          - prometheus.svc
     healthcheck:
       test:
         [
@@ -273,7 +287,9 @@ services:
       loki:
         condition: service_healthy
     networks:
-      - higress-net
+      higress-net:
+        aliases:
+          - promtail.svc
     ports:
       - "3101:3101/tcp"
     healthcheck:
@@ -301,7 +317,9 @@ services:
       - -config.file=/etc/loki/config/config.yaml
       - -target=all
     networks:
-      - higress-net
+      higress-net:
+        aliases:
+          - loki.svc
     ports:
       - "3100:3100/tcp"
     healthcheck:
@@ -330,7 +348,9 @@ services:
       loki:
         condition: service_healthy
     networks:
-      - higress-net
+      higress-net:
+        aliases:
+          - grafana.svc
     ports:
       - "3000:3000/tcp" 
     healthcheck:
