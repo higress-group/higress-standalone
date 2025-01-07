@@ -129,7 +129,7 @@ services:
     networks:
       higress-net:
         aliases:
-          - higress.svc
+          - controller.svc
     restart: always
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://127.0.0.1:8888/ready" ]
