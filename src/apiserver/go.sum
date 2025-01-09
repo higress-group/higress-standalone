@@ -40,8 +40,8 @@ github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751/go.mod h1:LOuy
 github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d/go.mod h1:rBZYJk541a8SKzHPHnH3zbiI+7dagKZ0cgpgrD7Fyho=
-github.com/alibaba/higress v1.4.3-0.20241011033946-1a53c7b4d384 h1:IAXP/CrzViFikR9G1UVfLs+jr0dW5Tsil7ujxJqpJyQ=
-github.com/alibaba/higress v1.4.3-0.20241011033946-1a53c7b4d384/go.mod h1:UiNowAdUdhDRp22A5gcEHgvMaoqqB3hBwCWviaMTY/w=
+github.com/alibaba/higress v0.0.0-20250109051946-2a89c3bb70e0 h1:G3wqgT2R9+o/IJR21FNDUDuazRwC5lJAJCbUpvMCiO8=
+github.com/alibaba/higress v0.0.0-20250109051946-2a89c3bb70e0/go.mod h1:UiNowAdUdhDRp22A5gcEHgvMaoqqB3hBwCWviaMTY/w=
 github.com/aliyun/alibaba-cloud-sdk-go v1.61.1704/go.mod h1:RcDobYh8k5VP6TNybz9m++gL3ijVI5wueVr0EM10VsU=
 github.com/aliyun/alibaba-cloud-sdk-go v1.61.1800 h1:ie/8RxBOfKZWcrbYSJi2Z8uX8TcOlSMwPlEJh83OeOw=
 github.com/aliyun/alibaba-cloud-sdk-go v1.61.1800/go.mod h1:RcDobYh8k5VP6TNybz9m++gL3ijVI5wueVr0EM10VsU=
