@@ -369,7 +369,7 @@ outputWelcomeMessage() {
   echo "    curl 'http://localhost:$GATEWAY_HTTP_PORT/v1/chat/completions' \\"
   echo "      -H 'Content-Type: application/json' \\"
   echo "      -d '{"
-  echo "        \"model\": \"aliyun/qwen-turbo\","
+  echo "        \"model\": \"qwen-turbo\","
   echo '        "messages": ['
   echo "          {"
   echo '            "role": "user",'
