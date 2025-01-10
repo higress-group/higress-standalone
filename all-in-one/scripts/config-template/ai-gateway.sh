@@ -5,43 +5,43 @@ ROOT=$(pwd)
 cd - >/dev/null
 source $ROOT/../base.sh
 
-AI_PROXY_VERSION=${AI_PROXY_VERSION:-latest}
-MODEL_ROUTER_VERSION=${MODEL_ROUTER_VERSION:-latest}
+AI_PROXY_VERSION=${AI_PROXY_VERSION:-1.0.0}
+MODEL_ROUTER_VERSION=${MODEL_ROUTER_VERSION:-1.0.0}
 
 function initializeLlmProviderConfigs() {
   local EXTRA_CONFIGS=()
 
-  initializeLlmProviderConfig aliyun qwen DASHSCOPE dashscope.aliyuncs.com
-  initializeLlmProviderConfig moonshot moonshot MOONSHOT api.moonshot.cn
-  initializeLlmProviderConfig openai openai OPENAI api.openai.com
-  initializeLlmProviderConfig ai360 ai360 AI360 api.360.cn
-  initializeLlmProviderConfig github github GITHUB models.inference.ai.azure.com
-  initializeLlmProviderConfig groq groq GROQ api.groq.com
-  initializeLlmProviderConfig baichuan baichuan BAICHUAN api.baichuan-ai.com
-  initializeLlmProviderConfig yi yi YI api.lingyiwanwu.com
-  initializeLlmProviderConfig deepseek deepseek DEEPSEEK api.deepseek.com
-  initializeLlmProviderConfig zhipuai zhipuai ZHIPUAI open.bigmodel.cn
-  # initializeLlmProviderConfig baidu baidu BAIDU aip.baidubce.com
-  # initializeLlmProviderConfig hunyuan hunyuan HUNYUAN hunyuan.tencentcloudapi.com 443 "https" "" "${EXTRA_CONFIGS[@]}"
-  initializeLlmProviderConfig stepfun stepfun STEPFUN api.stepfun.com
-  # initializeLlmProviderConfig cloudflare cloudflare CLOUDFLARE api.cloudflare.com 443 "https" "" "${EXTRA_CONFIGS[@]}"
-  # initializeLlmProviderConfig spark spark SPARK spark-api-open.xf-yun.com 443 "https" "" "${EXTRA_CONFIGS[@]}"
-  initializeLlmProviderConfig gemini gemini GEMINI generativelanguage.googleapis.com
-  # initializeLlmProviderConfig deepl deepl DEEPL 443 "https" "" "${EXTRA_CONFIGS[@]}"
-  initializeLlmProviderConfig mistral mistral MISTRAL api.mistral.ai
-  initializeLlmProviderConfig cohere cohere COHERE api.cohere.com
-  initializeLlmProviderConfig doubao doubao DOUBAO ark.cn-beijing.volces.com
-  initializeLlmProviderConfig coze coze COZE api.coze.cn
+  initializeLlmProviderConfig aliyun qwen DASHSCOPE dashscope.aliyuncs.com "443" "https" "" "PRE" 'qwen-'
+  initializeLlmProviderConfig moonshot moonshot MOONSHOT api.moonshot.cn "443" "https" "" "PRE" 'moonshot-'
+  initializeLlmProviderConfig openai openai OPENAI api.openai.com "443" "https" "" "REGULAR" 'gpt\\-.*|o1\\-.*'
+  # initializeLlmProviderConfig ai360 ai360 AI360 api.360.cn "443" "https" "" "PRE" ""
+  # initializeLlmProviderConfig github github GITHUB models.inference.ai.azure.com "443" "https" "" "PRE" ""
+  # initializeLlmProviderConfig groq groq GROQ api.groq.com "443" "https" "" "PRE" ""
+  initializeLlmProviderConfig baichuan baichuan BAICHUAN api.baichuan-ai.com "443" "https" "" "PRE" "Baichuan"
+  initializeLlmProviderConfig yi yi YI api.lingyiwanwu.com "443" "https" "" "PRE" 'yi-'
+  initializeLlmProviderConfig deepseek deepseek DEEPSEEK api.deepseek.com "443" "https" "" "PRE" "deepseek"
+  initializeLlmProviderConfig zhipuai zhipuai ZHIPUAI open.bigmodel.cn "443" "https" "" "PRE" "GLM-"
+  # initializeLlmProviderConfig baidu baidu BAIDU aip.baidubce.com "443" "https" "" "PRE" "ERNIE-"
+  # initializeLlmProviderConfig hunyuan hunyuan HUNYUAN hunyuan.tencentcloudapi.com "443" "https" "" "PRE" "hunyuan-" "${EXTRA_CONFIGS[@]}"
+  initializeLlmProviderConfig stepfun stepfun STEPFUN api.stepfun.com "443" "https" "" "PRE" "step-"
+  # initializeLlmProviderConfig cloudflare cloudflare CLOUDFLARE api.cloudflare.com "443" "https" "" "PRE" "" "${EXTRA_CONFIGS[@]}"
+  # initializeLlmProviderConfig spark spark SPARK spark-api-open.xf-yun.com "443" "https" "" "PRE" "" "${EXTRA_CONFIGS[@]}"
+  # initializeLlmProviderConfig gemini gemini GEMINI generativelanguage.googleapis.com "443" "https" "" "PRE" "gemini-"
+  # initializeLlmProviderConfig deepl deepl DEEPL "443" "https" "" "PRE" "" "${EXTRA_CONFIGS[@]}"
+  # initializeLlmProviderConfig mistral mistral MISTRAL api.mistral.ai "443" "https" "" "PRE" ""
+  # initializeLlmProviderConfig cohere cohere COHERE api.cohere.com "443" "https" "" "PRE" ""
+  initializeLlmProviderConfig doubao doubao DOUBAO ark.cn-beijing.volces.com "443" "https" "" "PRE" "doubao-"
+  # initializeLlmProviderConfig coze coze COZE api.coze.cn "443" "https" "" "PRE" ""
 
-  if [ -z "$AZURE_SERVICE_URL" ]; then
-    AZURE_SERVICE_URL="https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=2024-06-01"
-  fi
-  extractHostFromUrl "$AZURE_SERVICE_URL"
-  local AZURE_SERVICE_DOMAIN="$HOST"
-  EXTRA_CONFIGS=(
-    "azureServiceUrl=$AZURE_SERVICE_URL"
-  )
-  initializeLlmProviderConfig azure azure AZURE "$AZURE_SERVICE_DOMAIN" "443" "https" "" "${EXTRA_CONFIGS[@]}"
+  # if [ -z "$AZURE_SERVICE_URL" ]; then
+  #   AZURE_SERVICE_URL="https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=2024-06-01"
+  # fi
+  # extractHostFromUrl "$AZURE_SERVICE_URL"
+  # local AZURE_SERVICE_DOMAIN="$HOST"
+  # EXTRA_CONFIGS=(
+  #   "azureServiceUrl=$AZURE_SERVICE_URL"
+  # )
+  # initializeLlmProviderConfig azure azure AZURE "$AZURE_SERVICE_DOMAIN" "443" "https" "" "PRE" "" "${EXTRA_CONFIGS[@]}"
 
   if [ -z "$CLAUDE_VERSION" ]; then
     CLAUDE_VERSION="2023-06-01"
@@ -49,22 +49,22 @@ function initializeLlmProviderConfigs() {
   EXTRA_CONFIGS=(
     "claudeVersion=\"$CLAUDE_VERSION\""
   )
-  initializeLlmProviderConfig claude claude CLAUDE api.anthropic.com "443" "https" "" "${EXTRA_CONFIGS[@]}"
+  initializeLlmProviderConfig claude claude CLAUDE api.anthropic.com "443" "https" "" "PRE" "claude-" "${EXTRA_CONFIGS[@]}"
 
-  if [ -z "$OLLAMA_SERVER_HOST" ]; then
-    OLLAMA_SERVER_HOST="YOUR_OLLAMA_SERVER_HOST"
-  fi
-  OLLAMA_SERVER_PORT="${OLLAMA_SERVER_PORT:-11434}"
-  EXTRA_CONFIGS=(
-    "ollamaServerHost=\"$OLLAMA_SERVER_HOST\""
-    "ollamaServerPort=$OLLAMA_SERVER_PORT"
-  )
-  initializeLlmProviderConfig ollama ollama OLLAMA "$OLLAMA_SERVER_HOST" "$OLLAMA_SERVER_PORT" "http" "" "${EXTRA_CONFIGS[@]}"
+  # if [ -z "$OLLAMA_SERVER_HOST" ]; then
+  #   OLLAMA_SERVER_HOST="YOUR_OLLAMA_SERVER_HOST"
+  # fi
+  # OLLAMA_SERVER_PORT="${OLLAMA_SERVER_PORT:-11434}"
+  # EXTRA_CONFIGS=(
+  #   "ollamaServerHost=\"$OLLAMA_SERVER_HOST\""
+  #   "ollamaServerPort=$OLLAMA_SERVER_PORT"
+  # )
+  # initializeLlmProviderConfig ollama ollama OLLAMA "$OLLAMA_SERVER_HOST" "$OLLAMA_SERVER_PORT" "http" "" "PRE" "" "${EXTRA_CONFIGS[@]}"
 
   EXTRA_CONFIGS=(
     "minimaxGroupId=\"$MINIMAX_GROUP_ID\""
   )
-  initializeLlmProviderConfig minimax minimax MINIMAX api.minimax.chat "443" "https" "" "${EXTRA_CONFIGS[@]}"
+  initializeLlmProviderConfig minimax minimax MINIMAX api.minimax.chat "443" "https" "" "PRE" "abab" "${EXTRA_CONFIGS[@]}"
 }
 
 function initializeLlmProviderConfig() {
@@ -82,12 +82,16 @@ function initializeLlmProviderConfig() {
   shift
   local DEFAULT_API_KEY="$1"
   shift
+  local MODEL_MATCH_TYPE="$1"
+  shift
+  local MODEL_MATCH_VALUE="$1"
+  shift
   local EXTRA_CONFIGS=("$@")
 
   appendAiRegistry "$NAME" "$DOMAIN" "$PORT" "$PROTOCOL"
   appendAiProxyConfigs "$NAME" "$TYPE" "$API_KEY_PREFIX" "$DEFAULT_API_KEY" "${EXTRA_CONFIGS[@]}"
-  generateAiIngress "$NAME"
-  generateAiRoute "$NAME"
+  generateAiIngress "$NAME" "$MODEL_MATCH_TYPE" "$MODEL_MATCH_VALUE"
+  generateAiRoute "$NAME" "$MODEL_MATCH_TYPE" "$MODEL_MATCH_VALUE"
 }
 
 function initializeSharedConfigs() {
@@ -142,12 +146,11 @@ metadata:
   resourceVersion: \"1\"
 spec:
   defaultConfig:
-    enable: true
-    add_header_key: x-higress-llm-provider
+    modelToHeader: x-higress-llm-model
   defaultConfigDisable: false
   failStrategy: FAIL_OPEN
-  phase: UNSPECIFIED_PHASE
-  priority: 260
+  phase: AUTHN
+  priority: 900
   url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/model-router:$MODEL_ROUTER_VERSION" >"$WASM_PLUGIN_CONFIG_FOLDER/model-router.internal.yaml"
 }
 
@@ -244,20 +247,29 @@ function appendAiRegistry() {
 
 function generateAiIngress() {
   local PROVIDER_NAME="$1"
+  local MODEL_MATCH_TYPE="$2"
+  local MODEL_MATCH_VALUE="$3"
 
   local INGRESS_NAME="ai-route-$PROVIDER_NAME.internal"
   local INGRESS_FILE="/data/ingresses/$INGRESS_NAME.yaml"
 
   mkdir -p /data/ingresses
 
+  local HEADER_MATCH_ANNOTATION_PREFIX="unknown"
+  if [ "$MODEL_MATCH_TYPE" == "PRE" ]; then
+    HEADER_MATCH_ANNOTATION_PREFIX="prefix"
+  elif [ "$MODEL_MATCH_TYPE" == "REGULAR" ]; then
+    HEADER_MATCH_ANNOTATION_PREFIX="regex"
+  fi
+
   cat <<EOF >"$INGRESS_FILE"
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   annotations:
-    higress.io/destination: $LAST_SERVICE_NAME:$LAST_SERVICE_PORT
+    higress.io/destination: "$LAST_SERVICE_NAME:$LAST_SERVICE_PORT"
     higress.io/ignore-path-case: "false"
-    higress.io/exact-match-header-x-higress-llm-provider: $PROVIDER_NAME
+    higress.io/$HEADER_MATCH_ANNOTATION_PREFIX-match-header-x-higress-llm-model: "$MODEL_MATCH_VALUE"
   labels:
     higress.io/resource-definer: higress
   name: $INGRESS_NAME
@@ -280,8 +292,10 @@ EOF
 
 function generateAiRoute() {
   local ROUTE_NAME="$1"
+  local MODEL_MATCH_TYPE="$2"
+  local MODEL_MATCH_VALUE="$3"
 
-  local CONFIG_MAP_NAME="ai-route-$ROUTE_NAME.internal"
+  local CONFIG_MAP_NAME="ai-route-$ROUTE_NAME"
   local CONFIG_MAP_FILE="/data/configmaps/$CONFIG_MAP_NAME.yaml"
 
   mkdir -p /data/configmaps
@@ -305,10 +319,12 @@ data:
           "provider": "$ROUTE_NAME"
         }
       ],
-      "modelPredicate": {
-        "enabled": true,
-        "prefix": "$ROUTE_NAME"
-      },
+      "modelPredicates": [
+        {
+          "matchType": "$MODEL_MATCH_TYPE",
+          "matchValue": "$MODEL_MATCH_VALUE"
+        }
+      ],
       "version": "1"
     }
 EOF
