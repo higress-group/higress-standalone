@@ -6,7 +6,10 @@ cd - >/dev/null
 source $ROOT/../base.sh
 
 AI_PROXY_VERSION=${AI_PROXY_VERSION:-1.0.0}
+AI_STATISTICS_VERSION=${AI_STATISTICS_VERSION:-1.0.0}
 MODEL_ROUTER_VERSION=${MODEL_ROUTER_VERSION:-1.0.0}
+
+declare -a GENERATED_INGRESSES
 
 function initializeLlmProviderConfigs() {
   local EXTRA_CONFIGS=()
@@ -128,6 +131,52 @@ spec:
   phase: UNSPECIFIED_PHASE
   priority: 100
   url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/ai-proxy:$AI_PROXY_VERSION" >"$WASM_PLUGIN_CONFIG_FOLDER/ai-proxy.internal.yaml"
+
+AI_STATISTICS_MATCH_RULES=""
+for i in "${GENERATED_INGRESSES[@]}"
+do
+  AI_STATISTICS_MATCH_RULES="$AI_STATISTICS_MATCH_RULES
+  - config:
+      attributes:
+      - apply_to_log: true
+        key: question
+        value: messages.@reverse.0.content
+        value_source: request_body
+      - apply_to_log: true
+        key: answer
+        rule: append
+        value: choices.0.delta.content
+        value_source: response_streaming_body
+      - apply_to_log: true
+        key: answer
+        value: choices.0.message.content
+        value_source: response_body
+    configDisable: false
+    ingress:
+    - $i"
+done
+  echo -e "\
+apiVersion: extensions.higress.io/v1alpha1
+kind: WasmPlugin
+metadata:
+  annotations:
+    higress.io/wasm-plugin-title: AI Statistics
+  labels:
+    higress.io/resource-definer: higress
+    higress.io/wasm-plugin-built-in: \"true\"
+    higress.io/wasm-plugin-category: ai
+    higress.io/wasm-plugin-name: ai-statistics
+    higress.io/wasm-plugin-version: 1.0.0
+  name: ai-statistics-1.0.0
+  namespace: higress-system
+  resourceVersion: \"1\"
+spec:
+  defaultConfigDisable: true
+  failStrategy: FAIL_OPEN
+  matchRules:$AI_STATISTICS_MATCH_RULES
+  phase: UNSPECIFIED_PHASE
+  priority: 900
+  url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/ai-statistics:$AI_STATISTICS_VERSION" >"$WASM_PLUGIN_CONFIG_FOLDER/ai-statistics-1.0.0.yaml"
 
   echo -e "\
 apiVersion: extensions.higress.io/v1alpha1
@@ -288,6 +337,8 @@ spec:
         path: /
         pathType: Prefix
 EOF
+
+  GENERATED_INGRESSES+=("$INGRESS_NAME")
 }
 
 function generateAiRoute() {
