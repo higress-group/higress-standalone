@@ -4,7 +4,12 @@ on:
   push:
     tags:
     - "runner-v*.*.*"
-  workflow_dispatch: ~
+  workflow_dispatch:
+    inputs:
+      set_to_latest:
+        description: 'Set to latest (no need to check for "main" branch)'
+        required: true
+        type: boolean
 
 jobs:
   build-runner-image:
@@ -60,6 +65,9 @@ jobs:
         run: |
           cd src/runner/
           readarray -t IMAGES <<< "${{ steps.docker-meta.outputs.tags }}"
+          if [ "${{ inputs.set_to_latest }}" == "true" ] && [[ ! "${IMAGES[*]}" =~ ":latest" ]]; then
+            IMAGES+=("${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:latest")
+          fi
           baseImage=""
           for image in ${IMAGES[@]}; do
             echo "Image: $image"
