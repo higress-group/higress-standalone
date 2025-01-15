@@ -1,7 +1,7 @@
 ARG HUB=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress
 ARG BASE_VERSION=2022-10-27T19-02-22
-ARG CORE_VERSION=2.0.6-rc.1
-ARG CONSOLE_VERSION=2.0.0
+ARG CORE_VERSION=2.0.6-rc.2
+ARG CONSOLE_VERSION=2.0.1
 ARG APISERVER_VERSION=0.0.19
 ARG PROMETHEUS_VERSION=v2.40.7
 ARG PROMTAIL_VERSION=2.9.4
@@ -10,8 +10,7 @@ ARG GRAFANA_VERSION=9.3.6
 
 FROM ${HUB}/api-server:${APISERVER_VERSION} AS apiserver
 FROM ${HUB}/higress:${CORE_VERSION} AS controller
-# FROM ${HUB}/pilot:${CORE_VERSION} AS pilot
-FROM ${HUB}/pilot:743ae53ed47f50e9b1f7acc3fdd8ced8068cf3ee AS pilot
+FROM ${HUB}/pilot:${CORE_VERSION} AS pilot
 FROM ${HUB}/gateway:${CORE_VERSION} AS gateway
 FROM ${HUB}/console:${CONSOLE_VERSION} AS console
 FROM ${HUB}/prometheus:${PROMETHEUS_VERSION} AS prometheus
