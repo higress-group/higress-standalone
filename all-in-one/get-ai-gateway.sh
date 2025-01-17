@@ -136,6 +136,7 @@ resetEnv() {
   LLM_ENVS=()
 }
 
+# Configuration wizard
 runConfigWizard() {
   echo "Provide a key for each LLM provider you want to enable, then press Enter."
   echo "If no key is provided and Enter is pressed, configuration for that provider will be skipped."
@@ -185,15 +186,14 @@ runConfigWizard() {
       i+=1
       echo "${i}. ${mark}${providerName}"
     done
-    read -r -p "Please choose an LLM service provider to configure (1~$i, 0 to break): " selectedIndex
+    read -r -p "Please choose an LLM service provider to configure (1~$i, press Enter alone to break): " selectedIndex
 
     case $selectedIndex in
-    '' | *[!0-9]*) ;;
+    '') break ;;  # Breaks the loop if the input is an empty string
+    *[!0-9]*) ;;  # Handles invalid input where characters are non-numeric
     *)
       selectedIndex=$((selectedIndex))
-      if [ $selectedIndex -eq 0 ]; then
-        break
-      elif [ $selectedIndex -gt $i ]; then
+      if [ $selectedIndex -gt $i ]; then
         echo "Incorrect option number."
       else
         local provider=${providers[$selectedIndex - 1]}
