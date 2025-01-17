@@ -14,6 +14,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+# Create a file descriptor for reading user input
+exec 3</dev/tty
+
 DOCKER_COMMAND="docker"
 
 HAS_DOCKER="$(type "docker" &>/dev/null && echo true || echo false)"
@@ -186,14 +189,14 @@ runConfigWizard() {
       i+=1
       echo "${i}. ${mark}${providerName}"
     done
-    read -r -p "Please choose an LLM service provider to configure (1~$i, press Enter alone to break): " selectedIndex
+    read -r -u 3 -p "Please choose an LLM service provider to configure (1~$i, press Enter alone to break): " selectedIndex
 
     case $selectedIndex in
     '') break ;;  # Breaks the loop if the input is an empty string
-    *[!0-9]*) ;;  # Handles invalid input where characters are non-numeric
+    *[!0-9]*) echo "Please enter option number." ;;  # Handles invalid input where characters are non-numeric
     *)
       selectedIndex=$((selectedIndex))
-      if [ $selectedIndex -gt $i ]; then
+      if [ $selectedIndex -gt $i ] || [ $selectedIndex -eq 0 ]; then
         echo "Incorrect option number."
       else
         local provider=${providers[$selectedIndex - 1]}
@@ -206,7 +209,7 @@ runConfigWizard() {
           $customConfigFunction
         else
           local token=""
-          read -r -p "→ Enter API Key for ${providerName}: " token
+          read -r -u 3 -p "→ Enter API Key for ${providerName}: " token
           IFS= read -r -d '' "${apiKeyVarName}" <<<"$token"
           LLM_ENVS+=("${apiKeyVarName}")
         fi
@@ -220,18 +223,18 @@ runConfigWizard() {
 
 configureAzureProvider() {
   for (( ; ; )); do
-    read -r -p "→ Enter Azure OpenAI service URL (Sample: https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=2024-06-01): " AZURE_SERVICE_URL
+    read -r -u 3 -p "→ Enter Azure OpenAI service URL (Sample: https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=2024-06-01): " AZURE_SERVICE_URL
     if [[ "$AZURE_SERVICE_URL" == "https://"* ]]; then
       break
     fi
     echo 'URL must start with "https://"'
   done
-  read -r -p "→ Enter API Key for Azure OpenAI: " AZURE_API_KEY
+  read -r -u 3 -p "→ Enter API Key for Azure OpenAI: " AZURE_API_KEY
   LLM_ENVS+=("AZURE_SERVICE_URL" "AZURE_API_KEY")
 }
 
 configureOllamaProvider() {
-  read -r -p "→ Enter Ollama server host: " OLLAMA_SERVER_HOST
+  read -r -u 3 -p "→ Enter Ollama server host: " OLLAMA_SERVER_HOST
   readPortWithDefault "→ Enter Ollama server port (Default: 11434): " 11434
   OLLAMA_SERVER_PORT="$input"
   if [ -n "$OLLAMA_SERVER_HOST" ]; then
@@ -242,7 +245,7 @@ configureOllamaProvider() {
 }
 
 configureClaudeProvider() {
-  read -r -p "→ Enter API Key for Claude: " CLAUDE_API_KEY
+  read -r -u 3 -p "→ Enter API Key for Claude: " CLAUDE_API_KEY
   local DEFAULT_CLAUDE_VERSION="2023-06-01"
   readWithDefault "→ Enter API version for Claude (Default: $DEFAULT_CLAUDE_VERSION): " $DEFAULT_CLAUDE_VERSION
   CLAUDE_VERSION="$input"
@@ -250,8 +253,8 @@ configureClaudeProvider() {
 }
 
 configureMinimaxProvider() {
-  read -r -p "→ Enter API Key for Minimax: " MINIMAX_API_KEY
-  read -r -p "→ Enter group ID for Minimax (only required when using ChatCompletion Pro): " MINIMAX_GROUP_ID
+  read -r -u 3 -p "→ Enter API Key for Minimax: " MINIMAX_API_KEY
+  read -r -u 3 -p "→ Enter group ID for Minimax (only required when using ChatCompletion Pro): " MINIMAX_GROUP_ID
   LLM_ENVS+=("MINIMAX_API_KEY" "MINIMAX_GROUP_ID")
 }
 
@@ -269,7 +272,7 @@ configureStorage() {
 readNonEmpty() {
   # $1 prompt
   while true; do
-    read -r -p "$1" input
+    read -r -u 3 -p "$1" input
     if [ -n "$input" ]; then
       break
     fi
@@ -279,7 +282,7 @@ readNonEmpty() {
 readWithDefault() {
   # $1 prompt
   # $2 default
-  read -r -p "$1" input
+  read -r -u 3 -p "$1" input
   if [ -z "$input" ]; then
     input="$2"
   fi
@@ -289,7 +292,7 @@ readPortWithDefault() {
   # $1 prompt
   # $2 default
   for (( ; ; )); do
-    read -r -p "$1" input
+    read -r -u 3 -p "$1" input
     if [ -z "$input" ]; then
       input="$2"
       break
