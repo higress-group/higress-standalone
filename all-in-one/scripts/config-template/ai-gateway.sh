@@ -16,35 +16,35 @@ function initializeLlmProviderConfigs() {
 
   initializeLlmProviderConfig aliyun qwen DASHSCOPE dashscope.aliyuncs.com "443" "https" "" "PRE" 'qwen-'
   initializeLlmProviderConfig moonshot moonshot MOONSHOT api.moonshot.cn "443" "https" "" "PRE" 'moonshot-'
-  initializeLlmProviderConfig openai openai OPENAI api.openai.com "443" "https" "" "REGULAR" 'gpt\\-.*|o1\\-.*'
-  # initializeLlmProviderConfig ai360 ai360 AI360 api.360.cn "443" "https" "" "PRE" ""
+  initializeLlmProviderConfig openai openai OPENAI api.openai.com "443" "https" "" "REGULAR" 'gpt-.*|o1-.*|o3-.*'
+  initializeLlmProviderConfig ai360 ai360 AI360 api.360.cn "443" "https" "" "PRE" "360GPT"
   # initializeLlmProviderConfig github github GITHUB models.inference.ai.azure.com "443" "https" "" "PRE" ""
   # initializeLlmProviderConfig groq groq GROQ api.groq.com "443" "https" "" "PRE" ""
   initializeLlmProviderConfig baichuan baichuan BAICHUAN api.baichuan-ai.com "443" "https" "" "PRE" "Baichuan"
   initializeLlmProviderConfig yi yi YI api.lingyiwanwu.com "443" "https" "" "PRE" 'yi-'
   initializeLlmProviderConfig deepseek deepseek DEEPSEEK api.deepseek.com "443" "https" "" "PRE" "deepseek"
   initializeLlmProviderConfig zhipuai zhipuai ZHIPUAI open.bigmodel.cn "443" "https" "" "PRE" "GLM-"
-  # initializeLlmProviderConfig baidu baidu BAIDU aip.baidubce.com "443" "https" "" "PRE" "ERNIE-"
+  initializeLlmProviderConfig baidu baidu BAIDU qianfan.baidubce.com "443" "https" "" "PRE" "ERNIE-"
   # initializeLlmProviderConfig hunyuan hunyuan HUNYUAN hunyuan.tencentcloudapi.com "443" "https" "" "PRE" "hunyuan-" "${EXTRA_CONFIGS[@]}"
   initializeLlmProviderConfig stepfun stepfun STEPFUN api.stepfun.com "443" "https" "" "PRE" "step-"
   # initializeLlmProviderConfig cloudflare cloudflare CLOUDFLARE api.cloudflare.com "443" "https" "" "PRE" "" "${EXTRA_CONFIGS[@]}"
   # initializeLlmProviderConfig spark spark SPARK spark-api-open.xf-yun.com "443" "https" "" "PRE" "" "${EXTRA_CONFIGS[@]}"
-  # initializeLlmProviderConfig gemini gemini GEMINI generativelanguage.googleapis.com "443" "https" "" "PRE" "gemini-"
+  initializeLlmProviderConfig gemini gemini GEMINI generativelanguage.googleapis.com "443" "https" "" "PRE" "gemini-"
   # initializeLlmProviderConfig deepl deepl DEEPL "443" "https" "" "PRE" "" "${EXTRA_CONFIGS[@]}"
-  # initializeLlmProviderConfig mistral mistral MISTRAL api.mistral.ai "443" "https" "" "PRE" ""
-  # initializeLlmProviderConfig cohere cohere COHERE api.cohere.com "443" "https" "" "PRE" ""
+  initializeLlmProviderConfig mistral mistral MISTRAL api.mistral.ai "443" "https" "" "REGULAR" 'open-mistral-.*|mistral-.*'
+  initializeLlmProviderConfig cohere cohere COHERE api.cohere.com "443" "https" "" "REGULAR" 'command|command-.*'
   initializeLlmProviderConfig doubao doubao DOUBAO ark.cn-beijing.volces.com "443" "https" "" "PRE" "doubao-"
   # initializeLlmProviderConfig coze coze COZE api.coze.cn "443" "https" "" "PRE" ""
 
-  # if [ -z "$AZURE_SERVICE_URL" ]; then
-  #   AZURE_SERVICE_URL="https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=2024-06-01"
-  # fi
-  # extractHostFromUrl "$AZURE_SERVICE_URL"
-  # local AZURE_SERVICE_DOMAIN="$HOST"
-  # EXTRA_CONFIGS=(
-  #   "azureServiceUrl=$AZURE_SERVICE_URL"
-  # )
-  # initializeLlmProviderConfig azure azure AZURE "$AZURE_SERVICE_DOMAIN" "443" "https" "" "PRE" "" "${EXTRA_CONFIGS[@]}"
+  if [ -z "$AZURE_SERVICE_URL" ]; then
+    AZURE_SERVICE_URL="https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=2024-06-01"
+  fi
+  extractHostFromUrl "$AZURE_SERVICE_URL"
+  local AZURE_SERVICE_DOMAIN="$HOST"
+  EXTRA_CONFIGS=(
+    "azureServiceUrl=$AZURE_SERVICE_URL"
+  )
+  initializeLlmProviderConfig azure azure AZURE "$AZURE_SERVICE_DOMAIN" "443" "https" "" "REGULAR" 'gpt-.*|o1-.*|o3-.*' "${EXTRA_CONFIGS[@]}"
 
   if [ -z "$CLAUDE_VERSION" ]; then
     CLAUDE_VERSION="2023-06-01"
@@ -54,15 +54,15 @@ function initializeLlmProviderConfigs() {
   )
   initializeLlmProviderConfig claude claude CLAUDE api.anthropic.com "443" "https" "" "PRE" "claude-" "${EXTRA_CONFIGS[@]}"
 
-  # if [ -z "$OLLAMA_SERVER_HOST" ]; then
-  #   OLLAMA_SERVER_HOST="YOUR_OLLAMA_SERVER_HOST"
-  # fi
-  # OLLAMA_SERVER_PORT="${OLLAMA_SERVER_PORT:-11434}"
-  # EXTRA_CONFIGS=(
-  #   "ollamaServerHost=\"$OLLAMA_SERVER_HOST\""
-  #   "ollamaServerPort=$OLLAMA_SERVER_PORT"
-  # )
-  # initializeLlmProviderConfig ollama ollama OLLAMA "$OLLAMA_SERVER_HOST" "$OLLAMA_SERVER_PORT" "http" "" "PRE" "" "${EXTRA_CONFIGS[@]}"
+  if [ -z "$OLLAMA_SERVER_HOST" ]; then
+    OLLAMA_SERVER_HOST="YOUR_OLLAMA_SERVER_HOST"
+  fi
+  OLLAMA_SERVER_PORT="${OLLAMA_SERVER_PORT:-11434}"
+  EXTRA_CONFIGS=(
+    "ollamaServerHost=\"$OLLAMA_SERVER_HOST\""
+    "ollamaServerPort=$OLLAMA_SERVER_PORT"
+  )
+  initializeLlmProviderConfig ollama ollama OLLAMA "$OLLAMA_SERVER_HOST" "$OLLAMA_SERVER_PORT" "http" "" "REGULAR" 'codellama.*|llama.*' "${EXTRA_CONFIGS[@]}"
 
   EXTRA_CONFIGS=(
     "minimaxGroupId=\"$MINIMAX_GROUP_ID\""
