@@ -100,6 +100,7 @@ function initializeLlmProviderConfig() {
 function initializeSharedConfigs() {
   initializeWasmPlugins
   initializeMcpBridge
+  initializeConsole
 }
 
 function initializeWasmPlugins() {
@@ -258,6 +259,10 @@ function initializeMcpBridge() {
   # AI_REGISTRIES_END" '{gsub(/# AI_REGISTRIES_PLACEHOLDER/,r)}1' default.yaml >default-new.yaml
   mv default-new.yaml default.yaml
   cd -
+}
+
+function initializeConsole() {
+  sed -i -E 's|index.redirect-target:.*$|index.redirect-target: /ai/route|' /data/configmaps/higress-console.yaml
 }
 
 function appendAiRegistry() {
