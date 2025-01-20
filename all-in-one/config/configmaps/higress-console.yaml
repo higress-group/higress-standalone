@@ -2,6 +2,7 @@ apiVersion: v1
 data:
   mode: standalone
   system.initialized: "false"
+  index.redirect-target: ~
 kind: ConfigMap
 metadata:
   labels:
