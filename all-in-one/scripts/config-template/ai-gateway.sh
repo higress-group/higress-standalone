@@ -16,7 +16,9 @@ function initializeLlmProviderConfigs() {
 
   initializeLlmProviderConfig aliyun qwen DASHSCOPE dashscope.aliyuncs.com "443" "https" "" "PRE" 'qwen-'
   initializeLlmProviderConfig moonshot moonshot MOONSHOT api.moonshot.cn "443" "https" "" "PRE" 'moonshot-'
-  initializeLlmProviderConfig openai openai OPENAI api.openai.com "443" "https" "" "REGULAR" 'gpt-.*|o1-.*|o3-.*'
+  if [ -z "$AZURE_API_KEY" ]; then
+    initializeLlmProviderConfig openai openai OPENAI api.openai.com "443" "https" "" "REGULAR" 'gpt-.*|o1-.*|o3-.*'
+  fi
   initializeLlmProviderConfig ai360 ai360 AI360 api.360.cn "443" "https" "" "PRE" "360GPT"
   # initializeLlmProviderConfig github github GITHUB models.inference.ai.azure.com "443" "https" "" "PRE" ""
   # initializeLlmProviderConfig groq groq GROQ api.groq.com "443" "https" "" "PRE" ""
@@ -36,15 +38,17 @@ function initializeLlmProviderConfigs() {
   initializeLlmProviderConfig doubao doubao DOUBAO ark.cn-beijing.volces.com "443" "https" "" "PRE" "doubao-"
   # initializeLlmProviderConfig coze coze COZE api.coze.cn "443" "https" "" "PRE" ""
 
-  if [ -z "$AZURE_SERVICE_URL" ]; then
-    AZURE_SERVICE_URL="https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=2024-06-01"
+  if [ -z "$OPENAI_API_KEY" ]; then
+    if [ -z "$AZURE_SERVICE_URL" ]; then
+      AZURE_SERVICE_URL="https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=2024-06-01"
+    fi
+    extractHostFromUrl "$AZURE_SERVICE_URL"
+    local AZURE_SERVICE_DOMAIN="$HOST"
+    EXTRA_CONFIGS=(
+      "azureServiceUrl=$AZURE_SERVICE_URL"
+    )
+    initializeLlmProviderConfig azure azure AZURE "$AZURE_SERVICE_DOMAIN" "443" "https" "" "REGULAR" 'gpt-.*|o1-.*|o3-.*' "${EXTRA_CONFIGS[@]}"
   fi
-  extractHostFromUrl "$AZURE_SERVICE_URL"
-  local AZURE_SERVICE_DOMAIN="$HOST"
-  EXTRA_CONFIGS=(
-    "azureServiceUrl=$AZURE_SERVICE_URL"
-  )
-  initializeLlmProviderConfig azure azure AZURE "$AZURE_SERVICE_DOMAIN" "443" "https" "" "REGULAR" 'gpt-.*|o1-.*|o3-.*' "${EXTRA_CONFIGS[@]}"
 
   if [ -z "$CLAUDE_VERSION" ]; then
     CLAUDE_VERSION="2023-06-01"

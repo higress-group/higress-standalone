@@ -219,6 +219,12 @@ runConfigWizard() {
   done
 
   echo
+
+  # Validate only one between OpenAI and Azure OpenAI is configured
+  if [ -n "${OPENAI_API_KEY}" ] && [ -n "${AZURE_API_KEY}" ]; then
+    echo "Error: Can only configure either OpenAI or Azure OpenAI, not both"
+    exit 1
+  fi
 }
 
 configureAzureProvider() {
