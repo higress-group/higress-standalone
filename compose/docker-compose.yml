@@ -316,6 +316,9 @@ services:
     command:
       - -config.file=/etc/loki/config/config.yaml
       - -target=all
+    depends_on:
+      prepare:
+        condition: service_completed_successfully
     networks:
       higress-net:
         aliases:

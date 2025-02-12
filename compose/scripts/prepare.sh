@@ -3,6 +3,7 @@
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 VOLUMES_ROOT="/mnt/volumes"
+RSA_KEY_LENGTH=4096
 
 API_SERVER_BASE_URL="https://apiserver:8443"
 
@@ -191,31 +192,72 @@ EOF
 checkPilot() {
   echo "Checking pilot configurations..."
 
-  if [ ! -d "$VOLUMES_ROOT/pilot/" ]; then
-    echo "  The volume of pilot is missing."
-    exit -1
-  fi
+  mkdir -p $VOLUMES_ROOT/pilot/cacerts && cd "$_"
 
-  if [ ! -d "$VOLUMES_ROOT/pilot/cacerts/" ]; then
-    echo "  The cacerts folder of pilot is missing."
-    exit -1
-  fi
-  cd $VOLUMES_ROOT/pilot/cacerts
+  openssl req -newkey rsa:$RSA_KEY_LENGTH -nodes -keyout root-key.pem -x509 -days 36500 -out root-cert.pem >/dev/null 2>&1 <<EOF
+CN
+Shanghai
+Shanghai
+Higress
+Gateway
+Root CA
+rootca@higress.io
 
-  if [ ! -f root-key.pem ] || [ ! -f root-cert.pem ]; then
-    echo "  The root CA certificate files of pilot are missing."
-    exit -1
-  fi
 
-  if [ ! -f ca-key.pem ] || [ ! -f ca-cert.pem ] || [ ! -f cert-chain.pem ]; then
-    echo "  The CA certificate files of pilot are missing."
-    exit -1
-  fi
+EOF
+  checkExitCode "  Generating Root CA certificate for pilot fails with $?"
 
-  if [ ! -f gateway-key.pem ] || [ ! -f gateway-cert.pem ]; then
-    echo "  The gateway certificate files of pilot are missing."
-    exit -1
-  fi
+  cat <<EOF >ca.cfg
+[req]
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+prompt = no
+
+[req_distinguished_name]
+C = CN
+ST = Shanghai
+L = Shanghai
+O = Higress
+CN = Higress CA
+
+[v3_req]
+keyUsage = keyCertSign
+basicConstraints = CA:TRUE
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = ca.higress.io
+EOF
+  openssl genrsa -out ca-key.pem $RSA_KEY_LENGTH >/dev/null &&
+    openssl req -new -key ca-key.pem -out ca-cert.csr -config ca.cfg -batch -sha256 >/dev/null 2>&1 &&
+    openssl x509 -req -days 36500 -in ca-cert.csr -sha256 -CA root-cert.pem -CAkey root-key.pem -CAcreateserial -out ca-cert.pem -extensions v3_req -extfile ca.cfg >/dev/null 2>&1
+  checkExitCode "Generating intermedia CA certificate for pilot fails with $?"
+  cp ca-cert.pem cert-chain.pem >/dev/null
+  chmod a+r ca-key.pem
+  rm ./*csr >/dev/null
+
+  cat <<EOF >gateway.cfg
+[req]
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+prompt = no
+
+[req_distinguished_name]
+C = CN
+ST = Shanghai
+L = Shanghai
+O = Higress
+CN = Higress Gateway
+
+[v3_req]
+keyUsage = digitalSignature, keyEncipherment
+subjectAltName = URI:spiffe://cluster.local/ns/higress-system/sa/higress-gateway
+EOF
+  openssl genrsa -out gateway-key.pem $RSA_KEY_LENGTH >/dev/null &&
+    openssl req -new -key gateway-key.pem -out gateway-cert.csr -config gateway.cfg -batch -sha256 >/dev/null 2>&1 &&
+    openssl x509 -req -days 36500 -in gateway-cert.csr -sha256 -CA ca-cert.pem -CAkey ca-key.pem -CAcreateserial -out gateway-cert.pem -extensions v3_req -extfile gateway.cfg >/dev/null 2>&1
+  checkExitCode "Generating certificate for gateway fails with $?"
+  chmod a+r gateway-key.pem
 
   checkConfigExists "higress-system" "v1" "configmaps" "higress-config"
   if [ $? -ne 0 ]; then
@@ -292,20 +334,24 @@ EOF
 checkGateway() {
   echo "Checking gateway configurations..."
 
-  if [ ! -d "$VOLUMES_ROOT/gateway/certs/" ]; then
-    echo "  The cacerts folder of gateway is missing."
-    exit -1
-  fi
-  cd $VOLUMES_ROOT/gateway/certs/
-  if [ ! -f "./root-cert.pem" ] && [ ! -f "./cert-chain.pem" ] && [ ! -f "./key.pem" ]; then
-    echo "  One or some of the certificate files of gateway is missing."
-    exit -1
+  mkdir -p $VOLUMES_ROOT/gateway/certs && cd "$_"
+  cp $VOLUMES_ROOT/pilot/cacerts/root-cert.pem ./root-cert.pem
+  cp $VOLUMES_ROOT/pilot/cacerts/gateway-cert.pem ./cert-chain.pem
+  cp $VOLUMES_ROOT/pilot/cacerts/gateway-key.pem ./key.pem
+  cat $VOLUMES_ROOT/pilot/cacerts/ca-cert.pem >>./cert-chain.pem
+
+  mkdir -p $VOLUMES_ROOT/gateway/podinfo && cd "$_"
+  if [ ! -f labels ]; then
+    cat <<EOF >./labels
+app="higress-gateway"
+higress="higress-system-higress-gateway"
+EOF
   fi
 
-  if [ ! -f "$VOLUMES_ROOT/gateway/podinfo/labels" ]; then
-    echo "  The labels file of gateway are missing."
-    exit -1
-  fi
+  mkdir -p $VOLUMES_ROOT/gateway/istio/data
+
+  mkdir -p $VOLUMES_ROOT/gateway/log
+  touch $VOLUMES_ROOT/gateway/log/access.log
 }
 
 checkConsole() {
@@ -419,57 +465,196 @@ EOF
 checkPrometheus() {
   echo "Checking Prometheus configurations..."
 
-  if [ ! -d "$VOLUMES_ROOT/prometheus/config/" ]; then
-    echo "  The config folder of Prometheus is missing."
-    exit -1
-  fi
-  if [ ! -f "$VOLUMES_ROOT/prometheus/config/prometheus.yaml" ] ; then
-    echo "  Prometheus config file prometheus.yaml is missing."
-    exit -1
-  fi
+  mkdir -p $VOLUMES_ROOT/prometheus/config && cd "$_"
+  cat <<EOF >./prometheus.yaml
+global:
+  scrape_interval:     15s 
+  evaluation_interval: 15s
+scrape_configs:
+  - job_name: 'prometheus'
+    metrics_path: /prometheus/metrics
+    static_configs:
+    - targets: ['localhost:9090']
+  - job_name: 'gateway'
+    metrics_path: /stats/prometheus
+    static_configs:
+    - targets: ['gateway:15020']
+      labels:
+        container: 'higress-gateway'
+        namespace: 'higress-system'
+        higress: 'higress-system-higress-gateway'
+        pod: 'higress'
+EOF
+
+  mkdir -p $VOLUMES_ROOT/prometheus/data
+  chmod a+rwx $VOLUMES_ROOT/prometheus/data
 }
 
 checkPromtail() {
   echo "Checking Promtail configurations..."
 
-  if [ ! -d "$VOLUMES_ROOT/promtail/config/" ]; then
-    echo "  The config folder of Promtail is missing."
-    exit -1
+  mkdir -p $VOLUMES_ROOT/promtail/config && cd "$_"
+  if [ ! -f promtail.yaml ]; then
+    cat <<EOF >./promtail.yaml
+server:
+  log_level: info
+  http_listen_port: 3101
+
+clients:
+- url: http://loki:3100/loki/api/v1/push
+
+positions:
+  filename: /var/promtail/promtail-positions.yaml
+target_config:
+  sync_period: 10s
+scrape_configs:
+- job_name: access-logs
+  static_configs:
+  - targets:
+    - localhost
+    labels:
+      __path__: /var/log/proxy/access.log
+  pipeline_stages:
+  - json:
+      expressions:
+        authority:
+        method:
+        path:
+        protocol:
+        request_id:
+        response_code:
+        response_flags:
+        route_name:
+        trace_id:
+        upstream_cluster:
+        upstream_host:
+        upstream_transport_failure_reason:
+        user_agent:
+        x_forwarded_for:
+  - labels:
+      authority:
+      method:
+      path:
+      protocol:
+      request_id:
+      response_code:
+      response_flags:
+      route_name:
+      trace_id:
+      upstream_cluster:
+      upstream_host:
+      upstream_transport_failure_reason:
+      user_agent:
+      x_forwarded_for:
+  - timestamp:
+      source: timestamp
+      format: RFC3339Nano
+EOF
   fi
-  if [ ! -f "$VOLUMES_ROOT/promtail/config/promtail.yaml" ] ; then
-    echo "  Promtail config file promtail.yaml is missing."
-    exit -1
-  fi
+
+  mkdir -p $VOLUMES_ROOT/promtail/data
+  chmod a+rwx $VOLUMES_ROOT/promtail/data
 }
 
 checkLoki() {
   echo "Checking Loki configurations..."
 
-  if [ ! -d "$VOLUMES_ROOT/loki/config/" ]; then
-    echo "  The config folder of Loki is missing."
-    exit -1
+  mkdir -p $VOLUMES_ROOT/loki/config && cd "$_"
+  if [ ! -f config.yaml ]; then
+    cat <<EOF >./config.yaml
+auth_enabled: false
+common:
+  compactor_address: 'loki'
+  path_prefix: /var/loki
+  replication_factor: 1
+  storage:
+    filesystem:
+      chunks_directory: /var/loki/chunks
+      rules_directory: /var/loki/rules
+frontend:
+  scheduler_address: ""
+frontend_worker:
+  scheduler_address: ""
+index_gateway:
+  mode: ring
+limits_config:
+  max_cache_freshness_per_query: 10m
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+  split_queries_by_interval: 15m
+memberlist:
+  join_members:
+  - loki
+query_range:
+  align_queries_with_step: true
+ruler:
+  storage:
+    type: local
+runtime_config:
+  file: /etc/loki/config/runtime-config.yaml
+schema_config:
+  configs:
+  - from: "2022-01-11"
+    index:
+      period: 24h
+      prefix: loki_index_
+    object_store: filesystem
+    schema: v12
+    store: boltdb-shipper
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9095
+storage_config:
+  hedging:
+    at: 250ms
+    max_per_second: 20
+    up_to: 3
+tracing:
+  enabled: false
+EOF
   fi
-  if [ ! -f "$VOLUMES_ROOT/loki/config/config.yaml" ] ; then
-    echo "  Loki config file config.yaml is missing."
-    exit -1
+  if [ ! -f runtime-config.yaml ]; then
+    cat <<EOF >./runtime-config.yaml
+{}
+EOF
   fi
-  if [ ! -f "$VOLUMES_ROOT/loki/config/runtime-config.yaml" ] ; then
-    echo "  Loki config file runtime-config.yaml is missing."
-    exit -1
-  fi
+
+  mkdir -p $VOLUMES_ROOT/loki/data/
+  chmod a+rwx $VOLUMES_ROOT/loki/data/
 }
 
 checkGrafana() {
   echo "Checking Grafana configurations..."
 
-  if [ ! -d "$VOLUMES_ROOT/grafana/config/" ]; then
-    echo "  The config folder of Grafana is missing."
-    exit -1
+  mkdir -p $VOLUMES_ROOT/grafana/config && cd "$_"
+  if [ ! -f grafana.ini ]; then
+    cat <<EOF >./grafana.ini
+[server]
+protocol=http
+domain=localhost
+root_url="%(protocol)s://%(domain)s/grafana"
+serve_from_sub_path=true
+
+[auth]
+disable_login_form=true
+disable_signout_menu=true
+
+[auth.anonymous]
+enabled=true
+org_name=Main Org.
+org_role=Viewer
+
+[users]
+default_theme=light
+viewers_can_edit=true
+
+[security]
+allow_embedding=true
+EOF
   fi
-  if [ ! -f "$VOLUMES_ROOT/grafana/config/grafana.ini" ] ; then
-    echo "  Grafana config file grafana.ini is missing."
-    exit -1
-  fi
+
+  mkdir -p $VOLUMES_ROOT/grafana/lib
+  chmod a+rwx $VOLUMES_ROOT/grafana/lib
 }
 
 checkO11y() {
