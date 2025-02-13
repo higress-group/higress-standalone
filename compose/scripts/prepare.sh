@@ -352,6 +352,37 @@ EOF
 
   mkdir -p $VOLUMES_ROOT/gateway/log
   touch $VOLUMES_ROOT/gateway/log/access.log
+
+  checkConfigExists "higress-system" "networking.istio.io/v1alpha3" "envoyfilters" "higress-gateway-global-custom-response"
+  if [ $? -ne 0 ]; then
+    echo "  The EnvoyFilter resource \"higress-gateway-global-custom-response\" doesn't exist. Create it now..."
+    read -r -d '' content <<EOF
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: higress-gateway-global-custom-response
+  namespace: higress-system
+  labels:
+    app: higress-gateway
+    higress: higress-system-higress-gateway
+spec:
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      context: GATEWAY
+      listener:
+        filterChain:
+          filter:
+            name: envoy.filters.network.http_connection_manager
+    patch:
+      operation: INSERT_FIRST
+      value:
+        name: envoy.filters.http.custom_response
+        typed_config:
+          '@type': type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.CustomResponse
+EOF
+    publishConfig "higress-system" "networking.istio.io/v1alpha3" "envoyfilters" "higress-gateway-global-custom-response" "$content"
+  fi
 }
 
 checkConsole() {
