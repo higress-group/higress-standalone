@@ -374,11 +374,11 @@ func (n *nacosREST) Delete(
 
 	oldObj, err := n.Get(ctx, name, nil)
 	if err != nil {
-		return nil, false, apierrors.NewInternalError(err)
+		return nil, false, err
 	}
 	if deleteValidation != nil {
 		if err := deleteValidation(ctx, oldObj); err != nil {
-			return nil, false, apierrors.NewInternalError(err)
+			return nil, false, apierrors.NewBadRequest(err.Error())
 		}
 	}
 
