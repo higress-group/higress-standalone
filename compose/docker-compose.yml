@@ -290,8 +290,6 @@ services:
       higress-net:
         aliases:
           - promtail.svc
-    ports:
-      - "3101:3101/tcp"
     healthcheck:
       disable: true
       # There is no curl or wget in the promtail image. We need to find another way to perform health check.
@@ -323,8 +321,6 @@ services:
       higress-net:
         aliases:
           - loki.svc
-    ports:
-      - "3100:3100/tcp"
     healthcheck:
       test:
         [
@@ -354,8 +350,6 @@ services:
       higress-net:
         aliases:
           - grafana.svc
-    ports:
-      - "3000:3000/tcp" 
     healthcheck:
       test:
         [
