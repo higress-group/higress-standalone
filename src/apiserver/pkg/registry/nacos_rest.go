@@ -16,6 +16,7 @@ import (
 
 	"github.com/alibaba/higress/api-server/pkg/options"
 	"github.com/alibaba/higress/api-server/pkg/utils"
+	"github.com/google/uuid"
 	"github.com/nacos-group/nacos-sdk-go/v2/clients/config_client"
 	"github.com/nacos-group/nacos-sdk-go/v2/common/constant"
 	"github.com/nacos-group/nacos-sdk-go/v2/model"
@@ -83,7 +84,7 @@ func NewNacosREST(
 		newFunc:        newFunc,
 		newListFunc:    newListFunc,
 		attrFunc:       attrFunc,
-		watchers:       make(map[int]*nacosWatch, 10),
+		watchers:       make(map[string]*nacosWatch, 10),
 		encryptionKey:  dataEncryptionKey,
 	}
 	n.namesDataId = n.dataIdPrefix + dataIdSeparator + namesSuffix
@@ -104,7 +105,7 @@ type nacosREST struct {
 	listRefreshTicker  *time.Ticker
 	listConfigListened int32
 	watchersMutex      sync.RWMutex
-	watchers           map[int]*nacosWatch
+	watchers           map[string]*nacosWatch
 
 	newFunc     func() runtime.Object
 	newListFunc func() runtime.Object
@@ -446,7 +447,7 @@ func (n *nacosREST) Watch(ctx context.Context, options *metainternalversion.List
 	ns, _ := genericapirequest.NamespaceFrom(ctx)
 	predicate := n.buildListPredicate(options)
 	nw := &nacosWatch{
-		id:        len(n.watchers),
+		id:        uuid.New().String(),
 		f:         n,
 		ch:        make(chan watch.Event, 1024),
 		ns:        ns,
@@ -738,7 +739,7 @@ func calculateMd5(str string) string {
 
 type nacosWatch struct {
 	f         *nacosREST
-	id        int
+	id        string
 	ch        chan watch.Event
 	ns        string
 	predicate *storage.SelectionPredicate
