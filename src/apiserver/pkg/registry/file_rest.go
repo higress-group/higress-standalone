@@ -30,6 +30,7 @@ import (
 
 	"github.com/alibaba/higress/api-server/pkg/utils"
 	"github.com/fsnotify/fsnotify"
+	"github.com/google/uuid"
 )
 
 const fileChangeProcessInterval = 100 * time.Millisecond
@@ -78,7 +79,7 @@ func NewFileREST(
 		newListFunc:    newListFunc,
 		attrFunc:       attrFunc,
 		dirWatcher:     watcher,
-		fileWatchers:   make(map[int]*fileWatch, 10),
+		fileWatchers:   make(map[string]*fileWatch, 10),
 	}
 	err = f.startDirWatcher()
 	if err != nil {
@@ -101,7 +102,7 @@ type fileREST struct {
 	fileChangeMutex         sync.Mutex
 	fileChangeProcessTicker *time.Ticker
 	dirWatcher              *fsnotify.Watcher
-	fileWatchers            map[int]*fileWatch
+	fileWatchers            map[string]*fileWatch
 	fileWatchersMutex       sync.RWMutex
 
 	newFunc     func() runtime.Object
@@ -643,7 +644,7 @@ func (f *fileREST) visitDir(dirname string, extension string, newFunc func() run
 
 func (f *fileREST) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	fw := &fileWatch{
-		id: len(f.fileWatchers),
+		id: uuid.New().String(),
 		f:  f,
 		ch: make(chan watch.Event, 10),
 	}
@@ -682,7 +683,7 @@ func (f *fileREST) predicateFunc(label labels.Selector, field fields.Selector) s
 
 type fileWatch struct {
 	f  *fileREST
-	id int
+	id string
 	ch chan watch.Event
 }
 
