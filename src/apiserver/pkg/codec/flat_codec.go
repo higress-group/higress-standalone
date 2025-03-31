@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"strconv"
+
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -19,7 +22,13 @@ var (
 
 	noApiVersionKindError = fmt.Errorf("the given data doesn't contain APIVersion and Kind data")
 	nonFlatResourceError  = fmt.Errorf("the given data doesn't represent a flat resource")
+
+	flatIngressEnabled bool
 )
+
+func init() {
+	flatIngressEnabled, _ = strconv.ParseBool(os.Getenv("FLAT_INGRESS_ENABLED"))
+}
 
 func NewFlatAwareCodec(groupResource schema.GroupResource, innerCodec runtime.Codec) runtime.Codec {
 	if v1IngressGvr.GroupResource() == groupResource {
@@ -35,7 +44,7 @@ type flatIngressCodec struct {
 
 func (c *flatIngressCodec) Encode(obj runtime.Object, w io.Writer) error {
 	ingress, ok := obj.(*networkingv1.Ingress)
-	if !ok {
+	if !ok || !flatIngressEnabled {
 		return c.innerCodec.Encode(obj, w)
 	}
 	fIngress := toFlatIngress(ingress)
