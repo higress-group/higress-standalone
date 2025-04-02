@@ -256,10 +256,6 @@ configureNacosByArgs() {
 
   if [ "$USE_BUILTIN_NACOS" == "Y" ] || [ -n "$CONFIG_URL" ]; then
     if [ "$USE_BUILTIN_NACOS" == "Y" ]; then
-      if [ "$ARCH" != "amd64" ]; then
-        echo "Sorry, built-in Nacos service doesn't support your platform. Please use a standalone Nacos service instead."
-        exit -1
-      fi
       COMPOSE_PROFILES="nacos"
       NACOS_SERVER_URL="$BUILTIN_NACOS_SERVER_URL"
     else
