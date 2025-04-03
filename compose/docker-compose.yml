@@ -6,7 +6,7 @@ networks:
 
 services:
   nacos:
-    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/nacos-server:${NACOS_SERVER_TAG:-v2.2.3}
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/nacos-server:${NACOS_SERVER_TAG:-v2.5.1}
     profiles: [ "nacos" ]
     env_file:
       - ./env/nacos.env
