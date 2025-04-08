@@ -33,6 +33,7 @@ COPY --from=pilot /usr/local/bin/higress-pilot-start.sh /usr/local/bin/higress-p
 
 # Install gateway
 COPY --from=gateway /var/lib/istio/envoy/*.json /var/lib/istio/envoy/
+COPY --from=gateway /var/lib/istio/envoy/*.so /var/lib/istio/envoy/
 COPY --from=gateway /usr/local/bin/pilot-agent /usr/local/bin/pilot-agent
 COPY --from=gateway /usr/local/bin/envoy /usr/local/bin/envoy
 COPY --from=gateway /usr/local/bin/higress-proxy-*.sh /usr/local/bin/
