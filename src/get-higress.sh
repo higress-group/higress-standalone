@@ -200,7 +200,7 @@ download() {
 
 # install installs the product.
 install() {
-  tar -zx --exclude="docs" --exclude="src" --exclude="test" -f "$HIGRESS_TMP_FILE" -C "$DESTINATION" --strip-components=1
+  tar -zx --exclude=".github" --exclude="all-in-one" --exclude="docs" --exclude="src" --exclude="test" --exclude="CODEOWNERS" -f "$HIGRESS_TMP_FILE" -C "$DESTINATION" --strip-components=1
   echo -n "$VERSION" > "$DESTINATION/VERSION"
   bash "$DESTINATION/bin/configure.sh" ${CONFIG_ARGS[@]}
 }
@@ -225,7 +225,7 @@ update() {
   download
   echo ""
 
-  tar -zx --exclude="docs" --exclude="src" --exclude="test" --exclude="compose/.env" -f "$HIGRESS_TMP_FILE" -C "$DESTINATION" --strip-components=1
+  tar -zx --exclude=".github" --exclude="all-in-one" --exclude="docs" --exclude="src" --exclude="test" --exclude="CODEOWNERS" --exclude="compose/.env" -f "$HIGRESS_TMP_FILE" -C "$DESTINATION" --strip-components=1
   tar -zx -f "$HIGRESS_TMP_FILE" -C "$DESTINATION" --transform='s/env/env_new/g' --strip-components=1 "higress-standalone-${VERSION#v}/compose/.env"
   bash "$DESTINATION/bin/update.sh"
   echo -n "$VERSION" > "$DESTINATION/VERSION"
