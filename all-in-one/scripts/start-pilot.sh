@@ -88,6 +88,7 @@ set -e
 
 initCerts
 
+PILOT_FILTER_GATEWAY_CLUSTER_CONFIG=${PILOT_FILTER_GATEWAY_CLUSTER_CONFIG:-true} \
 /usr/local/bin/pilot-discovery \
     discovery \
     --httpAddr=:15080 \
