@@ -64,14 +64,17 @@ COPY --from=grafana /usr/share/grafana /usr/share/grafana
 COPY --from=grafana /run.sh /usr/local/bin/grafana.sh
 
 # Install supervisord, logrotate, cron and initialize related folders
-RUN apt-get update --allow-unauthenticated && \
+RUN arch="$(dpkg --print-architecture)"; arch="${arch##*-}"; \
+  apt-get update --allow-unauthenticated; \
   apt-get install --no-install-recommends -y --allow-unauthenticated \
-  supervisor logrotate cron \
-  && apt-get upgrade -y --allow-unauthenticated \
-  && apt-get clean \
-  && rm -rf /var/log/*log /var/lib/apt/lists/* /var/log/apt/* /var/lib/dpkg/*-old /var/cache/debconf/*-old \
-  && mkdir -p /var/log/higress \
-  && mkdir /data
+    wget supervisor logrotate cron; \
+  apt-get upgrade -y --allow-unauthenticated; \
+  apt-get clean; \
+  rm -rf /var/log/*log /var/lib/apt/lists/* /var/log/apt/* /var/lib/dpkg/*-old /var/cache/debconf/*-old; \
+  wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$arch -O /usr/local/bin/yq && chmod +x /usr/local/bin/yq; \
+  mkdir -p /var/log/higress; \
+  mkdir /data;
+
 COPY ./supervisord/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Initialize configurations
