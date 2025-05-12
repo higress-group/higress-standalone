@@ -14,7 +14,7 @@ now() {
 }
 
 base64UrlEncode() {
-  openssl enc -base64 -A | tr '+/' '-_' | tr -d '='; 
+  openssl enc -base64 -A | tr '+/' '-_' | tr -d '='
 }
 
 checkExitCode() {
@@ -35,24 +35,39 @@ initializeConfigStorage() {
     ;;
   file)
     initializeConfigDir
-      ;;
-    *)
-      printf "Unsupported storage type: %s\n" "$CONFIG_STORAGE"
-      ;;
+    ;;
+  *)
+    printf "Unsupported storage type: %s\n" "$CONFIG_STORAGE"
+    ;;
   esac
 }
 
 initializeNacos() {
   nacosReady=false
 
+  nacosApiVersion=1
+
   maxWaitTime=180
-  for (( i = 0; i < $maxWaitTime; i++ ))
-  do
-    statusCode=$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/")
-    if [ "$statusCode" -eq "200" ]; then
+  for ((i = 0; i < $maxWaitTime; i++)); do
+    # We always check the readiness with v1 API. And it will return a 410 if it's actually v3.
+    statusCode=$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v2/core/cluster/node/self")
+    if [ "$statusCode" -eq "410" -a "$nacosApiVersion" -eq "1" ]; then
       nacosReady=true
-      echo "Nacos is ready."
+      nacosApiVersion=3
       break
+    elif [ "$statusCode" -eq "200" ]; then
+      nacosReady=true
+      # The previous request may return 200 in Nacos 3.x if the cluster has nacos.core.api.compatibility.admin.enabled set to true.
+      # So we need to double check here with a v3 API.
+      statusCode=$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v3/admin/core/state")
+      if [ "$statusCode" -eq "200" ]; then
+        nacosApiVersion=3
+      fi
+      break
+    fi
+    if [ $(($i % 5)) == 0 -a "$COMPOSE_PROFILES" != "nacos" ]; then
+      # No status echo for built-in nacos
+      echo "$healthCheckUrl returns $statusCode"
     fi
     echo "Waiting for Nacos to get ready..."
     sleep 1
@@ -60,28 +75,61 @@ initializeNacos() {
 
   if [ "${nacosReady}" != "true" ]; then
     echo "Nacos server doesn't get ready within ${maxWaitTime} seconds. Initialization failed."
-    exit -1 
+    exit -1
   fi
+
+  echo "Nacos is ready."
 
   echo "Initializing Nacos server..."
 
   if [ -n "$NACOS_USERNAME" ] && [ -n "$NACOS_PASSWORD" ]; then
-    NACOS_ACCESS_TOKEN="$(curl -s "${NACOS_SERVER_URL}/v1/auth/login" -X POST --data-urlencode "username=${NACOS_USERNAME}" --data-urlencode "password=${NACOS_PASSWORD}" | jq -rM '.accessToken')";
+    NACOS_ACCESS_TOKEN="$(curl -s "${NACOS_SERVER_URL}/v1/auth/login" -X POST --data-urlencode "username=${NACOS_USERNAME}" --data-urlencode "password=${NACOS_PASSWORD}" | jq -rM '.accessToken')"
+    # nacos-go-sdk is still using the API above for login. There is no need to support the new V3 API here.
+    # if [ "$nacosApiVersion" == "1" ]; then
+    #   NACOS_ACCESS_TOKEN="$(curl -s "${NACOS_SERVER_URL}/v1/auth/login" -X POST --data-urlencode "username=${NACOS_USERNAME}" --data-urlencode "password=${NACOS_PASSWORD}" | jq -rM '.accessToken')"
+    # elif [ "$nacosApiVersion" == "3" ]; then
+    #   NACOS_ACCESS_TOKEN="$(curl -s "${NACOS_SERVER_URL}/v3/auth/user/login" -X POST --data-urlencode "username=${NACOS_USERNAME}" --data-urlencode "password=${NACOS_PASSWORD}" | jq -rM '.accessToken')"
+    # else
+    #   echo "Unsupported Nacos API version: v$nacosApiVersion"
+    #   exit -1
+    # fi
     if [ -z "$NACOS_ACCESS_TOKEN" ]; then
       echo "Unable to retrieve access token from Nacos. Possible causes are:"
       echo "  1. Incorrect username or password."
       echo "  2. The target Nacos service doesn't have authentication enabled."
+      if [ "$nacosApiVersion" == "3" ]; then
+        echo "  3. When using Nacos 3.x, please make sure the following property is set to true:
+    nacos.core.api.compatibility.client.enabled=true"
+      fi
     fi
   fi
 
-  if grep -q "\"namespace\":\"${NACOS_NS}\"" <<<"$(curl -s "${NACOS_SERVER_URL}/v1/console/namespaces?accessToken=${NACOS_ACCESS_TOKEN}")"; then
+  if [ "$nacosApiVersion" == "3" ]; then
+    # TODO: Remove extra compatibility check after nacos-go-sdk fully supports Nacos 3.x
+    checkNacos3ApiCompatibility
+  fi
+
+  # Only $nacosApiVersion 1 and 3 are supported below.
+
+  echo "Use Nacos API v${nacosApiVersion}"
+
+  if [ "$nacosApiVersion" == "1" ]; then
+    namespacesResponse="$(curl -s "${NACOS_SERVER_URL}/v1/console/namespaces?accessToken=${NACOS_ACCESS_TOKEN}")"
+  elif [ "$nacosApiVersion" == "3" ]; then
+    namespacesResponse="$(curl -s "${NACOS_SERVER_URL}/v3/admin/core/namespace/list?accessToken=${NACOS_ACCESS_TOKEN}")"
+  fi
+  if grep -q "\"namespace\":\"${NACOS_NS}\"" <<<"$namespacesResponse"; then
     echo "  Namespace ${NACOS_NS} already exists in Nacos."
 
-    if [ "$NACOS_USE_RANDOM_DATA_ENC_KEY" != "Y" ]; then
+    if [ "$NACOS_USE_RANDOM_DATA_ENC_KEY" != "N" ]; then
       echo "  Fixed data encryption key is used. Skip config overwriting check."
     else
       echo "  Checking existed configs in namespace ${NACOS_NS}..."
-      statusCode="$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v2/cs/config?accessToken=${NACOS_ACCESS_TOKEN}&namespaceId=${NACOS_NS}&dataId=secrets.__names__&group=DEFAULT_GROUP")"
+      if [ "$nacosApiVersion" == "1" ]; then
+        statusCode="$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v2/cs/config?accessToken=${NACOS_ACCESS_TOKEN}&namespaceId=${NACOS_NS}&dataId=secrets.__names__&group=DEFAULT_GROUP")"
+      elif [ "$nacosApiVersion" == "3" ]; then
+        statusCode="$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v3/admin/cs/config?accessToken=${NACOS_ACCESS_TOKEN}&namespaceId=${NACOS_NS}&dataId=secrets.__names__&groupName=DEFAULT_GROUP")"
+      fi
       if [ $statusCode -eq 200 ]; then
         echo "  ERROR: Higress configs are found in nacos namespace ${NACOS_NS}."
         echo
@@ -103,12 +151,36 @@ initializeNacos() {
   fi
 
   echo "  Creating namespace ${NACOS_NS}..."
-  statusCode="$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v1/console/namespaces?accessToken=${NACOS_ACCESS_TOKEN}" --data-urlencode "customNamespaceId=${NACOS_NS}" --data-urlencode "namespaceName=${NACOS_NS}")"
+  if [ "$nacosApiVersion" == "1" ]; then
+    statusCode="$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v1/console/namespaces?accessToken=${NACOS_ACCESS_TOKEN}" --data-urlencode "customNamespaceId=${NACOS_NS}" --data-urlencode "namespaceName=${NACOS_NS}")"
+  elif [ "$nacosApiVersion" == "3" ]; then
+    statusCode="$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v3/admin/core/namespace?accessToken=${NACOS_ACCESS_TOKEN}" --data-urlencode "namespaceId=${NACOS_NS}" --data-urlencode "namespaceName=${NACOS_NS}")"
+  fi
   if [ $statusCode -ne 200 ]; then
     echo "  Creating namespace ${NACOS_NS} in nacos failed with $statusCode."
     exit -1
   fi
   return 0
+}
+
+checkNacos3ApiCompatibility() {
+  if [ "$nacosApiVersion" != "3" ]; then
+    return
+  fi
+  url="${NACOS_SERVER_URL}/v1/cs/configs?accessToken=${NACOS_ACCESS_TOKEN}&namespaceId=${NACOS_NS}&dataId=unknown-config-cd60cd4c&group=DEFAULT_GROUP&search=blur&pageNo=1&pageSize=10"
+  statusCode="$(curl -s -o /dev/null -w "%{http_code}" "$url")"
+  if [ $statusCode -eq 410 ]; then
+    echo "
+Nacos 3.x isn't fully supported yet.
+  
+If you do want to use Nacos 3.x, please add the following property into its application.properties file:
+  nacos.core.api.compatibility.console.enabled=true
+"
+    exit -1
+  elif [ $statusCode -ne 200 ]; then
+    echo "Unexpected status code $statusCode got from $url"
+    echo "Something might be wrong. But we can continue and keep an eye on it."
+  fi
 }
 
 initializeConfigDir() {
@@ -132,12 +204,12 @@ initializeApiServer() {
   if [ ! -f nacos.key ]; then
     echo "  Generating data encryption key..."
     if [ -z "$NACOS_DATA_ENC_KEY" ]; then
-      cat /dev/urandom | tr -dc '[:graph:]' | head -c 32 > nacos.key
+      cat /dev/urandom | tr -dc '[:graph:]' | head -c 32 >nacos.key
     else
-      echo -n "$NACOS_DATA_ENC_KEY" > nacos.key
+      echo -n "$NACOS_DATA_ENC_KEY" >nacos.key
     fi
   else
-    echo "  Data encryption key already exists.";
+    echo "  Data encryption key already exists."
   fi
 }
 
@@ -151,7 +223,6 @@ initializeController() {
     chmod a+w ./log/nacos
   fi
 }
-
 
 initializeConfigStorage
 initializeApiServer

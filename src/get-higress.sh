@@ -97,9 +97,12 @@ outputUsage() {
  -k, --data-enc-key=KEY     the key used to encrypt sensitive configurations
                             MUST contain 32 characters
                             A random key will be generated if unspecified
-     --nacos-port=NACOS-PORT
-                            the HTTP port used to access the built-in Nacos
+     --nacos-service-port=NACOS-SERVICE-PORT
+                            the HTTP port used to access the built-in Nacos service
                             default to 8848 if unspecified
+     --nacos-console-port=NACOS-CONSOLE-PORT
+                            the HTTP port used to access the built-in Nacos console
+                            default to 8888 if unspecified
      --gateway-http-port=GATEWAY-HTTP-PORT
                             the HTTP port to be listened by the gateway
                             default to 80 if unspecified

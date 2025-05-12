@@ -6,7 +6,8 @@ networks:
 
 services:
   nacos:
-    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/nacos-server:${NACOS_SERVER_TAG:-v2.5.1}
+    hostname: higress-nacos
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/nacos-server:${NACOS_SERVER_TAG}
     profiles: [ "nacos" ]
     env_file:
       - ./env/nacos.env
@@ -22,11 +23,13 @@ services:
     volumes:
       - ./volumes/nacos:/home/nacos/data
     ports:
+      - "${NACOS_CONSOLE_PORT:-8888}:8080/tcp"
       - "${NACOS_HTTP_PORT:-8848}:8848/tcp"
       - "${NACOS_GRPC_PORT:-9848}:9848/tcp"
     restart: always
 
   initializer:
+    hostname: higress-initializer
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/runner:${HIGRESS_RUNNER_TAG}
     command:
       - ./init.sh
@@ -41,6 +44,7 @@ services:
       - ${FILE_ROOT_DIR:-./volumes/dummy}:/opt/data/:rw
 
   precheck:
+    hostname: higress-precheck
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/runner:${HIGRESS_RUNNER_TAG}
     command:
       - ./precheck.sh
@@ -55,6 +59,7 @@ services:
       - ${FILE_ROOT_DIR:-./volumes/dummy}:/opt/data/:ro
 
   apiserver:
+    hostname: higress-apiserver
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/api-server:${HIGRESS_API_SERVER_TAG}
     command:
       - --secure-port
@@ -97,6 +102,7 @@ services:
       - ${FILE_ROOT_DIR:-./volumes/dummy}:/opt/data/:rw
 
   prepare:
+    hostname: higress-prepare
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/runner:${HIGRESS_RUNNER_TAG}
     command:
       - ./prepare.sh
@@ -114,6 +120,7 @@ services:
       - ${FILE_ROOT_DIR:-./volumes/dummy}:/opt/data/:ro
 
   controller:
+    hostname: higress-controller
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress:${HIGRESS_CONTROLLER_TAG}
     command:
       - serve
@@ -141,6 +148,7 @@ services:
       - ./volumes/controller/log/nacos:/var/log/nacos:rw
 
   pilot:
+    hostname: higress-pilot
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/pilot:${HIGRESS_PILOT_TAG}
     command:
       - discovery
@@ -173,6 +181,7 @@ services:
       - ./volumes/pilot/config:/etc/istio/config:ro
 
   gateway:
+    hostname: higress-gateway
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/gateway:${HIGRESS_GATEWAY_TAG}
     command:
       - proxy
@@ -216,6 +225,7 @@ services:
       - ./volumes/gateway/log:/var/log/proxy:rw
 
   console:
+    hostname: higress-console
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/console:${HIGRESS_CONSOLE_TAG}
     env_file:
       - ./env/console.env
@@ -244,6 +254,7 @@ services:
       - ./volumes/kube:/home/higress/.kube:ro
 
   prometheus:
+    hostname: higress-prometheus
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/prometheus:${PROMETHEUS_TAG}
     command:
       - "--config.file=/etc/prometheus/prometheus.yaml"
@@ -276,6 +287,7 @@ services:
       - ./volumes/prometheus/data:/prometheus:rw
 
   promtail:
+    hostname: higress-promtail
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/promtail:${PROMTAIL_TAG}
     command:
       - -config.file=/etc/promtail/promtail.yaml
@@ -310,6 +322,7 @@ services:
       - ./volumes/gateway/log:/var/log/proxy:ro
 
   loki:
+    hostname: higress-loki
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/loki:${LOKI_TAG}
     command:
       - -config.file=/etc/loki/config/config.yaml
@@ -340,6 +353,7 @@ services:
       - ./volumes/loki/data:/var/loki:rw
 
   grafana:
+    hostname: higress-grafana
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/grafana:${GRAFANA_TAG}
     depends_on:
       prometheus:
@@ -369,6 +383,7 @@ services:
       - ./volumes/grafana/lib:/var/lib/grafana:rw
 
   postcheck:
+    hostname: higress-postcheck
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/runner:${HIGRESS_RUNNER_TAG}
     command:
       - ./postcheck.sh
