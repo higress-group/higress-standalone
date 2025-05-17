@@ -16,6 +16,7 @@
 
 BUILTIN_NACOS_SERVER_URL=nacos://nacos:8848
 DEFAULT_NACOS_NS=higress-system
+DEFAULT_NACOS_CONSOLE_PORT=8888
 DEFAULT_NACOS_HTTP_PORT=8848
 DEFAULT_GATEWAY_HTTP_PORT=80
 DEFAULT_GATEWAY_HTTPS_PORT=443
@@ -135,6 +136,16 @@ parseArgs() {
       MODE="params"
       shift
       ;;
+    --nacos-console-port=*)
+      NACOS_CONSOLE_PORT="${1#*=}"
+      MODE="params"
+      shift
+      ;;
+    --nacos-service-port=*)
+      NACOS_CONSOLE_PORT="${1#*=}"
+      MODE="params"
+      shift
+      ;;
     --nacos-port=*)
       NACOS_HTTP_PORT="${1#*=}"
       MODE="params"
@@ -225,6 +236,7 @@ resetEnv() {
   # Not to reset the encryption key to avoid accidental key losts.
   # NACOS_DATA_ENC_KEY=""
 
+  NACOS_CONSOLE_PORT=$DEFAULT_NACOS_CONSOLE_PORT
   NACOS_HTTP_PORT=$DEFAULT_NACOS_HTTP_PORT
   NACOS_GRPC_PORT=$(($DEFAULT_NACOS_HTTP_PORT + 1000))
   GATEWAY_HTTP_PORT=$DEFAULT_GATEWAY_HTTP_PORT
@@ -329,10 +341,12 @@ configureFileStorageByArgs() {
 configurePortsByArgs() {
   if [ "$CONFIG_STORAGE" == "nacos" ]; then
     if [ "$USE_BUILTIN_NACOS" == "Y" ]; then
-      validatePort $NACOS_HTTP_PORT "Invalid --nacos-port value." 1
+      validatePort $NACOS_CONSOLE_PORT "Invalid --nacos-console-port value." 1
+      validatePort $NACOS_HTTP_PORT "Invalid --nacos-port/--nacos-service-port value." 1
       NACOS_GRPC_PORT=$(($NACOS_HTTP_PORT + 1000))
       validatePort $NACOS_GRPC_PORT "--nacos-port value must be less than 64536." 1
     else
+      NACOS_CONSOLE_PORT=$DEFAULT_NACOS_CONSOLE_PORT
       NACOS_HTTP_PORT=$DEFAULT_NACOS_HTTP_PORT
       NACOS_GRPC_PORT=$(($DEFAULT_NACOS_HTTP_PORT + 1000))
     fi
@@ -495,13 +509,15 @@ configurePorts() {
 
   if [ "$USE_BUILTIN_NACOS" == "Y" ]; then
     while true; do
-      readPortWithDefault "Please input the local HTTP port to access the built-in Nacos [${DEFAULT_NACOS_HTTP_PORT}]: " ${DEFAULT_NACOS_HTTP_PORT}
+      readPortWithDefault "Please input the local HTTP port to access the built-in Nacos service [${DEFAULT_NACOS_HTTP_PORT}]: " ${DEFAULT_NACOS_HTTP_PORT}
       NACOS_HTTP_PORT=$input
       NACOS_GRPC_PORT=$(($NACOS_HTTP_PORT + 1000))
       validatePort $NACOS_GRPC_PORT "The HTTP port of Nacos must be less than 64536." 0
       if [ $? -eq 0 ]; then
         break
       fi
+      readPortWithDefault "Please input the local HTTP port to access the built-in Nacos console [${DEFAULT_NACOS_CONSOLE_PORT}]: " ${DEFAULT_NACOS_CONSOLE_PORT}
+      NACOS_CONSOLE_PORT=$input
     done
   fi
   readPortWithDefault "Please input the local HTTP port to access Higress Gateway [${DEFAULT_GATEWAY_HTTP_PORT}]: " ${DEFAULT_GATEWAY_HTTP_PORT}
@@ -535,9 +551,12 @@ outputUsage() {
  -k, --data-enc-key=KEY     the key used to encrypt sensitive configurations
                             MUST contain 32 characters
                             A random key will be generated if unspecified
-     --nacos-port=NACOS-PORT
-                            the HTTP port used to access the built-in Nacos
+     --nacos-service-port=NACOS-SERVICE-PORT
+                            the HTTP port used to access the built-in Nacos service
                             default to 8848 if unspecified
+     --nacos-console-port=NACOS-CONSOLE-PORT
+                            the HTTP port used to access the built-in Nacos console
+                            default to 8888 if unspecified
      --gateway-http-port=GATEWAY-HTTP-PORT
                             the HTTP port to be listened by the gateway
                             default to 80 if unspecified
@@ -614,6 +633,7 @@ PROMETHEUS_TAG='${PROMETHEUS_TAG}'
 PROMTAIL_TAG='${PROMTAIL_TAG}'
 LOKI_TAG='${LOKI_TAG}'
 GRAFANA_TAG='${GRAFANA_TAG}'
+NACOS_CONSOLE_PORT='${NACOS_CONSOLE_PORT}'
 NACOS_HTTP_PORT='${NACOS_HTTP_PORT}'
 NACOS_GRPC_PORT='${NACOS_GRPC_PORT}'
 GATEWAY_HTTP_PORT='${GATEWAY_HTTP_PORT}'
