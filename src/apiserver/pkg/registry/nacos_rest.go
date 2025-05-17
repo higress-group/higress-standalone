@@ -578,6 +578,7 @@ func (n *nacosREST) write(encoder runtime.Encoder, group, dataId, oldMd5 string,
 	if err != nil {
 		return err
 	}
+	oldResourceVersion := accessor.GetResourceVersion()
 	// No resource version saved into nacos
 	accessor.SetResourceVersion("")
 
@@ -589,7 +590,13 @@ func (n *nacosREST) write(encoder runtime.Encoder, group, dataId, oldMd5 string,
 	if err != nil {
 		return err
 	}
-	return n.writeRaw(group, dataId, content, oldMd5)
+	err = n.writeRaw(group, dataId, content, oldMd5)
+	if err == nil {
+		accessor.SetResourceVersion(calculateMd5(content))
+	} else {
+		accessor.SetResourceVersion(oldResourceVersion)
+	}
+	return err
 }
 
 func (n *nacosREST) writeRaw(group, dataId, content, oldMd5 string) error {
