@@ -177,6 +177,8 @@ services:
     command:
       - proxy
       - router
+      - --concurrency
+      - "16"
       - --domain
       - higress-system.svc.cluster.local
       - --proxyLogLevel=warning
