@@ -27,6 +27,7 @@ else
 fi
 
 /usr/local/bin/higress-proxy-start.sh proxy router \
+    --concurrency=${GATEWAY_CONCURRENCY:-16} \
     --domain=higress-system.svc.cluster.local \
     --proxyLogLevel=${GATEWAY_LOG_LEVEL:-warning} \
     --proxyComponentLogLevel=${GATEWAY_COMPONENT_LOG_LEVEL:-misc:error} \
