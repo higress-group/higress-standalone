@@ -273,6 +273,16 @@ metadata:
   namespace: higress-system
 data:
   higress: |-
+    mcpServer:
+      enable: false
+      sse_path_suffix: /sse
+      redis:
+        address: redis-address:6379
+        username: ""
+        password: ""
+        db: 0
+      match_list: []
+      servers: []
     downstream:
       connectionBufferLimits: 32768
       http2:
@@ -410,7 +420,7 @@ EOF
   if [ $? -ne 0 ]; then
     echo "  The Secret resource \"higress-console\" doesn't exist. Create it now..."
     read -r -d '' content <<EOF
-apiVersion: v1 
+apiVersion: v1
 kind: ConfigMap
 metadata:
   creationTimestamp: "$(now)"
@@ -499,7 +509,7 @@ checkPrometheus() {
   mkdir -p $VOLUMES_ROOT/prometheus/config && cd "$_"
   cat <<EOF >./prometheus.yaml
 global:
-  scrape_interval:     15s 
+  scrape_interval:     15s
   evaluation_interval: 15s
 scrape_configs:
   - job_name: 'prometheus'
