@@ -19,6 +19,8 @@ limits_config:
   reject_old_samples_max_age: 168h
   split_queries_by_interval: 15m
 memberlist:
+  bind_addr:
+  - 127.0.0.1
   join_members:
   - localhost
 query_range:
