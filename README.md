@@ -75,9 +75,13 @@ docker compose
 
     用于加密敏感配置数据的密钥。长度必须为 32 个字符。若未设置，Higress 将自动生成一个随机的密钥。若需集群部署，此项必须设置。
 
-  * --nacos-port=NACOS-PORT
+  * --nacos-service-port=NACOS-SERVICE-PORT
 
-    内置 NACOS 服务在服务器本地监听的端口。默认值为 8848。
+    内置 Nacos API 在服务器本地监听的端口。默认值为 8848。
+
+  * --nacos-console-port=NACOS-CONSOLE-PORT
+
+    内置 Nacos Console 在服务器本地监听的端口。默认值为 8888。
 
   * --gateway-http-port=GATEAWY-HTTP-PORT
 
