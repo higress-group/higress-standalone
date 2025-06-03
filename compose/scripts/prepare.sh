@@ -192,6 +192,22 @@ EOF
 checkPilot() {
   echo "Checking pilot configurations..."
 
+  renewPilotCerts
+  checkHigressConfig
+}
+
+renewPilotCerts() {
+  local pilotStatusCode=$(curl -s -o /dev/null -w "%{http_code}" "http://pilot.svc:8080/ready" -k)
+  if [ "$pilotStatusCode" != "000" ]; then
+    echo "  Pilot is running. Skip certificate renewal."
+    return
+  fi
+  local gatewayStatusCode=$(curl -s -o /dev/null -w "%{http_code}" "http://gateway.svc:15021/healthz/ready" -k)
+  if [ "$gatewayStatusCode" != "000" ]; then
+    echo "  Gateway is running. Skip certificate renewal."
+    return
+  fi
+  
   mkdir -p $VOLUMES_ROOT/pilot/cacerts && cd "$_"
 
   openssl req -newkey rsa:$RSA_KEY_LENGTH -nodes -keyout root-key.pem -x509 -days 36500 -out root-cert.pem >/dev/null 2>&1 <<EOF
@@ -258,7 +274,10 @@ EOF
     openssl x509 -req -days 36500 -in gateway-cert.csr -sha256 -CA ca-cert.pem -CAkey ca-key.pem -CAcreateserial -out gateway-cert.pem -extensions v3_req -extfile gateway.cfg >/dev/null 2>&1
   checkExitCode "Generating certificate for gateway fails with $?"
   chmod a+r gateway-key.pem
+}
 
+
+checkHigressConfig() {
   checkConfigExists "higress-system" "v1" "configmaps" "higress-config"
   if [ $? -ne 0 ]; then
     echo "  The ConfigMap resource \"higress-config\" doesn't exist. Create it now..."
