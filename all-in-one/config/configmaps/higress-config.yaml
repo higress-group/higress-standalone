@@ -7,6 +7,16 @@ metadata:
   resourceVersion: "1"
 data:
   higress: |-
+    mcpServer:
+      enable: false
+      sse_path_suffix: /sse
+      redis:
+        address: redis-address:6379
+        username: ""
+        password: ""
+        db: 0
+      match_list: []
+      servers: []
     downstream:
       connectionBufferLimits: 32768
       http2:
