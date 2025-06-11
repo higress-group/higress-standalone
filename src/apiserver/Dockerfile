@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.23.2 as builder
+FROM --platform=$BUILDPLATFORM golang:1.23.2 AS builder
 
 ARG GOPROXY
 ENV GOPROXY=${GOPROXY}
