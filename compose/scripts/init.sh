@@ -48,21 +48,29 @@ initializeNacos() {
   nacosApiVersion=1
 
   maxWaitTime=180
+  local tmpFile=$(mktemp /tmp/higress-init.XXXXXXXXX.cfg)
   for ((i = 0; i < $maxWaitTime; i++)); do
-    # We always check the readiness with v1 API. And it will return a 410 if it's actually v3.
-    statusCode=$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v2/core/cluster/node/self")
-    if [ "$statusCode" -eq "410" -a "$nacosApiVersion" -eq "1" ]; then
+    # We always check the readiness with v1 API. 
+    # If it's actually v3, the response will depend on the value of "nacos.core.api.compatibility.console.enabled" config:
+    # - If true, it will return a 404 error with "No endpoint GET /nacos/v1/console/health/readiness" in the content.
+    # - If false, it will return a 410 error.
+    local healthCheckUrl="${NACOS_SERVER_URL}/v1/console/health/readiness"
+    statusCode=$(curl -s -o "${tmpFile}" -w "%{http_code}" "$healthCheckUrl")
+    if [ "$statusCode" -eq "410" -o "$statusCode" -eq "404" -a -n "$(cat "$tmpFile" | grep "No endpoint")" ]; then
+      # Just double check here with a v3 API to confirm.
+      local v3HealthCheckurl="${NACOS_SERVER_URL}/v3/admin/core/state"
+      v3StatusCode=$(curl -s -o /dev/null -w "%{http_code}" "$v3HealthCheckurl")
+      if [ "$v3StatusCode" -ne "200" ]; then
+        echo "Unexpected Nacos health check result: 
+- Got ${statusCode} from ${healthCheckUrl}
+- Got ${v3StatusCode} from ${v3HealthCheckurl}"
+        continue
+      fi
       nacosReady=true
       nacosApiVersion=3
       break
     elif [ "$statusCode" -eq "200" ]; then
       nacosReady=true
-      # The previous request may return 200 in Nacos 3.x if the cluster has nacos.core.api.compatibility.admin.enabled set to true.
-      # So we need to double check here with a v3 API.
-      statusCode=$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v3/admin/core/state")
-      if [ "$statusCode" -eq "200" ]; then
-        nacosApiVersion=3
-      fi
       break
     fi
     if [ $(($i % 5)) == 0 -a "$COMPOSE_PROFILES" != "nacos" ]; then
@@ -72,6 +80,7 @@ initializeNacos() {
     echo "Waiting for Nacos to get ready..."
     sleep 1
   done
+  rm "${tmpFile}"
 
   if [ "${nacosReady}" != "true" ]; then
     echo "Nacos server doesn't get ready within ${maxWaitTime} seconds. Initialization failed."
@@ -120,46 +129,46 @@ initializeNacos() {
   fi
   if grep -q "\"namespace\":\"${NACOS_NS}\"" <<<"$namespacesResponse"; then
     echo "  Namespace ${NACOS_NS} already exists in Nacos."
-
-    if [ "$NACOS_USE_RANDOM_DATA_ENC_KEY" != "N" ]; then
-      echo "  Fixed data encryption key is used. Skip config overwriting check."
-    else
-      echo "  Checking existed configs in namespace ${NACOS_NS}..."
-      if [ "$nacosApiVersion" == "1" ]; then
-        statusCode="$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v2/cs/config?accessToken=${NACOS_ACCESS_TOKEN}&namespaceId=${NACOS_NS}&dataId=secrets.__names__&group=DEFAULT_GROUP")"
-      elif [ "$nacosApiVersion" == "3" ]; then
-        statusCode="$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v3/admin/cs/config?accessToken=${NACOS_ACCESS_TOKEN}&namespaceId=${NACOS_NS}&dataId=secrets.__names__&groupName=DEFAULT_GROUP")"
-      fi
-      if [ $statusCode -eq 200 ]; then
-        echo "  ERROR: Higress configs are found in nacos namespace ${NACOS_NS}."
-        echo
-        echo "  Using a random data encyption key in a configured nacos namespace is incorrect, and will cause Higress unable to start."
-        echo "  You can:"
-        echo "  1. Remove all the configurations in nacos namespace ${NACOS_NS} and try again."
-        echo "  2. Install Higress to another nacos namespace."
-        echo "  3. Specify the same data encryption key generated/used in the previous installation."
-        exit -1
-      elif [ $statusCode -eq 404 ]; then
-        echo "  No Higress config is found in nacos namespace ${NACOS_NS}."
-      else
-        echo "  Checking existed configs in nacos namespace ${NACOS_NS} failed with $statusCode."
-        exit -1
-      fi
+  else
+    echo "  Creating namespace ${NACOS_NS}..."
+    if [ "$nacosApiVersion" == "1" ]; then
+      statusCode="$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v1/console/namespaces?accessToken=${NACOS_ACCESS_TOKEN}" --data-urlencode "customNamespaceId=${NACOS_NS}" --data-urlencode "namespaceName=${NACOS_NS}")"
+    elif [ "$nacosApiVersion" == "3" ]; then
+      statusCode="$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v3/admin/core/namespace?accessToken=${NACOS_ACCESS_TOKEN}" --data-urlencode "namespaceId=${NACOS_NS}" --data-urlencode "namespaceName=${NACOS_NS}")"
     fi
-
-    return 0
+    if [ $statusCode -ne 200 ]; then
+      echo "  Creating namespace ${NACOS_NS} in nacos failed with $statusCode."
+      exit -1
+    fi
   fi
 
-  echo "  Creating namespace ${NACOS_NS}..."
-  if [ "$nacosApiVersion" == "1" ]; then
-    statusCode="$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v1/console/namespaces?accessToken=${NACOS_ACCESS_TOKEN}" --data-urlencode "customNamespaceId=${NACOS_NS}" --data-urlencode "namespaceName=${NACOS_NS}")"
-  elif [ "$nacosApiVersion" == "3" ]; then
-    statusCode="$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v3/admin/core/namespace?accessToken=${NACOS_ACCESS_TOKEN}" --data-urlencode "namespaceId=${NACOS_NS}" --data-urlencode "namespaceName=${NACOS_NS}")"
+  if [ "$NACOS_USE_RANDOM_DATA_ENC_KEY" != "N" ]; then
+    echo "  Fixed data encryption key is used. Skip config overwriting check."
+  else
+    # Even the namespace is just created, there might be some dangling config items in it if the namespace itself was delete before without cleaning all the configs first.
+    echo "  Checking existed configs in namespace ${NACOS_NS}..."
+    if [ "$nacosApiVersion" == "1" ]; then
+      statusCode="$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v2/cs/config?accessToken=${NACOS_ACCESS_TOKEN}&namespaceId=${NACOS_NS}&dataId=secrets.__names__&group=DEFAULT_GROUP")"
+    elif [ "$nacosApiVersion" == "3" ]; then
+      statusCode="$(curl -s -o /dev/null -w "%{http_code}" "${NACOS_SERVER_URL}/v3/admin/cs/config?accessToken=${NACOS_ACCESS_TOKEN}&namespaceId=${NACOS_NS}&dataId=secrets.__names__&groupName=DEFAULT_GROUP")"
+    fi
+    if [ $statusCode -eq 200 ]; then
+      echo "  ERROR: Higress configs are found in nacos namespace ${NACOS_NS}."
+      echo
+      echo "  Using a random data encyption key in a configured nacos namespace is incorrect, and will cause Higress unable to start."
+      echo "  You can:"
+      echo "  1. Remove all the configurations in nacos namespace ${NACOS_NS} and try again."
+      echo "  2. Install Higress to another nacos namespace."
+      echo "  3. Specify the same data encryption key generated/used in the previous installation."
+      exit -1
+    elif [ $statusCode -eq 404 ]; then
+      echo "  No Higress config is found in nacos namespace ${NACOS_NS}."
+    else
+      echo "  Checking existed configs in nacos namespace ${NACOS_NS} failed with $statusCode."
+      exit -1
+    fi
   fi
-  if [ $statusCode -ne 200 ]; then
-    echo "  Creating namespace ${NACOS_NS} in nacos failed with $statusCode."
-    exit -1
-  fi
+
   return 0
 }
 
