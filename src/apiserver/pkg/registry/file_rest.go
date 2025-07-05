@@ -425,7 +425,8 @@ func (f *fileREST) Update(
 		}
 	}
 
-	if updatedAccessor.GetResourceVersion() != oldAccessor.GetResourceVersion() {
+	currentResourceVersion := oldAccessor.GetResourceVersion()
+	if updatedAccessor.GetResourceVersion() != "" && currentResourceVersion != "" && updatedAccessor.GetResourceVersion() != currentResourceVersion {
 		requestInfo, ok := genericapirequest.RequestInfoFrom(ctx)
 		var groupResource = schema.GroupResource{}
 		if ok {
@@ -435,7 +436,6 @@ func (f *fileREST) Update(
 		return nil, false, apierrors.NewConflict(groupResource, name, nil)
 	}
 
-	currentResourceVersion := updatedAccessor.GetResourceVersion()
 	var newResourceVersion uint64
 	if currentResourceVersion == "" {
 		newResourceVersion = 1
