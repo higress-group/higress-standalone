@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -44,6 +45,23 @@ const encryptionMark = "enc|"
 const namesSuffix = "__names__"
 const namesGroup = constant.DEFAULT_GROUP
 const emptyNamesPlaceholder = "EMPTY"
+const defaultNacosCacheSyncDelay time.Duration = 500 * time.Millisecond
+
+var (
+	nacosCacheSyncDelay = defaultNacosCacheSyncDelay
+)
+
+func init() {
+	// Read nacosCacheSyncDelay from environment variable NACOS_CACHE_SYNC_DELAY
+	if delayStr := os.Getenv("NACOS_CACHE_SYNC_DELAY"); delayStr != "" {
+		if delay, err := time.ParseDuration(delayStr); err == nil {
+			nacosCacheSyncDelay = delay
+		} else {
+			klog.Errorf("failed to parse NACOS_CACHE_SYNC_DELAY: %v, using default value %v", err, nacosCacheSyncDelay)
+		}
+	}
+	klog.Infof("NacosCacheSyncDelay: %v", nacosCacheSyncDelay)
+}
 
 // ErrItemAlreadyExists means the item already exists.
 var ErrItemAlreadyExists = fmt.Errorf("item already exists")
@@ -66,11 +84,9 @@ func NewNacosREST(
 ) REST {
 	if attrFunc == nil {
 		if isNamespaced {
-			if isNamespaced {
-				attrFunc = storage.DefaultNamespaceScopedAttr
-			} else {
-				attrFunc = storage.DefaultClusterScopedAttr
-			}
+			attrFunc = storage.DefaultNamespaceScopedAttr
+		} else {
+			attrFunc = storage.DefaultClusterScopedAttr
 		}
 	}
 	n := &nacosREST{
@@ -302,6 +318,8 @@ func (n *nacosREST) Create(
 		}
 	}
 
+	n.waitForCacheSync()
+
 	return obj, nil
 }
 
@@ -363,14 +381,17 @@ func (n *nacosREST) Update(
 		return nil, false, apierrors.NewInternalError(err)
 	}
 
+	n.waitForCacheSync()
+
 	return updatedObj, false, nil
 }
 
-func (n *nacosREST) Delete(
+func (n *nacosREST) doDelete(
 	ctx context.Context,
 	name string,
 	deleteValidation rest.ValidateObjectFunc,
-	options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+	options *metav1.DeleteOptions,
+	waitForCacheSync bool) (runtime.Object, bool, error) {
 	dataId := n.objectDataId(ctx, name)
 
 	oldObj, err := n.Get(ctx, name, nil)
@@ -411,7 +432,19 @@ func (n *nacosREST) Delete(
 		}
 	}
 
+	if waitForCacheSync {
+		n.waitForCacheSync()
+	}
+
 	return oldObj, true, nil
+}
+
+func (n *nacosREST) Delete(
+	ctx context.Context,
+	name string,
+	deleteValidation rest.ValidateObjectFunc,
+	options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+	return n.doDelete(ctx, name, deleteValidation, options, true)
 }
 
 func (n *nacosREST) DeleteCollection(
@@ -432,7 +465,7 @@ func (n *nacosREST) DeleteCollection(
 	}
 
 	for _, obj := range list.(*unstructured.UnstructuredList).Items {
-		if deletedObj, deleted, err := n.Delete(ctx, obj.GetName(), deleteValidation, options); deleted && err == nil {
+		if deletedObj, deleted, err := n.doDelete(ctx, obj.GetName(), deleteValidation, options, false); deleted && err == nil {
 			appendItem(v, deletedObj)
 		}
 	}
@@ -736,6 +769,13 @@ func (n *nacosREST) decryptConfig(config string) (string, error) {
 		return "", err
 	}
 	return string(decryptedData), nil
+}
+
+func (n *nacosREST) waitForCacheSync() {
+	if nacosCacheSyncDelay <= 0 {
+		return
+	}
+	time.Sleep(nacosCacheSyncDelay)
 }
 
 func calculateMd5(str string) string {
