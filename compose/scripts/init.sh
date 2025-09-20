@@ -142,7 +142,7 @@ initializeNacos() {
     fi
   fi
 
-  if [ "$NACOS_USE_RANDOM_DATA_ENC_KEY" != "N" ]; then
+  if [ "$NACOS_USE_RANDOM_DATA_ENC_KEY" == "N" ]; then
     echo "  Fixed data encryption key is used. Skip config overwriting check."
   else
     # Even the namespace is just created, there might be some dangling config items in it if the namespace itself was delete before without cleaning all the configs first.
