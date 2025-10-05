@@ -100,9 +100,9 @@ func getOpenAPIDefinitions(openapicommon.ReferenceCallback) map[string]openapico
 		"k8s.io/api/networking/v1.Ingress":      {},
 		"k8s.io/api/networking/v1.IngressClass": {},
 
-		"github.com/alibaba/higress/client/pkg/apis/extensions/v1alpha1.WasmPlugin": {},
-		"github.com/alibaba/higress/client/pkg/apis/networking/v1.McpBridge":        {},
-		"github.com/alibaba/higress/client/pkg/apis/networking/v1.Http2Rpc":         {},
+		"github.com/alibaba/higress/v2/client/pkg/apis/extensions/v1alpha1.WasmPlugin": {},
+		"github.com/alibaba/higress/v2/client/pkg/apis/networking/v1.McpBridge":        {},
+		"github.com/alibaba/higress/v2/client/pkg/apis/networking/v1.Http2Rpc":         {},
 
 		"istio.io/client-go/pkg/apis/networking/v1alpha3.EnvoyFilter": {},
 

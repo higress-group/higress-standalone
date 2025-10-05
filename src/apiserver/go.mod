@@ -7,7 +7,7 @@ go 1.23
 toolchain go1.23.0
 
 require (
-	github.com/alibaba/higress v1.4.3-0.20250901112444-854ec1e289b3
+	github.com/alibaba/higress/v2 v2.1.8
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/google/uuid v1.6.0
 	github.com/nacos-group/nacos-sdk-go/v2 v2.3.2

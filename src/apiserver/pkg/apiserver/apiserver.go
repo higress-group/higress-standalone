@@ -46,8 +46,8 @@ import (
 	"github.com/alibaba/higress/api-server/pkg/options"
 	"github.com/alibaba/higress/api-server/pkg/registry"
 	"github.com/alibaba/higress/api-server/pkg/storage"
-	hiextensionsv1alpha1 "github.com/alibaba/higress/client/pkg/apis/extensions/v1alpha1"
-	hinetworkingv1 "github.com/alibaba/higress/client/pkg/apis/networking/v1"
+	hiextensionsv1alpha1 "github.com/alibaba/higress/v2/client/pkg/apis/extensions/v1alpha1"
+	hinetworkingv1 "github.com/alibaba/higress/v2/client/pkg/apis/networking/v1"
 	"github.com/nacos-group/nacos-sdk-go/v2/clients/config_client"
 )
 
