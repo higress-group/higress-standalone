@@ -2,8 +2,8 @@ cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMT
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/NYTimes/gziphandler v1.1.1 h1:ZUDjpQae29j0ryrS0u/B8HZfJBtBQHjqw2rQ2cqUQ3I=
 github.com/NYTimes/gziphandler v1.1.1/go.mod h1:n/CVRwUEOgIxrgPvAQhUUr9oeUtvrhMomdKFjzJNB0c=
-github.com/alibaba/higress v1.4.3-0.20250901112444-854ec1e289b3 h1:Z/VPiTgAqXyzVOE4DszwCcw02t1qPxvscpb5MFXhFL4=
-github.com/alibaba/higress v1.4.3-0.20250901112444-854ec1e289b3/go.mod h1:ndcYbKLZf7qA2eWEUakm5IpWLEqZjO1YKH90bMGaso4=
+github.com/alibaba/higress/v2 v2.1.8 h1:sxBEYRXF0nIF/qjYLgR1lAeC4Bgf95bZdc2vFKUJBLA=
+github.com/alibaba/higress/v2 v2.1.8/go.mod h1:o8IQOhGXqXewADALIMF6Xbu6vXKH6E3nEU4STNr1QuU=
 github.com/alibabacloud-go/alibabacloud-gateway-pop v0.0.6 h1:eIf+iGJxdU4U9ypaUfbtOWCsZSbTb8AUHvyPrxu6mAA=
 github.com/alibabacloud-go/alibabacloud-gateway-pop v0.0.6/go.mod h1:4EUIoxs/do24zMOGGqYVWgw0s9NtiylnJglOeEB5UJo=
 github.com/alibabacloud-go/alibabacloud-gateway-spi v0.0.4/go.mod h1:sCavSAvdzOjul4cEqeVtvlSaSScfNsTQ+46HwlTL1hc=
