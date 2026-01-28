@@ -281,14 +281,18 @@ configureBedrockProvider() {
   if [ "$BEDROCK_AUTH_METHOD" == "2" ]; then
     read -r -u 3 -p "→ Enter AWS Bearer Token: " BEDROCK_API_KEY
     LLM_ENVS+=("BEDROCK_API_KEY")
+    read -r -u 3 -p "→ Enter AWS Region (e.g., us-east-1): " BEDROCK_REGION
+    if [ -n "$BEDROCK_API_KEY" ] && [ -n "$BEDROCK_REGION" ]; then
+      BEDROCK_CONFIGURED="placeholder"
+    fi
   else
     read -r -u 3 -p "→ Enter AWS Access Key: " BEDROCK_ACCESS_KEY
     read -r -u 3 -p "→ Enter AWS Secret Key: " BEDROCK_SECRET_KEY
     LLM_ENVS+=("BEDROCK_ACCESS_KEY" "BEDROCK_SECRET_KEY")
-  fi
-  read -r -u 3 -p "→ Enter AWS Region (e.g., us-east-1): " BEDROCK_REGION
-  if [ -n "$BEDROCK_REGION" ]; then
-    BEDROCK_CONFIGURED="placeholder"
+    read -r -u 3 -p "→ Enter AWS Region (e.g., us-east-1): " BEDROCK_REGION
+    if [ -n "$BEDROCK_ACCESS_KEY" ] && [ -n "$BEDROCK_SECRET_KEY" ] && [ -n "$BEDROCK_REGION" ]; then
+      BEDROCK_CONFIGURED="placeholder"
+    fi
   fi
   LLM_ENVS+=("BEDROCK_REGION")
 }
@@ -301,16 +305,27 @@ configureVertexProvider() {
   if [ "$VERTEX_AUTH_MODE" == "2" ]; then
     read -r -u 3 -p "→ Enter Vertex AI API Key: " VERTEX_API_KEY
     LLM_ENVS+=("VERTEX_API_KEY")
+    read -r -u 3 -p "→ Enter Google Cloud Region (e.g., us-central1): " VERTEX_REGION
+    read -r -u 3 -p "→ Enter Google Cloud Project ID: " VERTEX_PROJECT_ID
+    if [ -n "$VERTEX_API_KEY" ] && [ -n "$VERTEX_REGION" ] && [ -n "$VERTEX_PROJECT_ID" ]; then
+      VERTEX_CONFIGURED="placeholder"
+    fi
   else
-    echo "→ Enter Service Account JSON Key (paste the entire JSON content, then press Enter):"
-    read -r -u 3 VERTEX_AUTH_KEY
+    read -r -u 3 -p "→ Enter path to Service Account JSON Key file: " VERTEX_AUTH_KEY_FILE
+    if [ -n "$VERTEX_AUTH_KEY_FILE" ] && [ -f "$VERTEX_AUTH_KEY_FILE" ]; then
+      # Read JSON file and compact it to a single line
+      VERTEX_AUTH_KEY=$(cat "$VERTEX_AUTH_KEY_FILE" | tr -d '\n' | tr -s ' ')
+    else
+      echo "Warning: File not found or not specified. Please configure manually later."
+      VERTEX_AUTH_KEY=""
+    fi
     read -r -u 3 -p "→ Enter Vertex AI Auth Service Name: " VERTEX_AUTH_SERVICE_NAME
     LLM_ENVS+=("VERTEX_AUTH_KEY" "VERTEX_AUTH_SERVICE_NAME")
-  fi
-  read -r -u 3 -p "→ Enter Google Cloud Region (e.g., us-central1): " VERTEX_REGION
-  read -r -u 3 -p "→ Enter Google Cloud Project ID: " VERTEX_PROJECT_ID
-  if [ -n "$VERTEX_REGION" ] && [ -n "$VERTEX_PROJECT_ID" ]; then
-    VERTEX_CONFIGURED="placeholder"
+    read -r -u 3 -p "→ Enter Google Cloud Region (e.g., us-central1): " VERTEX_REGION
+    read -r -u 3 -p "→ Enter Google Cloud Project ID: " VERTEX_PROJECT_ID
+    if [ -n "$VERTEX_AUTH_KEY" ] && [ -n "$VERTEX_AUTH_SERVICE_NAME" ] && [ -n "$VERTEX_REGION" ] && [ -n "$VERTEX_PROJECT_ID" ]; then
+      VERTEX_CONFIGURED="placeholder"
+    fi
   fi
   LLM_ENVS+=("VERTEX_REGION" "VERTEX_PROJECT_ID")
 }
@@ -318,12 +333,18 @@ configureVertexProvider() {
 configureCloudflareProvider() {
   read -r -u 3 -p "→ Enter API Token for Cloudflare Workers AI: " CLOUDFLARE_API_KEY
   read -r -u 3 -p "→ Enter Cloudflare Account ID: " CLOUDFLARE_ACCOUNT_ID
+  if [ -n "$CLOUDFLARE_API_KEY" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+    CLOUDFLARE_CONFIGURED="placeholder"
+  fi
   LLM_ENVS+=("CLOUDFLARE_API_KEY" "CLOUDFLARE_ACCOUNT_ID")
 }
 
 configureDeepLProvider() {
   read -r -u 3 -p "→ Enter API Key for DeepL: " DEEPL_API_KEY
   read -r -u 3 -p "→ Enter target language for DeepL (e.g., EN, ZH, JA): " DEEPL_TARGET_LANG
+  if [ -n "$DEEPL_API_KEY" ] && [ -n "$DEEPL_TARGET_LANG" ]; then
+    DEEPL_CONFIGURED="placeholder"
+  fi
   LLM_ENVS+=("DEEPL_API_KEY" "DEEPL_TARGET_LANG")
 }
 
@@ -357,6 +378,9 @@ configureSparkProvider() {
 configureHunyuanProvider() {
   read -r -u 3 -p "→ Enter Auth ID for Tencent Hunyuan: " HUNYUAN_AUTH_ID
   read -r -u 3 -p "→ Enter Auth Key for Tencent Hunyuan: " HUNYUAN_AUTH_KEY
+  if [ -n "$HUNYUAN_AUTH_ID" ] && [ -n "$HUNYUAN_AUTH_KEY" ]; then
+    HUNYUAN_CONFIGURED="placeholder"
+  fi
   LLM_ENVS+=("HUNYUAN_AUTH_ID" "HUNYUAN_AUTH_KEY")
 }
 
