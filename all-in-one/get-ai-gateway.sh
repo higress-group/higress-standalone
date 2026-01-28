@@ -146,32 +146,41 @@ runConfigWizard() {
 
   echo
 
+  # Provider order: Top 10 most commonly used providers first, then others alphabetically
   local providers=(
-    "OpenAI|OPENAI"
-    "Aliyun Dashscope|DASHSCOPE"
-    "Moonshot|MOONSHOT"
-    "Azure OpenAI|AZURE|configureAzureProvider"
-    "360 Zhinao|AI360"
-    # "Github Models|GITHUB"
-    # "Groq|GROQ"
-    "Baichuan AI|BAICHUAN"
-    "01.AI|YI"
+    # Top 10 commonly used providers (user-specified order)
+    "Aliyun Dashscope (Qwen)|DASHSCOPE"
     "DeepSeek|DEEPSEEK"
+    "Moonshot (Kimi)|MOONSHOT"
     "Zhipu AI|ZHIPUAI"
-    "Ollama|OLLAMA|configureOllamaProvider"
-    "Claude|CLAUDE|configureClaudeProvider"
-    "Baidu AI Cloud|BAIDU"
-    # "Tencent Hunyuan|HUNYUAN"
-    "Stepfun|STEPFUN"
     "Minimax|MINIMAX|configureMinimaxProvider"
-    # "Cloudflare Workers AI|CLOUDFLARE"
-    # "iFlyTek Spark|SPARK"
-    "Google Gemini|GEMINI"
-    # "DeepL|DEEPL"
-    "Mistral AI|MISTRAL"
+    "Azure OpenAI|AZURE|configureAzureProvider"
+    "AWS Bedrock|BEDROCK|configureBedrockProvider"
+    "Google Vertex AI|VERTEX|configureVertexProvider"
+    "OpenAI|OPENAI"
+    "OpenRouter|OPENROUTER"
+    # Other providers (alphabetically ordered)
+    "01.AI (Yi)|YI"
+    "360 Zhinao|AI360"
+    "Baichuan AI|BAICHUAN"
+    "Baidu AI Cloud|BAIDU"
+    "Claude|CLAUDE|configureClaudeProvider"
+    "Cloudflare Workers AI|CLOUDFLARE|configureCloudflareProvider"
     "Cohere|COHERE"
+    "DeepL|DEEPL|configureDeepLProvider"
+    "Dify|DIFY|configureDifyProvider"
     "Doubao|DOUBAO"
-    # "Coze|COZE"
+    "Fireworks AI|FIREWORKS"
+    "Github Models|GITHUB"
+    "Google Gemini|GEMINI"
+    "Grok|GROK"
+    "Groq|GROQ"
+    "Mistral AI|MISTRAL"
+    "Ollama|OLLAMA|configureOllamaProvider"
+    "iFlyTek Spark|SPARK|configureSparkProvider"
+    "Stepfun|STEPFUN"
+    "Tencent Hunyuan|HUNYUAN|configureHunyuanProvider"
+    "Together AI|TOGETHERAI"
   )
 
   local selectedIndex=''
@@ -262,6 +271,93 @@ configureMinimaxProvider() {
   read -r -u 3 -p "→ Enter API Key for Minimax: " MINIMAX_API_KEY
   read -r -u 3 -p "→ Enter group ID for Minimax (only required when using ChatCompletion Pro): " MINIMAX_GROUP_ID
   LLM_ENVS+=("MINIMAX_API_KEY" "MINIMAX_GROUP_ID")
+}
+
+configureBedrockProvider() {
+  echo "AWS Bedrock supports two authentication methods:"
+  echo "  1. AWS Signature V4 (Access Key + Secret Key)"
+  echo "  2. Bearer Token (API Token)"
+  read -r -u 3 -p "→ Choose authentication method (1 or 2, default: 1): " BEDROCK_AUTH_METHOD
+  if [ "$BEDROCK_AUTH_METHOD" == "2" ]; then
+    read -r -u 3 -p "→ Enter AWS Bearer Token: " BEDROCK_API_KEY
+    LLM_ENVS+=("BEDROCK_API_KEY")
+  else
+    read -r -u 3 -p "→ Enter AWS Access Key: " BEDROCK_ACCESS_KEY
+    read -r -u 3 -p "→ Enter AWS Secret Key: " BEDROCK_SECRET_KEY
+    LLM_ENVS+=("BEDROCK_ACCESS_KEY" "BEDROCK_SECRET_KEY")
+  fi
+  read -r -u 3 -p "→ Enter AWS Region (e.g., us-east-1): " BEDROCK_REGION
+  if [ -n "$BEDROCK_REGION" ]; then
+    BEDROCK_CONFIGURED="placeholder"
+  fi
+  LLM_ENVS+=("BEDROCK_REGION")
+}
+
+configureVertexProvider() {
+  echo "Google Vertex AI supports two authentication modes:"
+  echo "  1. Standard Mode (Service Account JSON Key)"
+  echo "  2. Express Mode (API Key only)"
+  read -r -u 3 -p "→ Choose authentication mode (1 or 2, default: 1): " VERTEX_AUTH_MODE
+  if [ "$VERTEX_AUTH_MODE" == "2" ]; then
+    read -r -u 3 -p "→ Enter Vertex AI API Key: " VERTEX_API_KEY
+    LLM_ENVS+=("VERTEX_API_KEY")
+  else
+    echo "→ Enter Service Account JSON Key (paste the entire JSON content, then press Enter):"
+    read -r -u 3 VERTEX_AUTH_KEY
+    read -r -u 3 -p "→ Enter Vertex AI Auth Service Name: " VERTEX_AUTH_SERVICE_NAME
+    LLM_ENVS+=("VERTEX_AUTH_KEY" "VERTEX_AUTH_SERVICE_NAME")
+  fi
+  read -r -u 3 -p "→ Enter Google Cloud Region (e.g., us-central1): " VERTEX_REGION
+  read -r -u 3 -p "→ Enter Google Cloud Project ID: " VERTEX_PROJECT_ID
+  if [ -n "$VERTEX_REGION" ] && [ -n "$VERTEX_PROJECT_ID" ]; then
+    VERTEX_CONFIGURED="placeholder"
+  fi
+  LLM_ENVS+=("VERTEX_REGION" "VERTEX_PROJECT_ID")
+}
+
+configureCloudflareProvider() {
+  read -r -u 3 -p "→ Enter API Token for Cloudflare Workers AI: " CLOUDFLARE_API_KEY
+  read -r -u 3 -p "→ Enter Cloudflare Account ID: " CLOUDFLARE_ACCOUNT_ID
+  LLM_ENVS+=("CLOUDFLARE_API_KEY" "CLOUDFLARE_ACCOUNT_ID")
+}
+
+configureDeepLProvider() {
+  read -r -u 3 -p "→ Enter API Key for DeepL: " DEEPL_API_KEY
+  read -r -u 3 -p "→ Enter target language for DeepL (e.g., EN, ZH, JA): " DEEPL_TARGET_LANG
+  LLM_ENVS+=("DEEPL_API_KEY" "DEEPL_TARGET_LANG")
+}
+
+configureDifyProvider() {
+  read -r -u 3 -p "→ Enter API Key for Dify: " DIFY_API_KEY
+  read -r -u 3 -p "→ Enter Dify API URL (leave empty for cloud service): " DIFY_API_URL
+  echo "Dify application types: Chat, Completion, Agent, Workflow"
+  read -r -u 3 -p "→ Enter Dify bot type (default: Chat): " DIFY_BOT_TYPE
+  if [ -z "$DIFY_BOT_TYPE" ]; then
+    DIFY_BOT_TYPE="Chat"
+  fi
+  LLM_ENVS+=("DIFY_API_KEY" "DIFY_API_URL" "DIFY_BOT_TYPE")
+  if [ "$DIFY_BOT_TYPE" == "Workflow" ]; then
+    read -r -u 3 -p "→ Enter Dify input variable name: " DIFY_INPUT_VARIABLE
+    read -r -u 3 -p "→ Enter Dify output variable name: " DIFY_OUTPUT_VARIABLE
+    LLM_ENVS+=("DIFY_INPUT_VARIABLE" "DIFY_OUTPUT_VARIABLE")
+  fi
+}
+
+configureSparkProvider() {
+  echo "Note: iFlyTek Spark API Key format is APIKey:APISecret"
+  read -r -u 3 -p "→ Enter API Key for iFlyTek Spark: " SPARK_API_KEY
+  read -r -u 3 -p "→ Enter API Secret for iFlyTek Spark: " SPARK_API_SECRET
+  if [ -n "$SPARK_API_KEY" ] && [ -n "$SPARK_API_SECRET" ]; then
+    SPARK_API_KEY="${SPARK_API_KEY}:${SPARK_API_SECRET}"
+    SPARK_CONFIGURED="placeholder"
+  fi
+  LLM_ENVS+=("SPARK_API_KEY")
+}
+
+configureHunyuanProvider() {
+  read -r -u 3 -p "→ Enter Auth ID for Tencent Hunyuan: " HUNYUAN_AUTH_ID
+  read -r -u 3 -p "→ Enter Auth Key for Tencent Hunyuan: " HUNYUAN_AUTH_KEY
+  LLM_ENVS+=("HUNYUAN_AUTH_ID" "HUNYUAN_AUTH_KEY")
 }
 
 configureStorage() {
