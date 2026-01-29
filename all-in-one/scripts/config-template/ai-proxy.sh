@@ -5,7 +5,7 @@ ROOT=$(pwd)
 cd - >/dev/null
 source $ROOT/../base.sh
 
-AI_PROXY_VERSION=${AI_PROXY_VERSION:-1.0.0}
+AI_PROXY_VERSION=${AI_PROXY_VERSION:-2.0.0}
 
 if [ -n "$AZURE_OPENAI_SERVICE_URL" ]; then
   AZURE_OPENAI_SERVICE_DOMAIN=$(echo "$AZURE_OPENAI_SERVICE_URL" | awk -F[/:] '{print $4}')
