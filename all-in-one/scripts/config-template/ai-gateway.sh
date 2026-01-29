@@ -123,7 +123,7 @@ metadata:
     higress.io/wasm-plugin-built-in: \"true\"
     higress.io/wasm-plugin-category: ai
     higress.io/wasm-plugin-name: ai-proxy
-    higress.io/wasm-plugin-version: 2.0.0
+    higress.io/wasm-plugin-version: 1.0.0
   name: ai-proxy.internal
   namespace: higress-system
   resourceVersion: \"1\"
