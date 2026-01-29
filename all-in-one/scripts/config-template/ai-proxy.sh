@@ -15,7 +15,7 @@ fi
 
 function initializeWasmPlugins() {
   mkdir -p /data/wasmplugins
-  WASM_PLUGIN_CONFIG_FILE="/data/wasmplugins/ai-proxy-$AI_PROXY_VERSION.yaml"
+  WASM_PLUGIN_CONFIG_FILE="/data/wasmplugins/ai-proxy-1.0.0.yaml"
 
   if [ "$CONSOLE_USED" == 'true' -a -f "$WASM_PLUGIN_CONFIG_FILE" ]; then
     return
@@ -64,8 +64,8 @@ metadata:
     higress.io/wasm-plugin-built-in: \"true\"
     higress.io/wasm-plugin-category: custom
     higress.io/wasm-plugin-name: ai-proxy
-    higress.io/wasm-plugin-version: $AI_PROXY_VERSION
-  name: ai-proxy-$AI_PROXY_VERSION
+    higress.io/wasm-plugin-version: 1.0.0
+  name: ai-proxy-1.0.0
   namespace: higress-system
 spec:
   defaultConfig: {}

@@ -171,8 +171,8 @@ metadata:
     higress.io/wasm-plugin-built-in: \"true\"
     higress.io/wasm-plugin-category: ai
     higress.io/wasm-plugin-name: ai-statistics
-    higress.io/wasm-plugin-version: 2.0.0
-  name: ai-statistics-2.0.0
+    higress.io/wasm-plugin-version: 1.0.0
+  name: ai-statistics-1.0.0
   namespace: higress-system
   resourceVersion: \"1\"
 spec:
@@ -181,7 +181,7 @@ spec:
   matchRules:$AI_STATISTICS_MATCH_RULES
   phase: UNSPECIFIED_PHASE
   priority: 900
-  url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/ai-statistics:$AI_STATISTICS_VERSION" >"$WASM_PLUGIN_CONFIG_FOLDER/ai-statistics-2.0.0.yaml"
+  url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/ai-statistics:$AI_STATISTICS_VERSION" >"$WASM_PLUGIN_CONFIG_FOLDER/ai-statistics-1.0.0.yaml"
 
   echo -e "\
 apiVersion: extensions.higress.io/v1alpha1
@@ -194,7 +194,7 @@ metadata:
     higress.io/wasm-plugin-built-in: \"true\"
     higress.io/wasm-plugin-category: ai
     higress.io/wasm-plugin-name: model-router
-    higress.io/wasm-plugin-version: 2.0.0
+    higress.io/wasm-plugin-version: 1.0.0
   name: model-router.internal
   namespace: higress-system
   resourceVersion: \"1\"
