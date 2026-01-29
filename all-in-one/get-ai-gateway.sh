@@ -41,9 +41,20 @@ KNOWN_COMMANDS=($COMMAND_START, $COMMAND_STOP, $COMMAND_DELETE)
 
 cd "$(dirname -- "$0")"
 ROOT="$(pwd -P)/higress"
+SCRIPT_DIR="$(pwd -P)"
 cd - >/dev/null
 
 CONFIGURED_MARK="$ROOT/.configured"
+
+# Clawdbot integration paths
+CLAWDBOT_WORKSPACE="$HOME/clawd"
+CLAWDBOT_EXTENSIONS_DIR="$HOME/.clawdbot/extensions"
+CLAWDBOT_SKILLS_DIR="$CLAWDBOT_WORKSPACE/skills/public"
+CLAWDBOT_INTEGRATION_DIR="$SCRIPT_DIR/clawdbot-integration"
+
+# Auto-routing configuration
+ENABLE_AUTO_ROUTING="false"
+AUTO_ROUTING_DEFAULT_MODEL=""
 
 initArch() {
   ARCH=$(uname -m)
@@ -137,6 +148,150 @@ resetEnv() {
   CONSOLE_PORT="${CONSOLE_PORT:-$DEFAULT_CONSOLE_PORT}"
 
   LLM_ENVS=()
+}
+
+# Check if Clawdbot is installed
+checkClawdbot() {
+  if [ -d "$CLAWDBOT_WORKSPACE" ]; then
+    return 0
+  fi
+  return 1
+}
+
+# Configure Clawdbot integration
+configureClawdbotIntegration() {
+  if ! checkClawdbot; then
+    return 0
+  fi
+
+  echo
+  echo "======================================================="
+  echo "          Clawdbot Integration Detected                "
+  echo "======================================================="
+  echo
+  echo "Clawdbot workspace found at: $CLAWDBOT_WORKSPACE"
+  echo
+  echo "Higress AI Gateway can integrate with Clawdbot to provide:"
+  echo "  1. Auto-routing: Automatically route requests to different models"
+  echo "     based on message content (e.g., 'deep thinking' → claude-opus-4.5)"
+  echo "  2. Model provider: Use Higress as a unified model provider in Clawdbot"
+  echo
+
+  read -r -u 3 -p "Enable auto-routing feature? (y/N): " enableAutoRouting
+  case "$enableAutoRouting" in
+    [yY]|[yY][eE][sS])
+      ENABLE_AUTO_ROUTING="true"
+      
+      echo
+      echo "Auto-routing allows you to route requests to different models based on"
+      echo "keywords in your message. For example:"
+      echo "  - '深入思考 ...' or 'deep thinking ...' → reasoning model"
+      echo "  - '写代码 ...' or 'code: ...' → coding model"
+      echo
+
+      # Get default model for auto-routing
+      read -r -u 3 -p "Default model when no routing rule matches (default: qwen-turbo): " defaultModel
+      if [ -z "$defaultModel" ]; then
+        AUTO_ROUTING_DEFAULT_MODEL="qwen-turbo"
+      else
+        AUTO_ROUTING_DEFAULT_MODEL="$defaultModel"
+      fi
+
+      echo
+      echo "You can configure routing rules later using natural language in Clawdbot."
+      echo "For example, say: 'route to claude-opus-4.5 when solving difficult problems'"
+      echo
+      ;;
+    *)
+      ENABLE_AUTO_ROUTING="false"
+      echo "Auto-routing disabled. You can enable it later via Higress Console."
+      ;;
+  esac
+
+  # Install Clawdbot plugin and skill
+  installClawdbotPlugin
+  installClawdbotSkill
+}
+
+# Install Clawdbot plugin
+installClawdbotPlugin() {
+  if [ ! -d "$CLAWDBOT_INTEGRATION_DIR/plugin" ]; then
+    echo "Warning: Plugin source not found at $CLAWDBOT_INTEGRATION_DIR/plugin"
+    return 1
+  fi
+
+  echo "Installing Higress AI Gateway plugin for Clawdbot..."
+  
+  # Create extensions directory if not exists
+  mkdir -p "$CLAWDBOT_EXTENSIONS_DIR"
+
+  # Copy plugin files
+  local PLUGIN_DEST="$CLAWDBOT_EXTENSIONS_DIR/higress-ai-gateway"
+  if [ -d "$PLUGIN_DEST" ]; then
+    echo "Plugin already exists, updating..."
+    rm -rf "$PLUGIN_DEST"
+  fi
+
+  cp -r "$CLAWDBOT_INTEGRATION_DIR/plugin" "$PLUGIN_DEST"
+  
+  echo "✓ Plugin installed at: $PLUGIN_DEST"
+
+  # Generate plugin configuration snippet
+  local GATEWAY_URL="http://localhost:$GATEWAY_HTTP_PORT"
+  local CONSOLE_URL="http://localhost:$CONSOLE_PORT"
+  
+  echo
+  echo "To complete plugin setup, run:"
+  echo "  clawdbot models auth login --provider higress"
+  echo
+  echo "Or add to your Clawdbot config (config.yaml):"
+  echo
+  cat <<EOF
+  models:
+    providers:
+      higress:
+        baseUrl: ${GATEWAY_URL}/v1
+        apiKey: higress-local
+        api: openai-completions
+        authHeader: false
+        models:
+          - id: higress/auto
+            name: Higress Auto Router
+            api: openai-completions
+          - id: qwen-turbo
+            name: Qwen Turbo
+            api: openai-completions
+EOF
+  echo
+}
+
+# Install Clawdbot skill
+installClawdbotSkill() {
+  if [ ! -d "$CLAWDBOT_INTEGRATION_DIR/skill/higress-auto-router" ]; then
+    echo "Warning: Skill source not found"
+    return 1
+  fi
+
+  echo "Installing Higress Auto Router skill for Clawdbot..."
+
+  # Create skills directory if not exists
+  mkdir -p "$CLAWDBOT_SKILLS_DIR"
+
+  # Copy skill files
+  local SKILL_DEST="$CLAWDBOT_SKILLS_DIR/higress-auto-router"
+  if [ -d "$SKILL_DEST" ]; then
+    echo "Skill already exists, updating..."
+    rm -rf "$SKILL_DEST"
+  fi
+
+  cp -r "$CLAWDBOT_INTEGRATION_DIR/skill/higress-auto-router" "$SKILL_DEST"
+
+  echo "✓ Skill installed at: $SKILL_DEST"
+  echo
+  echo "To configure auto-routing, tell Clawdbot something like:"
+  echo "  '我希望在解决困难问题时路由到claude-opus-4.5的模型'"
+  echo "  'route to qwen-coder when writing code'"
+  echo
 }
 
 # Configuration wizard
@@ -234,6 +389,9 @@ runConfigWizard() {
     echo "Error: Can only configure either OpenAI or Azure OpenAI, not both"
     exit 1
   fi
+
+  # Configure Clawdbot integration if detected
+  configureClawdbotIntegration
 }
 
 configureAzureProvider() {
@@ -451,6 +609,15 @@ writeConfiguration() {
     LLM_CONFIGS="$LLM_CONFIGS
 ${env}=${!env}"
   done
+
+  # Add auto-routing configuration if enabled
+  local AUTO_ROUTING_CONFIG=""
+  if [ "$ENABLE_AUTO_ROUTING" == "true" ]; then
+    AUTO_ROUTING_CONFIG="
+ENABLE_AUTO_ROUTING=true
+AUTO_ROUTING_DEFAULT_MODEL=${AUTO_ROUTING_DEFAULT_MODEL}"
+  fi
+
   cat <<EOF >$DATA_FOLDER/$CONFIG_FILENAME
 MODE=full
 O11Y=on
@@ -458,7 +625,7 @@ CONFIG_TEMPLATE=ai-gateway
 GATEWAY_HTTP_PORT=${GATEWAY_HTTP_PORT}
 GATEWAY_HTTPS_PORT=${GATEWAY_HTTPS_PORT}
 CONSOLE_PORT=${CONSOLE_PORT}
-${LLM_CONFIGS}
+${LLM_CONFIGS}${AUTO_ROUTING_CONFIG}
 EOF
 }
 
@@ -493,6 +660,34 @@ outputWelcomeMessage() {
   echo "Higress AI Gateway chat completion endpoint:"
   echo "    http://localhost:$GATEWAY_HTTP_PORT/v1/chat/completions"
   echo
+
+  # Show auto-routing info if enabled
+  if [ "$ENABLE_AUTO_ROUTING" == "true" ]; then
+    echo "======================================================="
+    echo "                   Auto-Routing Mode                   "
+    echo "======================================================="
+    echo
+    echo "Auto-routing is enabled! Use model 'higress/auto' to automatically"
+    echo "route requests based on message content."
+    echo
+    echo "Default model: $AUTO_ROUTING_DEFAULT_MODEL"
+    echo
+    echo "Example with auto-routing:"
+    echo
+    echo "    curl 'http://localhost:$GATEWAY_HTTP_PORT/v1/chat/completions' \\"
+    echo "      -H 'Content-Type: application/json' \\"
+    echo "      -d '{"
+    echo "        \"model\": \"higress/auto\","
+    echo '        "messages": ['
+    echo "          {"
+    echo '            "role": "user",'
+    echo '            "content": "深入思考 如何设计一个高并发系统？"'
+    echo "          }"
+    echo "        ]"
+    echo "      }'"
+    echo
+  fi
+
   echo "You can try it with cURL directly:"
   echo
   echo "    curl 'http://localhost:$GATEWAY_HTTP_PORT/v1/chat/completions' \\"
@@ -514,6 +709,23 @@ outputWelcomeMessage() {
   echo
   echo "Higress Console URL (open with browser):"
   echo "   http://localhost:$CONSOLE_PORT"
+
+  # Show Clawdbot integration info if detected
+  if checkClawdbot; then
+    echo
+    echo "======================================================="
+    echo "              Clawdbot Integration                     "
+    echo "======================================================="
+    echo
+    echo "Higress AI Gateway plugin and skill have been installed."
+    echo
+    echo "To complete setup, run:"
+    echo "   clawdbot models auth login --provider higress"
+    echo
+    echo "To configure auto-routing rules, tell Clawdbot:"
+    echo "   '我希望在解决困难问题时路由到claude-opus-4.5的模型'"
+    echo
+  fi
 
   echo
   echo "To stop the gateway run:"

@@ -1,0 +1,31 @@
+{
+  "id": "higress-ai-gateway",
+  "name": "Higress AI Gateway",
+  "description": "Model provider plugin for Higress AI Gateway with auto-routing support",
+  "providers": ["higress"],
+  "skills": ["higress-auto-router"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "gatewayUrl": {
+        "type": "string",
+        "description": "Higress AI Gateway URL (e.g., http://localhost:8080)"
+      },
+      "consoleUrl": {
+        "type": "string",
+        "description": "Higress Console URL for configuration (e.g., http://localhost:8001)"
+      }
+    }
+  },
+  "uiHints": {
+    "gatewayUrl": {
+      "label": "Gateway URL",
+      "placeholder": "http://localhost:8080"
+    },
+    "consoleUrl": {
+      "label": "Console URL",
+      "placeholder": "http://localhost:8001"
+    }
+  }
+}
