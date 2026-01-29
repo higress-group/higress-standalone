@@ -6,10 +6,10 @@ Configure automatic model routing based on user's natural language requests.
 
 This skill enables users to configure Higress AI Gateway's model-router plugin through natural language commands. When a user describes their routing preference (e.g., "route to claude-opus-4.5 when solving difficult problems"), this skill will:
 
-1. Analyze the user's request to understand the routing intent
+1. Analyze user's request to understand the routing intent
 2. Generate appropriate regex patterns that are distinctive and easy to remember
-3. Modify the model-router configuration file directly at `/data/wasmplugins/model-router.internal.yaml`
-4. Restart Higress Gateway to apply the changes
+3. Modify model-router configuration file **inside the container** at `/data/wasmplugins/model-router.internal.yaml`
+4. Trigger Higress configuration reload (no container restart needed)
 5. Confirm the configuration and explain how to trigger the route
 
 ## When to Use
@@ -21,14 +21,14 @@ Use this skill when:
 
 ## Prerequisites
 
-- Higress AI Gateway running
-- Access to modify `/data/wasmplugins/model-router.internal.yaml`
-- Ability to restart Higress container
+- Higress AI Gateway container running
+- Container name: `higress-ai-gateway` (default) or user-specified
+- Ability to execute `docker exec` commands
 
-## Configuration Files
+## Configuration Location
 
-**Higress Gateway Data Directory:** Usually the directory where the container mounts data (default: `/root/higress/`)
-**Model Router Config:** `<data_dir>/wasmplugins/model-router.internal.yaml`
+**Inside Container:** `/data/wasmplugins/model-router.internal.yaml`
+**Default Container Name:** `higress-ai-gateway`
 
 ## Workflow
 
@@ -55,20 +55,20 @@ Common mappings:
 | Image generation | `画图:`, `draw:`, `image:` | `(?i)^(画图:|draw:|image:)` |
 | Quick answers | `快速回答`, `quick:` | `(?i)^(快速回答|quick:)` |
 
-### Step 3: Find Configuration File
+### Step 3: Determine Container Name
 
-The model-router configuration file is typically at one of these locations:
-- `/root/higress/wasmplugins/model-router.internal.yaml` (default)
-- `/data/wasmplugins/model-router.internal.yaml` (inside container)
-
-Check these locations and use the first one that exists.
+Try to find the Higress container:
+1. Default: `higress-ai-gateway`
+2. If not found, list running containers and ask user to specify
+3. Use `docker ps --filter "name=higress"` to find containers
 
 ### Step 4: Read Existing Configuration
 
-Read the current `model-router.internal.yaml` file to understand:
-- Current `autoRouting` configuration (if any)
-- Existing rules to avoid conflicts
-- Default model setting
+Read the current `model-router.internal.yaml` file from inside the container:
+
+```bash
+docker exec <container_name> cat /data/wasmplugins/model-router.internal.yaml
+```
 
 Example configuration structure:
 ```yaml
@@ -91,48 +91,48 @@ spec:
 ### Step 5: Check for Conflicts
 
 Before adding a new rule:
-- Parse existing rules from the config
+- Parse existing rules from config
 - Check if the new pattern conflicts with existing ones
 - If conflict detected, suggest alternative trigger phrases
 
-### Step 6: Update Configuration File
+### Step 6: Modify Configuration File Inside Container
 
-Modify the YAML file to add/update the autoRouting configuration. Use a YAML parser or carefully structured text replacement.
+Use `docker exec` to modify the YAML file directly inside the container:
 
-**Structure:**
-```yaml
-spec:
-  defaultConfig:
-    modelToHeader: x-higress-llm-model
-    autoRouting:
-      enable: true
-      defaultModel: qwen-turbo
-      rules:
-        - pattern: (?i)^(深入思考|deep thinking)
-          model: claude-opus-4.5
-        - pattern: (?i)^(写代码|code:)
-          model: qwen-coder
+```bash
+# Option 1: Use sed to add rule
+docker exec <container_name> sed -i '/rules:/a\        - pattern: (?i)^(深入思考|deep thinking)\n          model: claude-opus-4.5' /data/wasmplugins/model-router.internal.yaml
+
+# Option 2: Copy file out, modify, copy back (safer)
+docker cp <container_name>:/data/wasmplugins/model-router.internal.yaml /tmp/model-router.yaml
+# Edit /tmp/model-router.yaml with new rule
+docker cp /tmp/model-router.yaml <container_name>:/data/wasmplugins/model-router.internal.yaml
 ```
 
+**Recommended approach: Copy out, modify, copy in** for safety and proper YAML formatting.
+
 **Important:**
-- Ensure proper YAML indentation
-- Keep the existing `modelToHeader` configuration
+- Ensure proper YAML indentation (2 spaces per level)
+- Keep existing `modelToHeader` configuration
 - Use `(?i)` for case-insensitive patterns
 - Use `^` to anchor pattern to message start (prevents false matches)
 
-### Step 7: Restart Higress Gateway
+### Step 7: Trigger Configuration Reload
 
-After modifying the configuration, restart the Higress container to apply changes:
+After modifying the configuration, trigger Higress to reload the plugin configuration **without restarting the container**:
 
 ```bash
-# If running via Docker
-docker restart higress-ai-gateway
+# Method 1: Touch the configuration file to trigger reload
+docker exec <container_name> touch /data/wasmplugins/model-router.internal.yaml
 
-# Or via systemd/systemd-managed container
-systemctl restart higress-gateway
+# Method 2: Use Higress's configuration reload endpoint (if available)
+curl -X POST http://localhost:8001/api/v1/plugins/reload
+
+# Method 3: Send SIGHUP to the Higress process (if supported)
+docker exec <container_name> kill -HUP 1
 ```
 
-Wait a few seconds for the gateway to be ready.
+**Note:** Higress watches configuration files in `/data/wasmplugins/` and automatically reloads when they are modified. The modification itself should trigger a reload. If not, use Method 1 (touch) to ensure the file's timestamp is updated.
 
 ### Step 8: Confirm to User
 
@@ -144,8 +144,8 @@ After successful configuration, inform the user:
 
 已添加规则：当消息以 "深入思考" 或 "deep thinking" 开头时，自动路由到 claude-opus-4.5 模型。
 
-配置文件已更新：/root/higress/wasmplugins/model-router.internal.yaml
-Higress Gateway 已重启以应用新配置。
+配置文件已更新（容器内）：/data/wasmplugins/model-router.internal.yaml
+配置已自动重载，无需重启容器。
 
 使用方式：
 - 中文：深入思考 如何优化这段代码的性能？
@@ -156,11 +156,11 @@ Higress Gateway 已重启以应用新配置。
 
 ## Error Handling
 
-- **Configuration file not found**: Inform user to check Higress installation directory
+- **Container not found**: List running containers and ask user to specify the correct container name
 - **Pattern conflicts**: Suggest alternative trigger phrases
 - **Invalid model name**: List available models from configured providers
-- **YAML parsing errors**: Report the specific line/issue and suggest manual review
-- **Restart failed**: Provide manual restart instructions
+- **YAML parsing errors**: Report the issue and suggest reviewing the file manually
+- **Permission errors**: Ensure the Docker socket is accessible and the user has necessary permissions
 
 ## Examples
 
@@ -173,8 +173,8 @@ Higress Gateway 已重启以应用新配置。
 触发方式：以 "深入思考" 或 "deep thinking" 开头发起请求
 目标模型：claude-opus-4.5
 
-配置文件：/root/higress/wasmplugins/model-router.internal.yaml
-Higress Gateway 已重启
+配置文件已更新（容器内）：/data/wasmplugins/model-router.internal.yaml
+配置已自动重载
 
 配置已生效。现在您可以这样使用：
 - 深入思考 这道算法题应该怎么解？
@@ -190,8 +190,8 @@ Higress Gateway 已重启
 触发方式：以 "写代码" 或 "code:" 开头发起请求
 目标模型：qwen-coder
 
-配置文件：/root/higress/wasmplugins/model-router.internal.yaml
-Higress Gateway 已重启
+配置文件已更新（容器内）：/data/wasmplugins/model-router.internal.yaml
+配置已自动重载
 
 配置已生效。使用示例：
 - 写代码 实现一个快速排序算法
@@ -202,8 +202,62 @@ Higress Gateway 已重启
 
 When implementing this skill:
 
-1. **Use a YAML library** (like `yaml` in Python or `js-yaml` in Node.js) for safe configuration manipulation
-2. **Backup before modification**: Always create a backup of the original config file
-3. **Validate YAML**: After modification, validate the YAML syntax before restarting
-4. **Wait for restart**: Ensure the gateway is fully started before confirming to user
-5. **Handle permissions**: Ensure the process has write access to the config file
+1. **Determine container name**: Use `docker ps` to find the running Higress container
+2. **Use docker cp for safety**: Copy the file out, modify with a YAML library, then copy it back
+3. **Validate YAML**: Before copying back, validate the YAML syntax
+4. **Trigger reload**: Higress automatically watches for file changes in `/data/wasmplugins/`
+5. **No restart needed**: Configuration changes are hot-reloaded by Higress
+6. **Handle timestamps**: Touch the file after modification to ensure Higress detects the change
+
+### Example Python Implementation
+
+```python
+import subprocess
+import yaml
+import tempfile
+import os
+
+CONTAINER_NAME = "higress-ai-gateway"
+CONFIG_PATH = "/data/wasmplugins/model-router.internal.yaml"
+
+def read_container_config():
+    result = subprocess.run(
+        ["docker", "exec", CONTAINER_NAME, "cat", CONFIG_PATH],
+        capture_output=True,
+        text=True
+    )
+    return yaml.safe_load(result.stdout)
+
+def write_container_config(config):
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        yaml.dump(config, f, default_flow_style=False)
+        temp_path = f.name
+    
+    # Copy back to container
+    subprocess.run(["docker", "cp", temp_path, f"{CONTAINER_NAME}:{CONFIG_PATH}"])
+    
+    # Clean up
+    os.unlink(temp_path)
+    
+    # Touch file to trigger reload
+    subprocess.run(["docker", "exec", CONTAINER_NAME, "touch", CONFIG_PATH])
+
+def add_routing_rule(pattern, model):
+    config = read_container_config()
+    
+    # Ensure autoRouting exists
+    if 'autoRouting' not in config['spec']['defaultConfig']:
+        config['spec']['defaultConfig']['autoRouting'] = {
+            'enable': True,
+            'defaultModel': 'qwen-turbo',
+            'rules': []
+        }
+    
+    # Add rule
+    config['spec']['defaultConfig']['autoRouting']['rules'].append({
+        'pattern': pattern,
+        'model': model
+    })
+    
+    write_container_config(config)
+```
