@@ -294,6 +294,54 @@ installClawdbotSkill() {
   echo
 }
 
+# Configure auto-routing in model-router plugin
+configureAutoRouting() {
+  if [ "$ENABLE_AUTO_ROUTING" != "true" ]; then
+    return 0
+  fi
+
+  echo "Configuring auto-routing in model-router plugin..."
+
+  local MODEL_ROUTER_FILE="$ROOT/wasmplugins/model-router.internal.yaml"
+  
+  # Wait for the file to be created (it's created when the container starts)
+  local MAX_WAIT=30
+  local WAIT_COUNT=0
+  while [ ! -f "$MODEL_ROUTER_FILE" ] && [ $WAIT_COUNT -lt $MAX_WAIT ]; do
+    sleep 1
+    WAIT_COUNT=$((WAIT_COUNT + 1))
+  done
+
+  if [ ! -f "$MODEL_ROUTER_FILE" ]; then
+    echo "Warning: Could not find model-router configuration file at $MODEL_ROUTER_FILE"
+    echo "Auto-routing will be configured manually later."
+    return 1
+  fi
+
+  # Backup the original file
+  cp "$MODEL_ROUTER_FILE" "${MODEL_ROUTER_FILE}.backup"
+
+  # Add auto-routing configuration to the defaultConfig section
+  # The file has this structure:
+  # spec:
+  #   defaultConfig:
+  #     modelToHeader: x-higress-llm-model
+  
+  # We need to add:
+  #   autoRouting:
+  #     enable: true
+  #     defaultModel: qwen-turbo
+
+  # Use sed to insert the auto-routing configuration after modelToHeader line
+  sed -i "/modelToHeader: x-higress-llm-model/a\\
+    autoRouting:\\
+      enable: true\\
+      defaultModel: $AUTO_ROUTING_DEFAULT_MODEL" "$MODEL_ROUTER_FILE"
+
+  echo "✓ Auto-routing configured with default model: $AUTO_ROUTING_DEFAULT_MODEL"
+  echo "  Configuration file: $MODEL_ROUTER_FILE"
+}
+
 # Configuration wizard
 runConfigWizard() {
   echo "Provide a key for each LLM provider you want to enable, then press Enter."
@@ -610,14 +658,6 @@ writeConfiguration() {
 ${env}=${!env}"
   done
 
-  # Add auto-routing configuration if enabled
-  local AUTO_ROUTING_CONFIG=""
-  if [ "$ENABLE_AUTO_ROUTING" == "true" ]; then
-    AUTO_ROUTING_CONFIG="
-ENABLE_AUTO_ROUTING=true
-AUTO_ROUTING_DEFAULT_MODEL=${AUTO_ROUTING_DEFAULT_MODEL}"
-  fi
-
   cat <<EOF >$DATA_FOLDER/$CONFIG_FILENAME
 MODE=full
 O11Y=on
@@ -625,7 +665,7 @@ CONFIG_TEMPLATE=ai-gateway
 GATEWAY_HTTP_PORT=${GATEWAY_HTTP_PORT}
 GATEWAY_HTTPS_PORT=${GATEWAY_HTTPS_PORT}
 CONSOLE_PORT=${CONSOLE_PORT}
-${LLM_CONFIGS}${AUTO_ROUTING_CONFIG}
+${LLM_CONFIGS}
 EOF
 }
 
@@ -772,6 +812,13 @@ start() {
     --mount "type=bind,source=$NORMALIZED_DATA_FOLDER_PATH,target=/data" "$IMAGE_REPO:$IMAGE_TAG" >/dev/null
 
   if [ $? -eq 0 ]; then
+    # Wait a moment for the container to generate initial config files
+    echo "Waiting for gateway to initialize..."
+    sleep 5
+    
+    # Configure auto-routing if enabled
+    configureAutoRouting
+    
     outputWelcomeMessage
   fi
 }
