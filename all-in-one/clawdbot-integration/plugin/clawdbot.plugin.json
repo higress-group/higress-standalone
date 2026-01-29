@@ -1,0 +1,7 @@
+{
+  "id": "higress-ai-gateway",
+  "name": "Higress AI Gateway",
+  "description": "Model provider plugin for Higress AI Gateway with auto-routing support",
+  "providers": ["higress"],
+  "skills": ["higress-auto-router"]
+}
