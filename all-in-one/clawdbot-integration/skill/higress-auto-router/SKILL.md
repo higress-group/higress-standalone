@@ -122,17 +122,10 @@ docker cp /tmp/model-router.yaml <container_name>:/data/wasmplugins/model-router
 After modifying the configuration, trigger Higress to reload the plugin configuration **without restarting the container**:
 
 ```bash
-# Method 1: Touch the configuration file to trigger reload
 docker exec <container_name> touch /data/wasmplugins/model-router.internal.yaml
-
-# Method 2: Use Higress's configuration reload endpoint (if available)
-curl -X POST http://localhost:8001/api/v1/plugins/reload
-
-# Method 3: Send SIGHUP to the Higress process (if supported)
-docker exec <container_name> kill -HUP 1
 ```
 
-**Note:** Higress watches configuration files in `/data/wasmplugins/` and automatically reloads when they are modified. The modification itself should trigger a reload. If not, use Method 1 (touch) to ensure the file's timestamp is updated.
+**Note:** Higress watches configuration files in `/data/wasmplugins/` and automatically reloads when they are modified. Touching the file ensures the timestamp is updated to trigger the reload.
 
 ### Step 8: Confirm to User
 
