@@ -86,6 +86,15 @@ normalizePath() {
   echo "$(cygpath -m "$1")"
 }
 
+# Cross-platform sed in-place edit (macOS vs Linux)
+sedInPlace() {
+  if [ "$OS" == "darwin" ]; then
+    sed -i '' "$@"
+  else
+    sed -i "$@"
+  fi
+}
+
 parseArgs() {
   resetEnv
 
@@ -150,12 +159,56 @@ resetEnv() {
   LLM_ENVS=()
 }
 
+# Load saved configuration from config file
+loadSavedConfig() {
+  local CONFIG_FILE="$ROOT/$CONFIG_FILENAME"
+  if [ -f "$CONFIG_FILE" ]; then
+    # Read ENABLE_AUTO_ROUTING and AUTO_ROUTING_DEFAULT_MODEL from config
+    local saved_auto_routing=$(grep "^ENABLE_AUTO_ROUTING=" "$CONFIG_FILE" | cut -d'=' -f2)
+    local saved_default_model=$(grep "^AUTO_ROUTING_DEFAULT_MODEL=" "$CONFIG_FILE" | cut -d'=' -f2)
+    if [ -n "$saved_auto_routing" ]; then
+      ENABLE_AUTO_ROUTING="$saved_auto_routing"
+    fi
+    if [ -n "$saved_default_model" ]; then
+      AUTO_ROUTING_DEFAULT_MODEL="$saved_default_model"
+    fi
+  fi
+}
+
 # Check if Clawdbot is installed
 checkClawdbot() {
   if [ -d "$CLAWDBOT_WORKSPACE" ]; then
     return 0
   fi
   return 1
+}
+
+# Generic function to install files to a destination
+installFiles() {
+  local SRC_DIR="$1"
+  local DEST_DIR="$2"
+  local NAME="$3"
+
+  if [ ! -d "$SRC_DIR" ]; then
+    echo "Warning: $NAME source not found at $SRC_DIR"
+    return 1
+  fi
+
+  echo "Installing $NAME..."
+  
+  # Create parent directory if not exists
+  mkdir -p "$(dirname "$DEST_DIR")"
+
+  # Remove existing if present
+  if [ -d "$DEST_DIR" ]; then
+    echo "$NAME already exists, updating..."
+    rm -rf "$DEST_DIR"
+  fi
+
+  cp -r "$SRC_DIR" "$DEST_DIR"
+  
+  echo "✓ $NAME installed at: $DEST_DIR"
+  return 0
 }
 
 # Configure Clawdbot integration
@@ -208,93 +261,17 @@ configureClawdbotIntegration() {
       ;;
   esac
 
-  # Install Clawdbot plugin and skill
-  installClawdbotPlugin
-  installClawdbotSkill
-}
-
-# Install Clawdbot plugin
-installClawdbotPlugin() {
-  if [ ! -d "$CLAWDBOT_INTEGRATION_DIR/plugin" ]; then
-    echo "Warning: Plugin source not found at $CLAWDBOT_INTEGRATION_DIR/plugin"
-    return 1
-  fi
-
-  echo "Installing Higress AI Gateway plugin for Clawdbot..."
-  
-  # Create extensions directory if not exists
-  mkdir -p "$CLAWDBOT_EXTENSIONS_DIR"
-
-  # Copy plugin files
-  local PLUGIN_DEST="$CLAWDBOT_EXTENSIONS_DIR/higress-ai-gateway"
-  if [ -d "$PLUGIN_DEST" ]; then
-    echo "Plugin already exists, updating..."
-    rm -rf "$PLUGIN_DEST"
-  fi
-
-  cp -r "$CLAWDBOT_INTEGRATION_DIR/plugin" "$PLUGIN_DEST"
-  
-  echo "✓ Plugin installed at: $PLUGIN_DEST"
-
-  # Generate plugin configuration snippet
-  local GATEWAY_URL="http://localhost:$GATEWAY_HTTP_PORT"
-  local CONSOLE_URL="http://localhost:$CONSOLE_PORT"
+  # Install Clawdbot plugin and skill using generic function
+  installFiles "$CLAWDBOT_INTEGRATION_DIR/plugin" "$CLAWDBOT_EXTENSIONS_DIR/higress-ai-gateway" "Higress AI Gateway plugin"
+  installFiles "$CLAWDBOT_INTEGRATION_DIR/skill/higress-auto-router" "$CLAWDBOT_SKILLS_DIR/higress-auto-router" "Higress Auto Router skill"
   
   echo
-  echo "To complete plugin setup, run:"
+  echo "To complete Clawdbot setup, run:"
   echo "  clawdbot models auth login --provider higress"
   echo
-  echo "Or add to your Clawdbot config (config.yaml):"
-  echo
-  cat <<EOF
-  models:
-    providers:
-      higress:
-        baseUrl: ${GATEWAY_URL}/v1
-        apiKey: higress-local
-        api: openai-completions
-        authHeader: false
-        models:
-          - id: higress/auto
-            name: Higress Auto Router
-            api: openai-completions
-          - id: qwen-turbo
-            name: Qwen Turbo
-            api: openai-completions
-EOF
-  echo
 }
 
-# Install Clawdbot skill
-installClawdbotSkill() {
-  if [ ! -d "$CLAWDBOT_INTEGRATION_DIR/skill/higress-auto-router" ]; then
-    echo "Warning: Skill source not found"
-    return 1
-  fi
-
-  echo "Installing Higress Auto Router skill for Clawdbot..."
-
-  # Create skills directory if not exists
-  mkdir -p "$CLAWDBOT_SKILLS_DIR"
-
-  # Copy skill files
-  local SKILL_DEST="$CLAWDBOT_SKILLS_DIR/higress-auto-router"
-  if [ -d "$SKILL_DEST" ]; then
-    echo "Skill already exists, updating..."
-    rm -rf "$SKILL_DEST"
-  fi
-
-  cp -r "$CLAWDBOT_INTEGRATION_DIR/skill/higress-auto-router" "$SKILL_DEST"
-
-  echo "✓ Skill installed at: $SKILL_DEST"
-  echo
-  echo "To configure auto-routing, tell Clawdbot something like:"
-  echo "  '我希望在解决困难问题时路由到claude-opus-4.5的模型'"
-  echo "  'route to qwen-coder when writing code'"
-  echo
-}
-
-# Configure auto-routing in model-router plugin
+# Configure auto-routing in model-router plugin (inside container)
 configureAutoRouting() {
   if [ "$ENABLE_AUTO_ROUTING" != "true" ]; then
     return 0
@@ -321,22 +298,26 @@ configureAutoRouting() {
   # Backup the original file
   cp "$MODEL_ROUTER_FILE" "${MODEL_ROUTER_FILE}.backup"
 
-  # Add auto-routing configuration to the defaultConfig section
-  # The file has this structure:
-  # spec:
-  #   defaultConfig:
-  #     modelToHeader: x-higress-llm-model
+  # Create a temp file with the new content
+  local TEMP_FILE=$(mktemp)
   
-  # We need to add:
-  #   autoRouting:
-  #     enable: true
-  #     defaultModel: qwen-turbo
+  # Read the file and insert auto-routing config after modelToHeader line
+  awk -v model="$AUTO_ROUTING_DEFAULT_MODEL" '
+    /modelToHeader: x-higress-llm-model/ {
+      print
+      print "    autoRouting:"
+      print "      enable: true"
+      print "      defaultModel: " model
+      next
+    }
+    { print }
+  ' "$MODEL_ROUTER_FILE" > "$TEMP_FILE"
 
-  # Use sed to insert the auto-routing configuration after modelToHeader line
-  sed -i "/modelToHeader: x-higress-llm-model/a\\
-    autoRouting:\\
-      enable: true\\
-      defaultModel: $AUTO_ROUTING_DEFAULT_MODEL" "$MODEL_ROUTER_FILE"
+  # Replace original with modified version
+  mv "$TEMP_FILE" "$MODEL_ROUTER_FILE"
+
+  # Trigger config reload inside container by touching the file
+  $DOCKER_COMMAND exec "$CONTAINER_NAME" touch /data/wasmplugins/model-router.internal.yaml 2>/dev/null || true
 
   echo "✓ Auto-routing configured with default model: $AUTO_ROUTING_DEFAULT_MODEL"
   echo "  Configuration file: $MODEL_ROUTER_FILE"
@@ -658,6 +639,14 @@ writeConfiguration() {
 ${env}=${!env}"
   done
 
+  # Save auto-routing configuration
+  local AUTO_ROUTING_CONFIG=""
+  if [ "$ENABLE_AUTO_ROUTING" == "true" ]; then
+    AUTO_ROUTING_CONFIG="
+ENABLE_AUTO_ROUTING=true
+AUTO_ROUTING_DEFAULT_MODEL=${AUTO_ROUTING_DEFAULT_MODEL}"
+  fi
+
   cat <<EOF >$DATA_FOLDER/$CONFIG_FILENAME
 MODE=full
 O11Y=on
@@ -665,7 +654,7 @@ CONFIG_TEMPLATE=ai-gateway
 GATEWAY_HTTP_PORT=${GATEWAY_HTTP_PORT}
 GATEWAY_HTTPS_PORT=${GATEWAY_HTTPS_PORT}
 CONSOLE_PORT=${CONSOLE_PORT}
-${LLM_CONFIGS}
+${LLM_CONFIGS}${AUTO_ROUTING_CONFIG}
 EOF
 }
 
@@ -701,7 +690,7 @@ outputWelcomeMessage() {
   echo "    http://localhost:$GATEWAY_HTTP_PORT/v1/chat/completions"
   echo
 
-  # Show auto-routing info if enabled
+  # Show auto-routing info if enabled (read from saved config)
   if [ "$ENABLE_AUTO_ROUTING" == "true" ]; then
     echo "======================================================="
     echo "                   Auto-Routing Mode                   "
@@ -757,14 +746,14 @@ outputWelcomeMessage() {
     echo "              Clawdbot Integration                     "
     echo "======================================================="
     echo
-    echo "Higress AI Gateway plugin and skill have been installed."
-    echo
-    echo "To complete setup, run:"
+    echo "To configure Clawdbot, run:"
     echo "   clawdbot models auth login --provider higress"
     echo
-    echo "To configure auto-routing rules, tell Clawdbot:"
-    echo "   '我希望在解决困难问题时路由到claude-opus-4.5的模型'"
-    echo
+    if [ "$ENABLE_AUTO_ROUTING" == "true" ]; then
+      echo "To configure auto-routing rules, tell Clawdbot:"
+      echo "   '我希望在解决困难问题时路由到claude-opus-4.5的模型'"
+      echo
+    fi
   fi
 
   echo
@@ -792,6 +781,9 @@ tryAwake() {
     fi
   fi
 
+  # Load saved config to show auto-routing info correctly on restart
+  loadSavedConfig
+  
   outputWelcomeMessage
   exit 0
 }

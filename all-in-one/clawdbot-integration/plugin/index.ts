@@ -30,16 +30,17 @@ const DEFAULT_MODEL_IDS = [
   "glm-4",
 ] as const;
 
-function normalizeGatewayUrl(value: string): string {
+function normalizeBaseUrl(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return DEFAULT_GATEWAY_URL;
   let normalized = trimmed;
   while (normalized.endsWith("/")) normalized = normalized.slice(0, -1);
+  if (!normalized.endsWith("/v1")) normalized = `${normalized}/v1`;
   return normalized;
 }
 
 function validateUrl(value: string): string | undefined {
-  const normalized = normalizeGatewayUrl(value);
+  const normalized = normalizeBaseUrl(value);
   try {
     new URL(normalized);
   } catch {
@@ -92,7 +93,7 @@ async function fetchAvailableModels(consoleUrl: string): Promise<string[]> {
       signal: AbortSignal.timeout(5000),
     });
     if (response.ok) {
-      const data = await response.json() as { data?: { model?: string }[] };
+      const data = (await response.json()) as { data?: { model?: string }[] };
       if (data.data && Array.isArray(data.data)) {
         return data.data
           .map((route: { model?: string }) => route.model)
@@ -129,7 +130,7 @@ const higressPlugin = {
               initialValue: DEFAULT_GATEWAY_URL,
               validate: validateUrl,
             });
-            const gatewayUrl = normalizeGatewayUrl(gatewayUrlInput);
+            const gatewayUrl = normalizeBaseUrl(gatewayUrlInput);
 
             // Step 2: Get Console URL (for auto-router configuration)
             const consoleUrlInput = await ctx.prompter.text({
@@ -137,9 +138,9 @@ const higressPlugin = {
               initialValue: DEFAULT_CONSOLE_URL,
               validate: validateUrl,
             });
-            const consoleUrl = normalizeGatewayUrl(consoleUrlInput);
+            const consoleUrl = normalizeBaseUrl(consoleUrlInput);
 
-            // Step 3: Test connection
+            // Step 3: Test connection (create a new spinner)
             const spin = ctx.prompter.progress("Testing gateway connection…");
             const isConnected = await testGatewayConnection(gatewayUrl);
             if (!isConnected) {
@@ -164,13 +165,13 @@ const higressPlugin = {
             });
             const apiKey = apiKeyInput.trim() || "higress-local";
 
-            // Step 5: Fetch available models or use defaults
-            spin.update("Fetching available models…");
+            // Step 5: Fetch available models (create a new spinner)
+            const spin2 = ctx.prompter.progress("Fetching available models…");
             const fetchedModels = await fetchAvailableModels(consoleUrl);
             const defaultModels = fetchedModels.length > 0
               ? ["higress/auto", ...fetchedModels]
               : DEFAULT_MODEL_IDS;
-            spin.stop();
+            spin2.stop();
 
             // Step 6: Let user customize model list
             const modelInput = await ctx.prompter.text({
@@ -182,16 +183,23 @@ const higressPlugin = {
 
             const modelIds = parseModelIds(modelInput);
             const hasAutoModel = modelIds.includes("higress/auto");
-            const defaultModelId = hasAutoModel ? "higress/auto" : (modelIds[0] ?? "qwen-turbo");
-            const defaultModelRef = `higress/${defaultModelId}`;
+            
+            // FIX: Avoid double prefix - if modelId already starts with provider, don't add prefix again
+            const defaultModelId = hasAutoModel 
+              ? "higress/auto" 
+              : (modelIds[0] ?? "qwen-turbo");
+            const defaultModelRef = defaultModelId.startsWith("higress/") 
+              ? defaultModelId 
+              : `higress/${defaultModelId}`;
 
             // Step 7: Configure default model for auto-routing
             let autoRoutingDefaultModel = "qwen-turbo";
             if (hasAutoModel) {
-              autoRoutingDefaultModel = await ctx.prompter.text({
+              const autoRoutingModelInput = await ctx.prompter.text({
                 message: "Default model for auto-routing (when no rule matches)",
                 initialValue: "qwen-turbo",
               });
+              autoRoutingDefaultModel = autoRoutingModelInput.trim(); // FIX: Add trim() here
             }
 
             return {
@@ -220,7 +228,13 @@ const higressPlugin = {
                 agents: {
                   defaults: {
                     models: Object.fromEntries(
-                      modelIds.map((modelId) => [`higress/${modelId}`, {}]),
+                      modelIds.map((modelId) => {
+                        // FIX: Avoid double prefix - only add provider prefix if not already present
+                        const modelRef = modelId.startsWith("higress/") 
+                          ? modelId 
+                          : `higress/${modelId}`;
+                        return [modelRef, {}];
+                      }),
                     ),
                   },
                 },
