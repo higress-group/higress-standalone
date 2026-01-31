@@ -49,7 +49,6 @@ CONFIGURED_MARK="$ROOT/.configured"
 # Clawdbot integration paths
 CLAWDBOT_WORKSPACE="$HOME/clawd"
 CLAWDBOT_EXTENSIONS_DIR="$HOME/.clawdbot/extensions"
-CLAWDBOT_SKILLS_DIR="$CLAWDBOT_WORKSPACE/skills/public"
 CLAWDBOT_INTEGRATION_DIR="$SCRIPT_DIR/clawdbot-integration"
 
 # Auto-routing configuration
@@ -263,7 +262,6 @@ configureClawdbotIntegration() {
 
   # Install Clawdbot plugin and skill using generic function
   installFiles "$CLAWDBOT_INTEGRATION_DIR/plugin" "$CLAWDBOT_EXTENSIONS_DIR/higress-ai-gateway" "Higress AI Gateway plugin"
-  installFiles "$CLAWDBOT_INTEGRATION_DIR/skill/higress-auto-router" "$CLAWDBOT_SKILLS_DIR/higress-auto-router" "Higress Auto Router skill"
   
   echo
   echo "To complete Clawdbot setup, run:"

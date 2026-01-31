@@ -1,5 +1,5 @@
 {
-  "name": "@higress/clawdbot-ai-gateway",
+  "name": "@higress/higress-ai-gateway",
   "version": "1.0.0",
   "description": "Higress AI Gateway model provider plugin for Clawdbot with auto-routing support",
   "main": "index.ts",
