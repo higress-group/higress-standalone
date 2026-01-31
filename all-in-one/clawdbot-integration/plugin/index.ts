@@ -162,7 +162,7 @@ const higressPlugin = {
             const apiKeyInput = await ctx.prompter.text({
               message: "API Key (leave empty if not required)",
               initialValue: "",
-            });
+            }) || '';
             const apiKey = apiKeyInput.trim() || "higress-local";
 
             // Step 5: Fetch available models (create a new spinner)
