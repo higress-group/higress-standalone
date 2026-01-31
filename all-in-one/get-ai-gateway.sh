@@ -280,7 +280,8 @@ configureAutoRouting() {
   echo "Configuring auto-routing in model-router plugin..."
 
   local MODEL_ROUTER_FILE="$ROOT/wasmplugins/model-router.internal.yaml"
-  
+  local CONTAINER_MODEL_ROUTER_FILE="/data/wasmplugins/model-router.internal.yaml"
+
   # Wait for the file to be created (it's created when the container starts)
   local MAX_WAIT=30
   local WAIT_COUNT=0
@@ -295,29 +296,21 @@ configureAutoRouting() {
     return 1
   fi
 
-  # Backup the original file
-  cp "$MODEL_ROUTER_FILE" "${MODEL_ROUTER_FILE}.backup"
-
-  # Create a temp file with the new content
-  local TEMP_FILE=$(mktemp)
-  
-  # Read the file and insert auto-routing config after modelToHeader line
-  awk -v model="$AUTO_ROUTING_DEFAULT_MODEL" '
-    /modelToHeader: x-higress-llm-model/ {
-      print
-      print "    autoRouting:"
-      print "      enable: true"
-      print "      defaultModel: " model
-      next
-    }
-    { print }
-  ' "$MODEL_ROUTER_FILE" > "$TEMP_FILE"
-
-  # Replace original with modified version
-  mv "$TEMP_FILE" "$MODEL_ROUTER_FILE"
-
-  # Trigger config reload inside container by touching the file
-  $DOCKER_COMMAND exec "$CONTAINER_NAME" touch /data/wasmplugins/model-router.internal.yaml 2>/dev/null || true
+  $DOCKER_COMMAND exec -i -e DEFAULT_MODEL="$AUTO_ROUTING_DEFAULT_MODEL" -e MODEL_ROUTER_FILE="$CONTAINER_MODEL_ROUTER_FILE" "$CONTAINER_NAME" /bin/sh <<'EOF'
+set -e
+cp ${MODEL_ROUTER_FILE} ${MODEL_ROUTER_FILE}.backup
+awk -v model="$DEFAULT_MODEL" '
+  /modelToHeader: x-higress-llm-model/ {
+    print
+    print "    autoRouting:"
+    print "      enable: true"
+    print "      defaultModel: " model
+    next
+  }
+  { print }
+' ${MODEL_ROUTER_FILE} > /tmp/model-router.internal.yaml.tmp.$$
+mv /tmp/model-router.internal.yaml.tmp.* ${MODEL_ROUTER_FILE}
+EOF
 
   echo "✓ Auto-routing configured with default model: $AUTO_ROUTING_DEFAULT_MODEL"
   echo "  Configuration file: $MODEL_ROUTER_FILE"
