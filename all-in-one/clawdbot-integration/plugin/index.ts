@@ -10,24 +10,25 @@ const DEFAULT_MODEL_IDS = [
   // Auto-routing special model
   "higress/auto",
   // OpenAI models
-  "gpt-4o",
-  "gpt-4o-mini",
-  "gpt-4-turbo",
+  "gpt-5.2",
+  "gpt-5-mini",
+  "gpt-5-nano",
   // Anthropic models
   "claude-opus-4.5",
   "claude-sonnet-4.5",
   "claude-haiku-4.5",
   // Qwen models
-  "qwen-turbo",
-  "qwen-plus",
-  "qwen-max",
-  "qwen-coder",
+  "qwen3-turbo",
+  "qwen3-plus",
+  "qwen3-max",
+  "qwen3-coder-480b-a35b-instruct",
   // DeepSeek models
   "deepseek-chat",
-  "deepseek-coder",
+  "deepseek-reasoner",
   // Other common models
-  "moonshot-v1-8k",
-  "glm-4",
+  "kimi-k2.5",
+  "glm-4.7",
+  "MiniMax-M2.1",
 ] as const;
 
 function normalizeBaseUrl(value: string): string {
