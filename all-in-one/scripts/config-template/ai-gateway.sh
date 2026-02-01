@@ -95,7 +95,7 @@ function initializeLlmProviderConfigs() {
   EXTRA_CONFIGS=(
     "minimaxGroupId=\"$MINIMAX_GROUP_ID\""
   )
-  local MINIMAX_MODELS="${MINIMAX_MODELS:-abab-*}"
+  local MINIMAX_MODELS="${MINIMAX_MODELS:-abab-*,MiniMax-*}"
   IFS='|' read -r MINIMAX_TYPE MINIMAX_PATTERN <<< "$(normalizeModelPattern "$MINIMAX_MODELS")"
   initializeLlmProviderConfig minimax minimax MINIMAX api.minimax.chat "443" "https" "" "$MINIMAX_TYPE" "$MINIMAX_PATTERN" "${EXTRA_CONFIGS[@]}"
 
