@@ -19,6 +19,7 @@ package apiserver
 import (
 	"fmt"
 
+	"github.com/fsnotify/fsnotify"
 	istiov1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	admregv1 "k8s.io/api/admissionregistration/v1"
 	authzv1 "k8s.io/api/authorization/v1"
@@ -169,6 +170,15 @@ func (c completedConfig) New() (*HigressServer, error) {
 		}
 	}
 
+	// Create shared watcher for file storage mode to avoid "too many open files"
+	var sharedWatcher *fsnotify.Watcher
+	if storageMode == options.Storage_File {
+		sharedWatcher, err = fsnotify.NewWatcher()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create shared file watcher: %v", err)
+		}
+	}
+
 	storageCreateFunc := func(
 		groupResource schema.GroupResource,
 		runtimeCodec runtime.Codec,
@@ -185,7 +195,7 @@ func (c completedConfig) New() (*HigressServer, error) {
 		switch storageMode {
 		case options.Storage_File:
 			runtimeCodec = codec.NewFlatAwareCodec(groupResource, runtimeCodec)
-			return registry.NewFileREST(groupResource, runtimeCodec, storageOptions.FileOptions.RootDir, extension, isNamespaced, singularName, newFunc, newListFunc, attrFunc)
+			return registry.NewFileREST(groupResource, runtimeCodec, storageOptions.FileOptions.RootDir, extension, isNamespaced, singularName, newFunc, newListFunc, attrFunc, sharedWatcher)
 		case options.Storage_Nacos:
 			var encryptionKey []byte = nil
 			if sensitive {
