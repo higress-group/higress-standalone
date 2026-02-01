@@ -14,30 +14,18 @@ declare -a GENERATED_INGRESSES
 function initializeLlmProviderConfigs() {
   local EXTRA_CONFIGS=()
 
+  # Top commonly used providers (matching get-ai-gateway.sh order)
   initializeLlmProviderConfig aliyun qwen DASHSCOPE dashscope.aliyuncs.com "443" "https" "" "PRE" 'qwen'
-  initializeLlmProviderConfig moonshot moonshot MOONSHOT api.moonshot.cn "443" "https" "" "REGULAR" 'moonshot-.*|kimi-.*'
-  if [ -z "$AZURE_API_KEY" ]; then
-    initializeLlmProviderConfig openai openai OPENAI api.openai.com "443" "https" "" "REGULAR" 'gpt-.*|o1-.*|o3-.*'
-  fi
-  initializeLlmProviderConfig ai360 ai360 AI360 api.360.cn "443" "https" "" "PRE" "360GPT"
-  # initializeLlmProviderConfig github github GITHUB models.inference.ai.azure.com "443" "https" "" "PRE" ""
-  # initializeLlmProviderConfig groq groq GROQ api.groq.com "443" "https" "" "PRE" ""
-  initializeLlmProviderConfig baichuan baichuan BAICHUAN api.baichuan-ai.com "443" "https" "" "PRE" "Baichuan"
-  initializeLlmProviderConfig yi yi YI api.lingyiwanwu.com "443" "https" "" "PRE" 'yi-'
   initializeLlmProviderConfig deepseek deepseek DEEPSEEK api.deepseek.com "443" "https" "" "PRE" "deepseek"
+  initializeLlmProviderConfig moonshot moonshot MOONSHOT api.moonshot.cn "443" "https" "" "REGULAR" 'moonshot-.*|kimi-.*'
   initializeLlmProviderConfig zhipuai zhipuai ZHIPUAI open.bigmodel.cn "443" "https" "" "PRE" "GLM-"
-  initializeLlmProviderConfig baidu baidu BAIDU qianfan.baidubce.com "443" "https" "" "PRE" "ERNIE-"
-  # initializeLlmProviderConfig hunyuan hunyuan HUNYUAN hunyuan.tencentcloudapi.com "443" "https" "" "PRE" "hunyuan-" "${EXTRA_CONFIGS[@]}"
-  initializeLlmProviderConfig stepfun stepfun STEPFUN api.stepfun.com "443" "https" "" "PRE" "step-"
-  # initializeLlmProviderConfig cloudflare cloudflare CLOUDFLARE api.cloudflare.com "443" "https" "" "PRE" "" "${EXTRA_CONFIGS[@]}"
-  # initializeLlmProviderConfig spark spark SPARK spark-api-open.xf-yun.com "443" "https" "" "PRE" "" "${EXTRA_CONFIGS[@]}"
-  initializeLlmProviderConfig gemini gemini GEMINI generativelanguage.googleapis.com "443" "https" "" "PRE" "gemini-"
-  # initializeLlmProviderConfig deepl deepl DEEPL "443" "https" "" "PRE" "" "${EXTRA_CONFIGS[@]}"
-  initializeLlmProviderConfig mistral mistral MISTRAL api.mistral.ai "443" "https" "" "REGULAR" 'open-mistral-.*|mistral-.*'
-  initializeLlmProviderConfig cohere cohere COHERE api.cohere.com "443" "https" "" "REGULAR" 'command|command-.*'
-  initializeLlmProviderConfig doubao doubao DOUBAO ark.cn-beijing.volces.com "443" "https" "" "PRE" "doubao-"
-  # initializeLlmProviderConfig coze coze COZE api.coze.cn "443" "https" "" "PRE" ""
+  
+  EXTRA_CONFIGS=(
+    "minimaxGroupId=\"$MINIMAX_GROUP_ID\""
+  )
+  initializeLlmProviderConfig minimax minimax MINIMAX api.minimax.chat "443" "https" "" "PRE" "abab" "${EXTRA_CONFIGS[@]}"
 
+  # Azure OpenAI
   if [ -z "$OPENAI_API_KEY" ]; then
     if [ -z "$AZURE_SERVICE_URL" ]; then
       AZURE_SERVICE_URL="https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=2024-06-01"
@@ -50,6 +38,58 @@ function initializeLlmProviderConfigs() {
     initializeLlmProviderConfig azure azure AZURE "$AZURE_SERVICE_DOMAIN" "443" "https" "" "REGULAR" 'gpt-.*|o1-.*|o3-.*' "${EXTRA_CONFIGS[@]}"
   fi
 
+  # AWS Bedrock - requires region configuration
+  if [ -n "$BEDROCK_CONFIGURED" ]; then
+    EXTRA_CONFIGS=()
+    if [ -n "$BEDROCK_REGION" ]; then
+      EXTRA_CONFIGS+=("region=\"$BEDROCK_REGION\"")
+    fi
+    if [ -n "$BEDROCK_ACCESS_KEY" ] && [ -n "$BEDROCK_SECRET_KEY" ]; then
+      EXTRA_CONFIGS+=("accessKeyId=\"$BEDROCK_ACCESS_KEY\"")
+      EXTRA_CONFIGS+=("secretAccessKey=\"$BEDROCK_SECRET_KEY\"")
+    fi
+    # Support custom model patterns via environment variable
+    local BEDROCK_MODELS="${BEDROCK_MODELS:-.*}"
+    initializeLlmProviderConfig bedrock bedrock BEDROCK bedrock-runtime.${BEDROCK_REGION:-us-east-1}.amazonaws.com "443" "https" "" "REGULAR" "$BEDROCK_MODELS" "${EXTRA_CONFIGS[@]}"
+  fi
+
+  # Google Vertex AI - requires project and region configuration
+  if [ -n "$VERTEX_CONFIGURED" ]; then
+    EXTRA_CONFIGS=()
+    if [ -n "$VERTEX_PROJECT_ID" ]; then
+      EXTRA_CONFIGS+=("gcpProject=\"$VERTEX_PROJECT_ID\"")
+    fi
+    if [ -n "$VERTEX_REGION" ]; then
+      EXTRA_CONFIGS+=("gcpRegion=\"$VERTEX_REGION\"")
+    fi
+    if [ -n "$VERTEX_AUTH_KEY" ]; then
+      EXTRA_CONFIGS+=("serviceAccount=\"$VERTEX_AUTH_KEY\"")
+    fi
+    if [ -n "$VERTEX_AUTH_SERVICE_NAME" ]; then
+      EXTRA_CONFIGS+=("serviceAccountName=\"$VERTEX_AUTH_SERVICE_NAME\"")
+    fi
+    # Support custom model patterns via environment variable
+    local VERTEX_MODELS="${VERTEX_MODELS:-gemini-.*}"
+    initializeLlmProviderConfig vertex vertex VERTEX ${VERTEX_REGION:-us-central1}-aiplatform.googleapis.com "443" "https" "" "REGULAR" "$VERTEX_MODELS" "${EXTRA_CONFIGS[@]}"
+  fi
+
+  # OpenAI (if Azure is not configured)
+  if [ -z "$AZURE_API_KEY" ]; then
+    initializeLlmProviderConfig openai openai OPENAI api.openai.com "443" "https" "" "REGULAR" 'gpt-.*|o1-.*|o3-.*'
+  fi
+
+  # OpenRouter - multi-provider router, supports custom models
+  if [ -n "$OPENROUTER_API_KEY" ]; then
+    local OPENROUTER_MODELS="${OPENROUTER_MODELS:-.*}"
+    initializeLlmProviderConfig openrouter openrouter OPENROUTER openrouter.ai "443" "https" "" "REGULAR" "$OPENROUTER_MODELS"
+  fi
+
+  # Other providers (alphabetically ordered)
+  initializeLlmProviderConfig yi yi YI api.lingyiwanwu.com "443" "https" "" "PRE" 'yi-'
+  initializeLlmProviderConfig ai360 ai360 AI360 api.360.cn "443" "https" "" "PRE" "360GPT"
+  initializeLlmProviderConfig baichuan baichuan BAICHUAN api.baichuan-ai.com "443" "https" "" "PRE" "Baichuan"
+  initializeLlmProviderConfig baidu baidu BAIDU qianfan.baidubce.com "443" "https" "" "PRE" "ERNIE-"
+  
   if [ -z "$CLAUDE_VERSION" ]; then
     CLAUDE_VERSION="2023-06-01"
   fi
@@ -57,6 +97,80 @@ function initializeLlmProviderConfigs() {
     "claudeVersion=\"$CLAUDE_VERSION\""
   )
   initializeLlmProviderConfig claude claude CLAUDE api.anthropic.com "443" "https" "" "PRE" "claude-" "${EXTRA_CONFIGS[@]}"
+
+  # Cloudflare Workers AI
+  if [ -n "$CLOUDFLARE_CONFIGURED" ]; then
+    EXTRA_CONFIGS=()
+    if [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+      EXTRA_CONFIGS+=("accountId=\"$CLOUDFLARE_ACCOUNT_ID\"")
+    fi
+    local CLOUDFLARE_MODELS="${CLOUDFLARE_MODELS:-.*}"
+    initializeLlmProviderConfig cloudflare cloudflare CLOUDFLARE api.cloudflare.com "443" "https" "" "REGULAR" "$CLOUDFLARE_MODELS" "${EXTRA_CONFIGS[@]}"
+  fi
+
+  initializeLlmProviderConfig cohere cohere COHERE api.cohere.com "443" "https" "" "REGULAR" 'command|command-.*'
+
+  # DeepL - translation service
+  if [ -n "$DEEPL_CONFIGURED" ]; then
+    EXTRA_CONFIGS=()
+    if [ -n "$DEEPL_TARGET_LANG" ]; then
+      EXTRA_CONFIGS+=("targetLang=\"$DEEPL_TARGET_LANG\"")
+    fi
+    local DEEPL_MODELS="${DEEPL_MODELS:-.*}"
+    initializeLlmProviderConfig deepl deepl DEEPL api.deepl.com "443" "https" "" "REGULAR" "$DEEPL_MODELS" "${EXTRA_CONFIGS[@]}"
+  fi
+
+  # Dify - AI workflow platform
+  if [ -n "$DIFY_API_KEY" ]; then
+    EXTRA_CONFIGS=()
+    if [ -n "$DIFY_API_URL" ]; then
+      extractHostFromUrl "$DIFY_API_URL"
+      local DIFY_DOMAIN="$HOST"
+    else
+      local DIFY_DOMAIN="api.dify.ai"
+    fi
+    if [ -n "$DIFY_BOT_TYPE" ]; then
+      EXTRA_CONFIGS+=("botType=\"$DIFY_BOT_TYPE\"")
+    fi
+    if [ -n "$DIFY_INPUT_VARIABLE" ]; then
+      EXTRA_CONFIGS+=("inputVariable=\"$DIFY_INPUT_VARIABLE\"")
+    fi
+    if [ -n "$DIFY_OUTPUT_VARIABLE" ]; then
+      EXTRA_CONFIGS+=("outputVariable=\"$DIFY_OUTPUT_VARIABLE\"")
+    fi
+    local DIFY_MODELS="${DIFY_MODELS:-.*}"
+    initializeLlmProviderConfig dify dify DIFY "$DIFY_DOMAIN" "443" "https" "" "REGULAR" "$DIFY_MODELS" "${EXTRA_CONFIGS[@]}"
+  fi
+
+  initializeLlmProviderConfig doubao doubao DOUBAO ark.cn-beijing.volces.com "443" "https" "" "PRE" "doubao-"
+
+  # Fireworks AI - fast inference
+  if [ -n "$FIREWORKS_API_KEY" ]; then
+    local FIREWORKS_MODELS="${FIREWORKS_MODELS:-.*}"
+    initializeLlmProviderConfig fireworks fireworks FIREWORKS api.fireworks.ai "443" "https" "" "REGULAR" "$FIREWORKS_MODELS"
+  fi
+
+  # GitHub Models
+  if [ -n "$GITHUB_API_KEY" ]; then
+    local GITHUB_MODELS="${GITHUB_MODELS:-.*}"
+    initializeLlmProviderConfig github github GITHUB models.inference.ai.azure.com "443" "https" "" "REGULAR" "$GITHUB_MODELS"
+  fi
+
+  initializeLlmProviderConfig gemini gemini GEMINI generativelanguage.googleapis.com "443" "https" "" "PRE" "gemini-"
+
+  # Grok - xAI's model
+  if [ -n "$GROK_API_KEY" ]; then
+    local GROK_MODELS="${GROK_MODELS:-grok-.*}"
+    initializeLlmProviderConfig grok grok GROK api.x.ai "443" "https" "" "REGULAR" "$GROK_MODELS"
+  fi
+
+  # Groq - fast inference
+  if [ -n "$GROQ_API_KEY" ]; then
+    local GROQ_MODELS="${GROQ_MODELS:-.*}"
+    initializeLlmProviderConfig groq groq GROQ api.groq.com "443" "https" "" "REGULAR" "$GROQ_MODELS"
+  fi
+
+  initializeLlmProviderConfig mistral mistral MISTRAL api.mistral.ai "443" "https" "" "REGULAR" 'open-mistral-.*|mistral-.*'
 
   if [ -z "$OLLAMA_SERVER_HOST" ]; then
     OLLAMA_SERVER_HOST="YOUR_OLLAMA_SERVER_HOST"
@@ -68,10 +182,32 @@ function initializeLlmProviderConfigs() {
   )
   initializeLlmProviderConfig ollama ollama OLLAMA "$OLLAMA_SERVER_HOST" "$OLLAMA_SERVER_PORT" "http" "" "REGULAR" 'codellama.*|llama.*' "${EXTRA_CONFIGS[@]}"
 
-  EXTRA_CONFIGS=(
-    "minimaxGroupId=\"$MINIMAX_GROUP_ID\""
-  )
-  initializeLlmProviderConfig minimax minimax MINIMAX api.minimax.chat "443" "https" "" "PRE" "abab" "${EXTRA_CONFIGS[@]}"
+  # iFlyTek Spark
+  if [ -n "$SPARK_CONFIGURED" ]; then
+    local SPARK_MODELS="${SPARK_MODELS:-.*}"
+    initializeLlmProviderConfig spark spark SPARK spark-api-open.xf-yun.com "443" "https" "" "REGULAR" "$SPARK_MODELS"
+  fi
+
+  initializeLlmProviderConfig stepfun stepfun STEPFUN api.stepfun.com "443" "https" "" "PRE" "step-"
+
+  # Tencent Hunyuan
+  if [ -n "$HUNYUAN_CONFIGURED" ]; then
+    EXTRA_CONFIGS=()
+    if [ -n "$HUNYUAN_AUTH_ID" ]; then
+      EXTRA_CONFIGS+=("authId=\"$HUNYUAN_AUTH_ID\"")
+    fi
+    if [ -n "$HUNYUAN_AUTH_KEY" ]; then
+      EXTRA_CONFIGS+=("authKey=\"$HUNYUAN_AUTH_KEY\"")
+    fi
+    local HUNYUAN_MODELS="${HUNYUAN_MODELS:-hunyuan-.*}"
+    initializeLlmProviderConfig hunyuan hunyuan HUNYUAN hunyuan.tencentcloudapi.com "443" "https" "" "REGULAR" "$HUNYUAN_MODELS" "${EXTRA_CONFIGS[@]}"
+  fi
+
+  # Together AI - open model hosting
+  if [ -n "$TOGETHERAI_API_KEY" ]; then
+    local TOGETHERAI_MODELS="${TOGETHERAI_MODELS:-.*}"
+    initializeLlmProviderConfig togetherai togetherai TOGETHERAI api.together.xyz "443" "https" "" "REGULAR" "$TOGETHERAI_MODELS"
+  fi
 }
 
 function initializeLlmProviderConfig() {
