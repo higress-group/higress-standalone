@@ -78,8 +78,7 @@ func NewFileREST(
 		dirWatcher:     sharedWatcher,
 		fileWatchers:   make(map[string]*fileWatch, 10),
 	}
-	err = f.startDirWatcher()
-	if err != nil {
+	if err := f.startDirWatcher(); err != nil {
 		return nil, err
 	}
 	return f, nil
