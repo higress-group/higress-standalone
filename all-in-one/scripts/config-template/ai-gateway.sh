@@ -11,27 +11,93 @@ MODEL_ROUTER_VERSION=${MODEL_ROUTER_VERSION:-1.0.0}
 
 declare -a GENERATED_INGRESSES
 
+# Normalize model pattern to match type and regex value
+# Supports:
+#   - Wildcard prefix: "qwen-*" -> PRE "qwen-"
+#   - Exact name: "qwen3-max" -> PRE "qwen3-max"
+#   - Multiple wildcards: "kimi-*,moonshot-*" -> REGULAR "kimi-.*|moonshot-.*"
+#   - Multiple exact: "kimi-2.5,moonshot-k1" -> REGULAR "kimi-2.5|moonshot-k1"
+#   - Mixed: "qwen-*,gpt-4" -> REGULAR "qwen-.*|gpt-4"
+# Returns: "MATCH_TYPE|MATCH_VALUE"
+normalizeModelPattern() {
+  local pattern="$1"
+  local match_type=""
+  local match_value=""
+  
+  # Remove spaces
+  pattern="${pattern// /}"
+  
+  # Empty pattern defaults to match all
+  if [ -z "$pattern" ]; then
+    echo "REGULAR|.*"
+    return
+  fi
+  
+  # Check if contains comma (multiple patterns)
+  if [[ "$pattern" == *","* ]]; then
+    IFS=',' read -ra parts <<< "$pattern"
+    local regex_parts=()
+    
+    for part in "${parts[@]}"; do
+      if [[ "$part" == *"*" ]]; then
+        # Has wildcard, convert * to .*
+        part="${part//\*/.*}"
+      fi
+      regex_parts+=("$part")
+    done
+    
+    # Join with |
+    match_value=$(IFS='|'; echo "${regex_parts[*]}")
+    match_type="REGULAR"
+  else
+    # Single pattern
+    if [[ "$pattern" == *"*" ]]; then
+      # Has wildcard
+      if [[ "$pattern" == *"-*" ]] && [[ "$pattern" != *".*" ]]; then
+        # Simple suffix wildcard like "qwen-*", use PRE for efficiency
+        match_type="PRE"
+        match_value="${pattern//\*/}"
+      else
+        # Complex wildcard, use REGULAR
+        match_type="REGULAR"
+        match_value="${pattern//\*/.*}"
+      fi
+    else
+      # No wildcard, exact match - use PRE for simple prefix/exact match
+      match_type="PRE"
+      match_value="$pattern"
+    fi
+  fi
+  
+  echo "$match_type|$match_value"
+}
+
 function initializeLlmProviderConfigs() {
   local EXTRA_CONFIGS=()
 
   # Top commonly used providers (matching get-ai-gateway.sh order)
-  local DASHSCOPE_MODELS="${DASHSCOPE_MODELS:-qwen}"
-  initializeLlmProviderConfig aliyun qwen DASHSCOPE dashscope.aliyuncs.com "443" "https" "" "PRE" "$DASHSCOPE_MODELS"
+  local DASHSCOPE_MODELS="${DASHSCOPE_MODELS:-qwen-*}"
+  IFS='|' read -r DASHSCOPE_TYPE DASHSCOPE_PATTERN <<< "$(normalizeModelPattern "$DASHSCOPE_MODELS")"
+  initializeLlmProviderConfig aliyun qwen DASHSCOPE dashscope.aliyuncs.com "443" "https" "" "$DASHSCOPE_TYPE" "$DASHSCOPE_PATTERN"
   
-  local DEEPSEEK_MODELS="${DEEPSEEK_MODELS:-deepseek}"
-  initializeLlmProviderConfig deepseek deepseek DEEPSEEK api.deepseek.com "443" "https" "" "PRE" "$DEEPSEEK_MODELS"
+  local DEEPSEEK_MODELS="${DEEPSEEK_MODELS:-deepseek-*}"
+  IFS='|' read -r DEEPSEEK_TYPE DEEPSEEK_PATTERN <<< "$(normalizeModelPattern "$DEEPSEEK_MODELS")"
+  initializeLlmProviderConfig deepseek deepseek DEEPSEEK api.deepseek.com "443" "https" "" "$DEEPSEEK_TYPE" "$DEEPSEEK_PATTERN"
   
-  local MOONSHOT_MODELS="${MOONSHOT_MODELS:-moonshot-.*|kimi-.*}"
-  initializeLlmProviderConfig moonshot moonshot MOONSHOT api.moonshot.cn "443" "https" "" "REGULAR" "$MOONSHOT_MODELS"
+  local MOONSHOT_MODELS="${MOONSHOT_MODELS:-moonshot-*,kimi-*}"
+  IFS='|' read -r MOONSHOT_TYPE MOONSHOT_PATTERN <<< "$(normalizeModelPattern "$MOONSHOT_MODELS")"
+  initializeLlmProviderConfig moonshot moonshot MOONSHOT api.moonshot.cn "443" "https" "" "$MOONSHOT_TYPE" "$MOONSHOT_PATTERN"
   
-  local ZHIPUAI_MODELS="${ZHIPUAI_MODELS:-GLM-}"
-  initializeLlmProviderConfig zhipuai zhipuai ZHIPUAI open.bigmodel.cn "443" "https" "" "PRE" "$ZHIPUAI_MODELS"
+  local ZHIPUAI_MODELS="${ZHIPUAI_MODELS:-GLM-*}"
+  IFS='|' read -r ZHIPUAI_TYPE ZHIPUAI_PATTERN <<< "$(normalizeModelPattern "$ZHIPUAI_MODELS")"
+  initializeLlmProviderConfig zhipuai zhipuai ZHIPUAI open.bigmodel.cn "443" "https" "" "$ZHIPUAI_TYPE" "$ZHIPUAI_PATTERN"
   
   EXTRA_CONFIGS=(
     "minimaxGroupId=\"$MINIMAX_GROUP_ID\""
   )
-  local MINIMAX_MODELS="${MINIMAX_MODELS:-abab}"
-  initializeLlmProviderConfig minimax minimax MINIMAX api.minimax.chat "443" "https" "" "PRE" "$MINIMAX_MODELS" "${EXTRA_CONFIGS[@]}"
+  local MINIMAX_MODELS="${MINIMAX_MODELS:-abab-*}"
+  IFS='|' read -r MINIMAX_TYPE MINIMAX_PATTERN <<< "$(normalizeModelPattern "$MINIMAX_MODELS")"
+  initializeLlmProviderConfig minimax minimax MINIMAX api.minimax.chat "443" "https" "" "$MINIMAX_TYPE" "$MINIMAX_PATTERN" "${EXTRA_CONFIGS[@]}"
 
   # Azure OpenAI
   if [ -z "$OPENAI_API_KEY" ]; then
@@ -43,8 +109,9 @@ function initializeLlmProviderConfigs() {
     EXTRA_CONFIGS=(
       "azureServiceUrl=$AZURE_SERVICE_URL"
     )
-    local AZURE_MODELS="${AZURE_MODELS:-gpt-.*|o1-.*|o3-.*}"
-    initializeLlmProviderConfig azure azure AZURE "$AZURE_SERVICE_DOMAIN" "443" "https" "" "REGULAR" "$AZURE_MODELS" "${EXTRA_CONFIGS[@]}"
+    local AZURE_MODELS="${AZURE_MODELS:-gpt-*,o1-*,o3-*}"
+    IFS='|' read -r AZURE_TYPE AZURE_PATTERN <<< "$(normalizeModelPattern "$AZURE_MODELS")"
+    initializeLlmProviderConfig azure azure AZURE "$AZURE_SERVICE_DOMAIN" "443" "https" "" "$AZURE_TYPE" "$AZURE_PATTERN" "${EXTRA_CONFIGS[@]}"
   fi
 
   # AWS Bedrock - requires region configuration
@@ -57,9 +124,9 @@ function initializeLlmProviderConfigs() {
       EXTRA_CONFIGS+=("accessKeyId=\"$BEDROCK_ACCESS_KEY\"")
       EXTRA_CONFIGS+=("secretAccessKey=\"$BEDROCK_SECRET_KEY\"")
     fi
-    # Support custom model patterns via environment variable
-    local BEDROCK_MODELS="${BEDROCK_MODELS:-.*}"
-    initializeLlmProviderConfig bedrock bedrock BEDROCK bedrock-runtime.${BEDROCK_REGION:-us-east-1}.amazonaws.com "443" "https" "" "REGULAR" "$BEDROCK_MODELS" "${EXTRA_CONFIGS[@]}"
+    local BEDROCK_MODELS="${BEDROCK_MODELS:-*}"
+    IFS='|' read -r BEDROCK_TYPE BEDROCK_PATTERN <<< "$(normalizeModelPattern "$BEDROCK_MODELS")"
+    initializeLlmProviderConfig bedrock bedrock BEDROCK bedrock-runtime.${BEDROCK_REGION:-us-east-1}.amazonaws.com "443" "https" "" "$BEDROCK_TYPE" "$BEDROCK_PATTERN" "${EXTRA_CONFIGS[@]}"
   fi
 
   # Google Vertex AI - requires project and region configuration
@@ -77,35 +144,41 @@ function initializeLlmProviderConfigs() {
     if [ -n "$VERTEX_AUTH_SERVICE_NAME" ]; then
       EXTRA_CONFIGS+=("serviceAccountName=\"$VERTEX_AUTH_SERVICE_NAME\"")
     fi
-    # Support custom model patterns via environment variable
-    local VERTEX_MODELS="${VERTEX_MODELS:-gemini-.*}"
-    initializeLlmProviderConfig vertex vertex VERTEX ${VERTEX_REGION:-us-central1}-aiplatform.googleapis.com "443" "https" "" "REGULAR" "$VERTEX_MODELS" "${EXTRA_CONFIGS[@]}"
+    local VERTEX_MODELS="${VERTEX_MODELS:-gemini-*}"
+    IFS='|' read -r VERTEX_TYPE VERTEX_PATTERN <<< "$(normalizeModelPattern "$VERTEX_MODELS")"
+    initializeLlmProviderConfig vertex vertex VERTEX ${VERTEX_REGION:-us-central1}-aiplatform.googleapis.com "443" "https" "" "$VERTEX_TYPE" "$VERTEX_PATTERN" "${EXTRA_CONFIGS[@]}"
   fi
 
   # OpenAI (if Azure is not configured)
   if [ -z "$AZURE_API_KEY" ]; then
-    local OPENAI_MODELS="${OPENAI_MODELS:-gpt-.*|o1-.*|o3-.*}"
-    initializeLlmProviderConfig openai openai OPENAI api.openai.com "443" "https" "" "REGULAR" "$OPENAI_MODELS"
+    local OPENAI_MODELS="${OPENAI_MODELS:-gpt-*,o1-*,o3-*}"
+    IFS='|' read -r OPENAI_TYPE OPENAI_PATTERN <<< "$(normalizeModelPattern "$OPENAI_MODELS")"
+    initializeLlmProviderConfig openai openai OPENAI api.openai.com "443" "https" "" "$OPENAI_TYPE" "$OPENAI_PATTERN"
   fi
 
   # OpenRouter - multi-provider router, supports custom models
   if [ -n "$OPENROUTER_API_KEY" ]; then
-    local OPENROUTER_MODELS="${OPENROUTER_MODELS:-.*}"
-    initializeLlmProviderConfig openrouter openrouter OPENROUTER openrouter.ai "443" "https" "" "REGULAR" "$OPENROUTER_MODELS"
+    local OPENROUTER_MODELS="${OPENROUTER_MODELS:-*}"
+    IFS='|' read -r OPENROUTER_TYPE OPENROUTER_PATTERN <<< "$(normalizeModelPattern "$OPENROUTER_MODELS")"
+    initializeLlmProviderConfig openrouter openrouter OPENROUTER openrouter.ai "443" "https" "" "$OPENROUTER_TYPE" "$OPENROUTER_PATTERN"
   fi
 
   # Other providers (alphabetically ordered)
-  local YI_MODELS="${YI_MODELS:-yi-}"
-  initializeLlmProviderConfig yi yi YI api.lingyiwanwu.com "443" "https" "" "PRE" "$YI_MODELS"
+  local YI_MODELS="${YI_MODELS:-yi-*}"
+  IFS='|' read -r YI_TYPE YI_PATTERN <<< "$(normalizeModelPattern "$YI_MODELS")"
+  initializeLlmProviderConfig yi yi YI api.lingyiwanwu.com "443" "https" "" "$YI_TYPE" "$YI_PATTERN"
   
-  local AI360_MODELS="${AI360_MODELS:-360GPT}"
-  initializeLlmProviderConfig ai360 ai360 AI360 api.360.cn "443" "https" "" "PRE" "$AI360_MODELS"
+  local AI360_MODELS="${AI360_MODELS:-360GPT-*}"
+  IFS='|' read -r AI360_TYPE AI360_PATTERN <<< "$(normalizeModelPattern "$AI360_MODELS")"
+  initializeLlmProviderConfig ai360 ai360 AI360 api.360.cn "443" "https" "" "$AI360_TYPE" "$AI360_PATTERN"
   
-  local BAICHUAN_MODELS="${BAICHUAN_MODELS:-Baichuan}"
-  initializeLlmProviderConfig baichuan baichuan BAICHUAN api.baichuan-ai.com "443" "https" "" "PRE" "$BAICHUAN_MODELS"
+  local BAICHUAN_MODELS="${BAICHUAN_MODELS:-Baichuan*}"
+  IFS='|' read -r BAICHUAN_TYPE BAICHUAN_PATTERN <<< "$(normalizeModelPattern "$BAICHUAN_MODELS")"
+  initializeLlmProviderConfig baichuan baichuan BAICHUAN api.baichuan-ai.com "443" "https" "" "$BAICHUAN_TYPE" "$BAICHUAN_PATTERN"
   
-  local BAIDU_MODELS="${BAIDU_MODELS:-ERNIE-}"
-  initializeLlmProviderConfig baidu baidu BAIDU qianfan.baidubce.com "443" "https" "" "PRE" "$BAIDU_MODELS"
+  local BAIDU_MODELS="${BAIDU_MODELS:-ERNIE-*}"
+  IFS='|' read -r BAIDU_TYPE BAIDU_PATTERN <<< "$(normalizeModelPattern "$BAIDU_MODELS")"
+  initializeLlmProviderConfig baidu baidu BAIDU qianfan.baidubce.com "443" "https" "" "$BAIDU_TYPE" "$BAIDU_PATTERN"
   
   if [ -z "$CLAUDE_VERSION" ]; then
     CLAUDE_VERSION="2023-06-01"
@@ -113,8 +186,9 @@ function initializeLlmProviderConfigs() {
   EXTRA_CONFIGS=(
     "claudeVersion=\"$CLAUDE_VERSION\""
   )
-  local CLAUDE_MODELS="${CLAUDE_MODELS:-claude-}"
-  initializeLlmProviderConfig claude claude CLAUDE api.anthropic.com "443" "https" "" "PRE" "$CLAUDE_MODELS" "${EXTRA_CONFIGS[@]}"
+  local CLAUDE_MODELS="${CLAUDE_MODELS:-claude-*}"
+  IFS='|' read -r CLAUDE_TYPE CLAUDE_PATTERN <<< "$(normalizeModelPattern "$CLAUDE_MODELS")"
+  initializeLlmProviderConfig claude claude CLAUDE api.anthropic.com "443" "https" "" "$CLAUDE_TYPE" "$CLAUDE_PATTERN" "${EXTRA_CONFIGS[@]}"
 
   # Cloudflare Workers AI
   if [ -n "$CLOUDFLARE_CONFIGURED" ]; then
@@ -122,12 +196,14 @@ function initializeLlmProviderConfigs() {
     if [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
       EXTRA_CONFIGS+=("accountId=\"$CLOUDFLARE_ACCOUNT_ID\"")
     fi
-    local CLOUDFLARE_MODELS="${CLOUDFLARE_MODELS:-.*}"
-    initializeLlmProviderConfig cloudflare cloudflare CLOUDFLARE api.cloudflare.com "443" "https" "" "REGULAR" "$CLOUDFLARE_MODELS" "${EXTRA_CONFIGS[@]}"
+    local CLOUDFLARE_MODELS="${CLOUDFLARE_MODELS:-*}"
+    IFS='|' read -r CLOUDFLARE_TYPE CLOUDFLARE_PATTERN <<< "$(normalizeModelPattern "$CLOUDFLARE_MODELS")"
+    initializeLlmProviderConfig cloudflare cloudflare CLOUDFLARE api.cloudflare.com "443" "https" "" "$CLOUDFLARE_TYPE" "$CLOUDFLARE_PATTERN" "${EXTRA_CONFIGS[@]}"
   fi
 
-  local COHERE_MODELS="${COHERE_MODELS:-command|command-.*}"
-  initializeLlmProviderConfig cohere cohere COHERE api.cohere.com "443" "https" "" "REGULAR" "$COHERE_MODELS"
+  local COHERE_MODELS="${COHERE_MODELS:-command*}"
+  IFS='|' read -r COHERE_TYPE COHERE_PATTERN <<< "$(normalizeModelPattern "$COHERE_MODELS")"
+  initializeLlmProviderConfig cohere cohere COHERE api.cohere.com "443" "https" "" "$COHERE_TYPE" "$COHERE_PATTERN"
 
   # DeepL - translation service
   if [ -n "$DEEPL_CONFIGURED" ]; then
@@ -135,8 +211,9 @@ function initializeLlmProviderConfigs() {
     if [ -n "$DEEPL_TARGET_LANG" ]; then
       EXTRA_CONFIGS+=("targetLang=\"$DEEPL_TARGET_LANG\"")
     fi
-    local DEEPL_MODELS="${DEEPL_MODELS:-.*}"
-    initializeLlmProviderConfig deepl deepl DEEPL api.deepl.com "443" "https" "" "REGULAR" "$DEEPL_MODELS" "${EXTRA_CONFIGS[@]}"
+    local DEEPL_MODELS="${DEEPL_MODELS:-*}"
+    IFS='|' read -r DEEPL_TYPE DEEPL_PATTERN <<< "$(normalizeModelPattern "$DEEPL_MODELS")"
+    initializeLlmProviderConfig deepl deepl DEEPL api.deepl.com "443" "https" "" "$DEEPL_TYPE" "$DEEPL_PATTERN" "${EXTRA_CONFIGS[@]}"
   fi
 
   # Dify - AI workflow platform
@@ -157,42 +234,50 @@ function initializeLlmProviderConfigs() {
     if [ -n "$DIFY_OUTPUT_VARIABLE" ]; then
       EXTRA_CONFIGS+=("outputVariable=\"$DIFY_OUTPUT_VARIABLE\"")
     fi
-    local DIFY_MODELS="${DIFY_MODELS:-.*}"
-    initializeLlmProviderConfig dify dify DIFY "$DIFY_DOMAIN" "443" "https" "" "REGULAR" "$DIFY_MODELS" "${EXTRA_CONFIGS[@]}"
+    local DIFY_MODELS="${DIFY_MODELS:-*}"
+    IFS='|' read -r DIFY_TYPE DIFY_PATTERN <<< "$(normalizeModelPattern "$DIFY_MODELS")"
+    initializeLlmProviderConfig dify dify DIFY "$DIFY_DOMAIN" "443" "https" "" "$DIFY_TYPE" "$DIFY_PATTERN" "${EXTRA_CONFIGS[@]}"
   fi
 
-  local DOUBAO_MODELS="${DOUBAO_MODELS:-doubao-}"
-  initializeLlmProviderConfig doubao doubao DOUBAO ark.cn-beijing.volces.com "443" "https" "" "PRE" "$DOUBAO_MODELS"
+  local DOUBAO_MODELS="${DOUBAO_MODELS:-doubao-*}"
+  IFS='|' read -r DOUBAO_TYPE DOUBAO_PATTERN <<< "$(normalizeModelPattern "$DOUBAO_MODELS")"
+  initializeLlmProviderConfig doubao doubao DOUBAO ark.cn-beijing.volces.com "443" "https" "" "$DOUBAO_TYPE" "$DOUBAO_PATTERN"
 
   # Fireworks AI - fast inference
   if [ -n "$FIREWORKS_API_KEY" ]; then
-    local FIREWORKS_MODELS="${FIREWORKS_MODELS:-.*}"
-    initializeLlmProviderConfig fireworks fireworks FIREWORKS api.fireworks.ai "443" "https" "" "REGULAR" "$FIREWORKS_MODELS"
+    local FIREWORKS_MODELS="${FIREWORKS_MODELS:-*}"
+    IFS='|' read -r FIREWORKS_TYPE FIREWORKS_PATTERN <<< "$(normalizeModelPattern "$FIREWORKS_MODELS")"
+    initializeLlmProviderConfig fireworks fireworks FIREWORKS api.fireworks.ai "443" "https" "" "$FIREWORKS_TYPE" "$FIREWORKS_PATTERN"
   fi
 
   # GitHub Models
   if [ -n "$GITHUB_API_KEY" ]; then
-    local GITHUB_MODELS="${GITHUB_MODELS:-.*}"
-    initializeLlmProviderConfig github github GITHUB models.inference.ai.azure.com "443" "https" "" "REGULAR" "$GITHUB_MODELS"
+    local GITHUB_MODELS="${GITHUB_MODELS:-*}"
+    IFS='|' read -r GITHUB_TYPE GITHUB_PATTERN <<< "$(normalizeModelPattern "$GITHUB_MODELS")"
+    initializeLlmProviderConfig github github GITHUB models.inference.ai.azure.com "443" "https" "" "$GITHUB_TYPE" "$GITHUB_PATTERN"
   fi
 
-  local GEMINI_MODELS="${GEMINI_MODELS:-gemini-}"
-  initializeLlmProviderConfig gemini gemini GEMINI generativelanguage.googleapis.com "443" "https" "" "PRE" "$GEMINI_MODELS"
+  local GEMINI_MODELS="${GEMINI_MODELS:-gemini-*}"
+  IFS='|' read -r GEMINI_TYPE GEMINI_PATTERN <<< "$(normalizeModelPattern "$GEMINI_MODELS")"
+  initializeLlmProviderConfig gemini gemini GEMINI generativelanguage.googleapis.com "443" "https" "" "$GEMINI_TYPE" "$GEMINI_PATTERN"
 
   # Grok - xAI's model
   if [ -n "$GROK_API_KEY" ]; then
-    local GROK_MODELS="${GROK_MODELS:-grok-.*}"
-    initializeLlmProviderConfig grok grok GROK api.x.ai "443" "https" "" "REGULAR" "$GROK_MODELS"
+    local GROK_MODELS="${GROK_MODELS:-grok-*}"
+    IFS='|' read -r GROK_TYPE GROK_PATTERN <<< "$(normalizeModelPattern "$GROK_MODELS")"
+    initializeLlmProviderConfig grok grok GROK api.x.ai "443" "https" "" "$GROK_TYPE" "$GROK_PATTERN"
   fi
 
   # Groq - fast inference
   if [ -n "$GROQ_API_KEY" ]; then
-    local GROQ_MODELS="${GROQ_MODELS:-.*}"
-    initializeLlmProviderConfig groq groq GROQ api.groq.com "443" "https" "" "REGULAR" "$GROQ_MODELS"
+    local GROQ_MODELS="${GROQ_MODELS:-*}"
+    IFS='|' read -r GROQ_TYPE GROQ_PATTERN <<< "$(normalizeModelPattern "$GROQ_MODELS")"
+    initializeLlmProviderConfig groq groq GROQ api.groq.com "443" "https" "" "$GROQ_TYPE" "$GROQ_PATTERN"
   fi
 
-  local MISTRAL_MODELS="${MISTRAL_MODELS:-open-mistral-.*|mistral-.*}"
-  initializeLlmProviderConfig mistral mistral MISTRAL api.mistral.ai "443" "https" "" "REGULAR" "$MISTRAL_MODELS"
+  local MISTRAL_MODELS="${MISTRAL_MODELS:-mistral-*,open-mistral-*}"
+  IFS='|' read -r MISTRAL_TYPE MISTRAL_PATTERN <<< "$(normalizeModelPattern "$MISTRAL_MODELS")"
+  initializeLlmProviderConfig mistral mistral MISTRAL api.mistral.ai "443" "https" "" "$MISTRAL_TYPE" "$MISTRAL_PATTERN"
 
   if [ -z "$OLLAMA_SERVER_HOST" ]; then
     OLLAMA_SERVER_HOST="YOUR_OLLAMA_SERVER_HOST"
@@ -202,17 +287,20 @@ function initializeLlmProviderConfigs() {
     "ollamaServerHost=\"$OLLAMA_SERVER_HOST\""
     "ollamaServerPort=$OLLAMA_SERVER_PORT"
   )
-  local OLLAMA_MODELS="${OLLAMA_MODELS:-codellama.*|llama.*}"
-  initializeLlmProviderConfig ollama ollama OLLAMA "$OLLAMA_SERVER_HOST" "$OLLAMA_SERVER_PORT" "http" "" "REGULAR" "$OLLAMA_MODELS" "${EXTRA_CONFIGS[@]}"
+  local OLLAMA_MODELS="${OLLAMA_MODELS:-llama*,codellama*}"
+  IFS='|' read -r OLLAMA_TYPE OLLAMA_PATTERN <<< "$(normalizeModelPattern "$OLLAMA_MODELS")"
+  initializeLlmProviderConfig ollama ollama OLLAMA "$OLLAMA_SERVER_HOST" "$OLLAMA_SERVER_PORT" "http" "" "$OLLAMA_TYPE" "$OLLAMA_PATTERN" "${EXTRA_CONFIGS[@]}"
 
   # iFlyTek Spark
   if [ -n "$SPARK_CONFIGURED" ]; then
-    local SPARK_MODELS="${SPARK_MODELS:-.*}"
-    initializeLlmProviderConfig spark spark SPARK spark-api-open.xf-yun.com "443" "https" "" "REGULAR" "$SPARK_MODELS"
+    local SPARK_MODELS="${SPARK_MODELS:-*}"
+    IFS='|' read -r SPARK_TYPE SPARK_PATTERN <<< "$(normalizeModelPattern "$SPARK_MODELS")"
+    initializeLlmProviderConfig spark spark SPARK spark-api-open.xf-yun.com "443" "https" "" "$SPARK_TYPE" "$SPARK_PATTERN"
   fi
 
-  local STEPFUN_MODELS="${STEPFUN_MODELS:-step-}"
-  initializeLlmProviderConfig stepfun stepfun STEPFUN api.stepfun.com "443" "https" "" "PRE" "$STEPFUN_MODELS"
+  local STEPFUN_MODELS="${STEPFUN_MODELS:-step-*}"
+  IFS='|' read -r STEPFUN_TYPE STEPFUN_PATTERN <<< "$(normalizeModelPattern "$STEPFUN_MODELS")"
+  initializeLlmProviderConfig stepfun stepfun STEPFUN api.stepfun.com "443" "https" "" "$STEPFUN_TYPE" "$STEPFUN_PATTERN"
 
   # Tencent Hunyuan
   if [ -n "$HUNYUAN_CONFIGURED" ]; then
@@ -223,14 +311,16 @@ function initializeLlmProviderConfigs() {
     if [ -n "$HUNYUAN_AUTH_KEY" ]; then
       EXTRA_CONFIGS+=("authKey=\"$HUNYUAN_AUTH_KEY\"")
     fi
-    local HUNYUAN_MODELS="${HUNYUAN_MODELS:-hunyuan-.*}"
-    initializeLlmProviderConfig hunyuan hunyuan HUNYUAN hunyuan.tencentcloudapi.com "443" "https" "" "REGULAR" "$HUNYUAN_MODELS" "${EXTRA_CONFIGS[@]}"
+    local HUNYUAN_MODELS="${HUNYUAN_MODELS:-hunyuan-*}"
+    IFS='|' read -r HUNYUAN_TYPE HUNYUAN_PATTERN <<< "$(normalizeModelPattern "$HUNYUAN_MODELS")"
+    initializeLlmProviderConfig hunyuan hunyuan HUNYUAN hunyuan.tencentcloudapi.com "443" "https" "" "$HUNYUAN_TYPE" "$HUNYUAN_PATTERN" "${EXTRA_CONFIGS[@]}"
   fi
 
   # Together AI - open model hosting
   if [ -n "$TOGETHERAI_API_KEY" ]; then
-    local TOGETHERAI_MODELS="${TOGETHERAI_MODELS:-.*}"
-    initializeLlmProviderConfig togetherai togetherai TOGETHERAI api.together.xyz "443" "https" "" "REGULAR" "$TOGETHERAI_MODELS"
+    local TOGETHERAI_MODELS="${TOGETHERAI_MODELS:-*}"
+    IFS='|' read -r TOGETHERAI_TYPE TOGETHERAI_PATTERN <<< "$(normalizeModelPattern "$TOGETHERAI_MODELS")"
+    initializeLlmProviderConfig togetherai togetherai TOGETHERAI api.together.xyz "443" "https" "" "$TOGETHERAI_TYPE" "$TOGETHERAI_PATTERN"
   fi
 }
 
