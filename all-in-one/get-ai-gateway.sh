@@ -60,11 +60,6 @@ cd - >/dev/null
 
 CONFIGURED_MARK="$ROOT/.configured"
 
-# Clawdbot integration paths
-CLAWDBOT_WORKSPACE="$HOME/clawd"
-CLAWDBOT_EXTENSIONS_DIR="$HOME/.clawdbot/extensions"
-CLAWDBOT_INTEGRATION_DIR="$SCRIPT_DIR/clawdbot-integration"
-
 # Auto-routing configuration
 ENABLE_AUTO_ROUTING="false"
 AUTO_ROUTING_DEFAULT_MODEL=""
@@ -553,101 +548,6 @@ loadSavedConfig() {
   fi
 }
 
-# Check if Clawdbot is installed
-checkClawdbot() {
-  if [ -d "$CLAWDBOT_WORKSPACE" ]; then
-    return 0
-  fi
-  return 1
-}
-
-# Generic function to install files to a destination
-installFiles() {
-  local SRC_DIR="$1"
-  local DEST_DIR="$2"
-  local NAME="$3"
-
-  if [ ! -d "$SRC_DIR" ]; then
-    echo "Warning: $NAME source not found at $SRC_DIR"
-    return 1
-  fi
-
-  echo "Installing $NAME..."
-  
-  # Create parent directory if not exists
-  mkdir -p "$(dirname "$DEST_DIR")"
-
-  # Remove existing if present
-  if [ -d "$DEST_DIR" ]; then
-    echo "$NAME already exists, updating..."
-    rm -rf "$DEST_DIR"
-  fi
-
-  cp -r "$SRC_DIR" "$DEST_DIR"
-  
-  echo "✓ $NAME installed at: $DEST_DIR"
-  return 0
-}
-
-# Configure Clawdbot integration
-configureClawdbotIntegration() {
-  if ! checkClawdbot; then
-    return 0
-  fi
-
-  echo
-  echo "======================================================="
-  echo "          Clawdbot Integration Detected                "
-  echo "======================================================="
-  echo
-  echo "Clawdbot workspace found at: $CLAWDBOT_WORKSPACE"
-  echo
-  echo "Higress AI Gateway can integrate with Clawdbot to provide:"
-  echo "  1. Auto-routing: Automatically route requests to different models"
-  echo "     based on message content (e.g., 'deep thinking' → claude-opus-4.5)"
-  echo "  2. Model provider: Use Higress as a unified model provider in Clawdbot"
-  echo
-
-  read -r -u 3 -p "Enable auto-routing feature? (y/N): " enableAutoRouting
-  case "$enableAutoRouting" in
-    [yY]|[yY][eE][sS])
-      ENABLE_AUTO_ROUTING="true"
-      
-      echo
-      echo "Auto-routing allows you to route requests to different models based on"
-      echo "keywords in your message. For example:"
-      echo "  - '深入思考 ...' or 'deep thinking ...' → reasoning model"
-      echo "  - '写代码 ...' or 'code: ...' → coding model"
-      echo
-
-      # Get default model for auto-routing
-      read -r -u 3 -p "Default model when no routing rule matches (default: qwen-turbo): " defaultModel
-      if [ -z "$defaultModel" ]; then
-        AUTO_ROUTING_DEFAULT_MODEL="qwen-turbo"
-      else
-        AUTO_ROUTING_DEFAULT_MODEL="$defaultModel"
-      fi
-
-      echo
-      echo "You can configure routing rules later using natural language in Clawdbot."
-      echo "For example, say: 'route to claude-opus-4.5 when solving difficult problems'"
-      echo
-      ;;
-    *)
-      ENABLE_AUTO_ROUTING="false"
-      echo "Auto-routing disabled. You can enable it later via Higress Console."
-      ;;
-  esac
-
-  # Install Clawdbot plugin and skill using generic function
-  installFiles "$CLAWDBOT_INTEGRATION_DIR/plugin" "$CLAWDBOT_EXTENSIONS_DIR/higress-ai-gateway" "Higress AI Gateway plugin"
-  
-  echo
-  echo "To complete Clawdbot setup, run:"
-  echo "  clawdbot models auth login --provider higress"
-  echo
-}
-
 # Configure auto-routing in model-router plugin (inside container)
 configureAutoRouting() {
   if [ "$ENABLE_AUTO_ROUTING" != "true" ]; then
@@ -788,9 +688,6 @@ runConfigWizard() {
     echo "Error: Can only configure either OpenAI or Azure OpenAI, not both"
     exit 1
   fi
-
-  # Configure Clawdbot integration if detected
-  configureClawdbotIntegration
 }
 
 configureAzureProvider() {
@@ -1693,24 +1590,6 @@ outputWelcomeMessage() {
   echo
   echo "Access logs directory:"
   echo "   $DATA_FOLDER/logs"
-
-  # Show Clawdbot integration info if detected
-  if checkClawdbot; then
-    echo
-    echo "======================================================="
-    echo "              Clawdbot Integration                     "
-    echo "======================================================="
-    echo
-    echo "To configure Clawdbot, run:"
-    echo "   clawdbot models auth login --provider higress"
-    echo
-    if [ "$ENABLE_AUTO_ROUTING" == "true" ]; then
-      echo "To configure auto-routing rules, tell Clawdbot:"
-      echo "   '我希望在解决困难问题时路由到claude-opus-4.5的模型'"
-      echo
-    fi
-  fi
-
   echo
   echo "To stop the gateway run:"
   echo
