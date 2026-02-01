@@ -274,7 +274,37 @@ parseArgs() {
       LLM_ENVS+=("GROK_API_KEY")
       shift 2
       ;;
-    # Model pattern configurations for providers with custom model support
+    # Model pattern configurations for all providers
+    --dashscope-models)
+      DASHSCOPE_MODELS="$2"
+      LLM_ENVS+=("DASHSCOPE_MODELS")
+      shift 2
+      ;;
+    --deepseek-models)
+      DEEPSEEK_MODELS="$2"
+      LLM_ENVS+=("DEEPSEEK_MODELS")
+      shift 2
+      ;;
+    --moonshot-models)
+      MOONSHOT_MODELS="$2"
+      LLM_ENVS+=("MOONSHOT_MODELS")
+      shift 2
+      ;;
+    --zhipuai-models)
+      ZHIPUAI_MODELS="$2"
+      LLM_ENVS+=("ZHIPUAI_MODELS")
+      shift 2
+      ;;
+    --minimax-models)
+      MINIMAX_MODELS="$2"
+      LLM_ENVS+=("MINIMAX_MODELS")
+      shift 2
+      ;;
+    --azure-models)
+      AZURE_MODELS="$2"
+      LLM_ENVS+=("AZURE_MODELS")
+      shift 2
+      ;;
     --bedrock-models)
       BEDROCK_MODELS="$2"
       LLM_ENVS+=("BEDROCK_MODELS")
@@ -283,6 +313,11 @@ parseArgs() {
     --vertex-models)
       VERTEX_MODELS="$2"
       LLM_ENVS+=("VERTEX_MODELS")
+      shift 2
+      ;;
+    --openai-models)
+      OPENAI_MODELS="$2"
+      LLM_ENVS+=("OPENAI_MODELS")
       shift 2
       ;;
     --openrouter-models)
@@ -338,6 +373,61 @@ parseArgs() {
     --togetherai-models)
       TOGETHERAI_MODELS="$2"
       LLM_ENVS+=("TOGETHERAI_MODELS")
+      shift 2
+      ;;
+    --yi-models)
+      YI_MODELS="$2"
+      LLM_ENVS+=("YI_MODELS")
+      shift 2
+      ;;
+    --ai360-models)
+      AI360_MODELS="$2"
+      LLM_ENVS+=("AI360_MODELS")
+      shift 2
+      ;;
+    --baichuan-models)
+      BAICHUAN_MODELS="$2"
+      LLM_ENVS+=("BAICHUAN_MODELS")
+      shift 2
+      ;;
+    --baidu-models)
+      BAIDU_MODELS="$2"
+      LLM_ENVS+=("BAIDU_MODELS")
+      shift 2
+      ;;
+    --claude-models)
+      CLAUDE_MODELS="$2"
+      LLM_ENVS+=("CLAUDE_MODELS")
+      shift 2
+      ;;
+    --cohere-models)
+      COHERE_MODELS="$2"
+      LLM_ENVS+=("COHERE_MODELS")
+      shift 2
+      ;;
+    --doubao-models)
+      DOUBAO_MODELS="$2"
+      LLM_ENVS+=("DOUBAO_MODELS")
+      shift 2
+      ;;
+    --gemini-models)
+      GEMINI_MODELS="$2"
+      LLM_ENVS+=("GEMINI_MODELS")
+      shift 2
+      ;;
+    --mistral-models)
+      MISTRAL_MODELS="$2"
+      LLM_ENVS+=("MISTRAL_MODELS")
+      shift 2
+      ;;
+    --ollama-models)
+      OLLAMA_MODELS="$2"
+      LLM_ENVS+=("OLLAMA_MODELS")
+      shift 2
+      ;;
+    --stepfun-models)
+      STEPFUN_MODELS="$2"
+      LLM_ENVS+=("STEPFUN_MODELS")
       shift 2
       ;;
     # Route command options
@@ -613,36 +703,36 @@ runConfigWizard() {
   # Provider order: Top 10 most commonly used providers first, then others alphabetically
   local providers=(
     # Top 10 commonly used providers (user-specified order)
-    "Aliyun Dashscope (Qwen)|DASHSCOPE"
-    "DeepSeek|DEEPSEEK"
-    "Moonshot (Kimi)|MOONSHOT"
-    "Zhipu AI|ZHIPUAI"
+    "Aliyun Dashscope (Qwen)|DASHSCOPE|configureDashscopeProvider"
+    "DeepSeek|DEEPSEEK|configureDeepSeekProvider"
+    "Moonshot (Kimi)|MOONSHOT|configureMoonshotProvider"
+    "Zhipu AI|ZHIPUAI|configureZhipuAIProvider"
     "Minimax|MINIMAX|configureMinimaxProvider"
     "Azure OpenAI|AZURE|configureAzureProvider"
     "AWS Bedrock|BEDROCK|configureBedrockProvider"
     "Google Vertex AI|VERTEX|configureVertexProvider"
-    "OpenAI|OPENAI"
+    "OpenAI|OPENAI|configureOpenAIProvider"
     "OpenRouter|OPENROUTER|configureOpenRouterProvider"
     # Other providers (alphabetically ordered)
-    "01.AI (Yi)|YI"
-    "360 Zhinao|AI360"
-    "Baichuan AI|BAICHUAN"
-    "Baidu AI Cloud|BAIDU"
+    "01.AI (Yi)|YI|configureYiProvider"
+    "360 Zhinao|AI360|configureAI360Provider"
+    "Baichuan AI|BAICHUAN|configureBaichuanProvider"
+    "Baidu AI Cloud|BAIDU|configureBaiduProvider"
     "Claude|CLAUDE|configureClaudeProvider"
     "Cloudflare Workers AI|CLOUDFLARE|configureCloudflareProvider"
-    "Cohere|COHERE"
+    "Cohere|COHERE|configureCohereProvider"
     "DeepL|DEEPL|configureDeepLProvider"
     "Dify|DIFY|configureDifyProvider"
-    "Doubao|DOUBAO"
+    "Doubao|DOUBAO|configureDoubaoProvider"
     "Fireworks AI|FIREWORKS|configureFireworksProvider"
     "Github Models|GITHUB|configureGitHubProvider"
-    "Google Gemini|GEMINI"
+    "Google Gemini|GEMINI|configureGeminiProvider"
     "Grok|GROK|configureGrokProvider"
     "Groq|GROQ|configureGroqProvider"
-    "Mistral AI|MISTRAL"
+    "Mistral AI|MISTRAL|configureMistralProvider"
     "Ollama|OLLAMA|configureOllamaProvider"
     "iFlyTek Spark|SPARK|configureSparkProvider"
-    "Stepfun|STEPFUN"
+    "Stepfun|STEPFUN|configureStepfunProvider"
     "Tencent Hunyuan|HUNYUAN|configureHunyuanProvider"
     "Together AI|TOGETHERAI|configureTogetherAIProvider"
   )
@@ -713,6 +803,16 @@ configureAzureProvider() {
   done
   read -r -u 3 -p "→ Enter API Key for Azure OpenAI: " AZURE_API_KEY
   LLM_ENVS+=("AZURE_SERVICE_URL" "AZURE_API_KEY")
+  
+  # Configure model pattern
+  if [ -z "$AZURE_MODELS" ]; then
+    echo "Enter model pattern for routing (regex, e.g., 'gpt-.*|o1-.*|o3-.*'):"
+    read -r -u 3 -p "→ Model pattern (default: gpt-.*|o1-.*|o3-.*): " AZURE_MODELS
+    if [ -z "$AZURE_MODELS" ]; then
+      AZURE_MODELS="gpt-.*|o1-.*|o3-.*"
+    fi
+  fi
+  LLM_ENVS+=("AZURE_MODELS")
 }
 
 configureOllamaProvider() {
@@ -724,6 +824,16 @@ configureOllamaProvider() {
     OLLAMA_CONFIGURED="placeholder"
   fi
   LLM_ENVS+=("OLLAMA_SERVER_HOST" "OLLAMA_SERVER_PORT")
+  
+  # Configure model pattern
+  if [ -z "$OLLAMA_MODELS" ]; then
+    echo "Enter model pattern for routing (regex, e.g., 'codellama.*|llama.*'):"
+    read -r -u 3 -p "→ Model pattern (default: codellama.*|llama.*): " OLLAMA_MODELS
+    if [ -z "$OLLAMA_MODELS" ]; then
+      OLLAMA_MODELS="codellama.*|llama.*"
+    fi
+  fi
+  LLM_ENVS+=("OLLAMA_MODELS")
 }
 
 configureClaudeProvider() {
@@ -732,12 +842,32 @@ configureClaudeProvider() {
   readWithDefault "→ Enter API version for Claude (Default: $DEFAULT_CLAUDE_VERSION): " $DEFAULT_CLAUDE_VERSION
   CLAUDE_VERSION="$input"
   LLM_ENVS+=("CLAUDE_API_KEY" "CLAUDE_VERSION")
+  
+  # Configure model pattern
+  if [ -z "$CLAUDE_MODELS" ]; then
+    echo "Enter model pattern for routing (prefix match, e.g., 'claude-'):"
+    read -r -u 3 -p "→ Model pattern (default: claude-): " CLAUDE_MODELS
+    if [ -z "$CLAUDE_MODELS" ]; then
+      CLAUDE_MODELS="claude-"
+    fi
+  fi
+  LLM_ENVS+=("CLAUDE_MODELS")
 }
 
 configureMinimaxProvider() {
   read -r -u 3 -p "→ Enter API Key for Minimax: " MINIMAX_API_KEY
   read -r -u 3 -p "→ Enter group ID for Minimax (only required when using ChatCompletion Pro): " MINIMAX_GROUP_ID
   LLM_ENVS+=("MINIMAX_API_KEY" "MINIMAX_GROUP_ID")
+  
+  # Configure model pattern
+  if [ -z "$MINIMAX_MODELS" ]; then
+    echo "Enter model pattern for routing (prefix match, e.g., 'abab'):"
+    read -r -u 3 -p "→ Model pattern (default: abab): " MINIMAX_MODELS
+    if [ -z "$MINIMAX_MODELS" ]; then
+      MINIMAX_MODELS="abab"
+    fi
+  fi
+  LLM_ENVS+=("MINIMAX_MODELS")
 }
 
 configureBedrockProvider() {
@@ -1009,6 +1139,203 @@ configureTogetherAIProvider() {
     fi
   fi
   LLM_ENVS+=("TOGETHERAI_MODELS")
+}
+
+# Simple provider configuration functions
+configureDashscopeProvider() {
+  read -r -u 3 -p "→ Enter API Key for Aliyun Dashscope (Qwen): " DASHSCOPE_API_KEY
+  LLM_ENVS+=("DASHSCOPE_API_KEY")
+  
+  if [ -z "$DASHSCOPE_MODELS" ]; then
+    echo "Enter model pattern for routing (prefix match, e.g., 'qwen'):"
+    read -r -u 3 -p "→ Model pattern (default: qwen): " DASHSCOPE_MODELS
+    if [ -z "$DASHSCOPE_MODELS" ]; then
+      DASHSCOPE_MODELS="qwen"
+    fi
+  fi
+  LLM_ENVS+=("DASHSCOPE_MODELS")
+}
+
+configureDeepSeekProvider() {
+  read -r -u 3 -p "→ Enter API Key for DeepSeek: " DEEPSEEK_API_KEY
+  LLM_ENVS+=("DEEPSEEK_API_KEY")
+  
+  if [ -z "$DEEPSEEK_MODELS" ]; then
+    echo "Enter model pattern for routing (prefix match, e.g., 'deepseek'):"
+    read -r -u 3 -p "→ Model pattern (default: deepseek): " DEEPSEEK_MODELS
+    if [ -z "$DEEPSEEK_MODELS" ]; then
+      DEEPSEEK_MODELS="deepseek"
+    fi
+  fi
+  LLM_ENVS+=("DEEPSEEK_MODELS")
+}
+
+configureMoonshotProvider() {
+  read -r -u 3 -p "→ Enter API Key for Moonshot (Kimi): " MOONSHOT_API_KEY
+  LLM_ENVS+=("MOONSHOT_API_KEY")
+  
+  if [ -z "$MOONSHOT_MODELS" ]; then
+    echo "Enter model pattern for routing (regex, e.g., 'moonshot-.*|kimi-.*'):"
+    read -r -u 3 -p "→ Model pattern (default: moonshot-.*|kimi-.*): " MOONSHOT_MODELS
+    if [ -z "$MOONSHOT_MODELS" ]; then
+      MOONSHOT_MODELS="moonshot-.*|kimi-.*"
+    fi
+  fi
+  LLM_ENVS+=("MOONSHOT_MODELS")
+}
+
+configureZhipuAIProvider() {
+  read -r -u 3 -p "→ Enter API Key for Zhipu AI: " ZHIPUAI_API_KEY
+  LLM_ENVS+=("ZHIPUAI_API_KEY")
+  
+  if [ -z "$ZHIPUAI_MODELS" ]; then
+    echo "Enter model pattern for routing (prefix match, e.g., 'GLM-'):"
+    read -r -u 3 -p "→ Model pattern (default: GLM-): " ZHIPUAI_MODELS
+    if [ -z "$ZHIPUAI_MODELS" ]; then
+      ZHIPUAI_MODELS="GLM-"
+    fi
+  fi
+  LLM_ENVS+=("ZHIPUAI_MODELS")
+}
+
+configureOpenAIProvider() {
+  read -r -u 3 -p "→ Enter API Key for OpenAI: " OPENAI_API_KEY
+  LLM_ENVS+=("OPENAI_API_KEY")
+  
+  if [ -z "$OPENAI_MODELS" ]; then
+    echo "Enter model pattern for routing (regex, e.g., 'gpt-.*|o1-.*|o3-.*'):"
+    read -r -u 3 -p "→ Model pattern (default: gpt-.*|o1-.*|o3-.*): " OPENAI_MODELS
+    if [ -z "$OPENAI_MODELS" ]; then
+      OPENAI_MODELS="gpt-.*|o1-.*|o3-.*"
+    fi
+  fi
+  LLM_ENVS+=("OPENAI_MODELS")
+}
+
+configureYiProvider() {
+  read -r -u 3 -p "→ Enter API Key for 01.AI (Yi): " YI_API_KEY
+  LLM_ENVS+=("YI_API_KEY")
+  
+  if [ -z "$YI_MODELS" ]; then
+    echo "Enter model pattern for routing (prefix match, e.g., 'yi-'):"
+    read -r -u 3 -p "→ Model pattern (default: yi-): " YI_MODELS
+    if [ -z "$YI_MODELS" ]; then
+      YI_MODELS="yi-"
+    fi
+  fi
+  LLM_ENVS+=("YI_MODELS")
+}
+
+configureAI360Provider() {
+  read -r -u 3 -p "→ Enter API Key for 360 Zhinao: " AI360_API_KEY
+  LLM_ENVS+=("AI360_API_KEY")
+  
+  if [ -z "$AI360_MODELS" ]; then
+    echo "Enter model pattern for routing (prefix match, e.g., '360GPT'):"
+    read -r -u 3 -p "→ Model pattern (default: 360GPT): " AI360_MODELS
+    if [ -z "$AI360_MODELS" ]; then
+      AI360_MODELS="360GPT"
+    fi
+  fi
+  LLM_ENVS+=("AI360_MODELS")
+}
+
+configureBaichuanProvider() {
+  read -r -u 3 -p "→ Enter API Key for Baichuan AI: " BAICHUAN_API_KEY
+  LLM_ENVS+=("BAICHUAN_API_KEY")
+  
+  if [ -z "$BAICHUAN_MODELS" ]; then
+    echo "Enter model pattern for routing (prefix match, e.g., 'Baichuan'):"
+    read -r -u 3 -p "→ Model pattern (default: Baichuan): " BAICHUAN_MODELS
+    if [ -z "$BAICHUAN_MODELS" ]; then
+      BAICHUAN_MODELS="Baichuan"
+    fi
+  fi
+  LLM_ENVS+=("BAICHUAN_MODELS")
+}
+
+configureBaiduProvider() {
+  read -r -u 3 -p "→ Enter API Key for Baidu AI Cloud: " BAIDU_API_KEY
+  LLM_ENVS+=("BAIDU_API_KEY")
+  
+  if [ -z "$BAIDU_MODELS" ]; then
+    echo "Enter model pattern for routing (prefix match, e.g., 'ERNIE-'):"
+    read -r -u 3 -p "→ Model pattern (default: ERNIE-): " BAIDU_MODELS
+    if [ -z "$BAIDU_MODELS" ]; then
+      BAIDU_MODELS="ERNIE-"
+    fi
+  fi
+  LLM_ENVS+=("BAIDU_MODELS")
+}
+
+configureCohereProvider() {
+  read -r -u 3 -p "→ Enter API Key for Cohere: " COHERE_API_KEY
+  LLM_ENVS+=("COHERE_API_KEY")
+  
+  if [ -z "$COHERE_MODELS" ]; then
+    echo "Enter model pattern for routing (regex, e.g., 'command|command-.*'):"
+    read -r -u 3 -p "→ Model pattern (default: command|command-.*): " COHERE_MODELS
+    if [ -z "$COHERE_MODELS" ]; then
+      COHERE_MODELS="command|command-.*"
+    fi
+  fi
+  LLM_ENVS+=("COHERE_MODELS")
+}
+
+configureDoubaoProvider() {
+  read -r -u 3 -p "→ Enter API Key for Doubao: " DOUBAO_API_KEY
+  LLM_ENVS+=("DOUBAO_API_KEY")
+  
+  if [ -z "$DOUBAO_MODELS" ]; then
+    echo "Enter model pattern for routing (prefix match, e.g., 'doubao-'):"
+    read -r -u 3 -p "→ Model pattern (default: doubao-): " DOUBAO_MODELS
+    if [ -z "$DOUBAO_MODELS" ]; then
+      DOUBAO_MODELS="doubao-"
+    fi
+  fi
+  LLM_ENVS+=("DOUBAO_MODELS")
+}
+
+configureGeminiProvider() {
+  read -r -u 3 -p "→ Enter API Key for Google Gemini: " GEMINI_API_KEY
+  LLM_ENVS+=("GEMINI_API_KEY")
+  
+  if [ -z "$GEMINI_MODELS" ]; then
+    echo "Enter model pattern for routing (prefix match, e.g., 'gemini-'):"
+    read -r -u 3 -p "→ Model pattern (default: gemini-): " GEMINI_MODELS
+    if [ -z "$GEMINI_MODELS" ]; then
+      GEMINI_MODELS="gemini-"
+    fi
+  fi
+  LLM_ENVS+=("GEMINI_MODELS")
+}
+
+configureMistralProvider() {
+  read -r -u 3 -p "→ Enter API Key for Mistral AI: " MISTRAL_API_KEY
+  LLM_ENVS+=("MISTRAL_API_KEY")
+  
+  if [ -z "$MISTRAL_MODELS" ]; then
+    echo "Enter model pattern for routing (regex, e.g., 'open-mistral-.*|mistral-.*'):"
+    read -r -u 3 -p "→ Model pattern (default: open-mistral-.*|mistral-.*): " MISTRAL_MODELS
+    if [ -z "$MISTRAL_MODELS" ]; then
+      MISTRAL_MODELS="open-mistral-.*|mistral-.*"
+    fi
+  fi
+  LLM_ENVS+=("MISTRAL_MODELS")
+}
+
+configureStepfunProvider() {
+  read -r -u 3 -p "→ Enter API Key for Stepfun: " STEPFUN_API_KEY
+  LLM_ENVS+=("STEPFUN_API_KEY")
+  
+  if [ -z "$STEPFUN_MODELS" ]; then
+    echo "Enter model pattern for routing (prefix match, e.g., 'step-'):"
+    read -r -u 3 -p "→ Model pattern (default: step-): " STEPFUN_MODELS
+    if [ -z "$STEPFUN_MODELS" ]; then
+      STEPFUN_MODELS="step-"
+    fi
+  fi
+  LLM_ENVS+=("STEPFUN_MODELS")
 }
 
 configureStorage() {
