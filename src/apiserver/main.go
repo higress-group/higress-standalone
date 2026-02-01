@@ -17,12 +17,42 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"os"
+	"syscall"
 
 	"github.com/alibaba/higress/api-server/pkg/cmd/server"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/component-base/cli"
 )
+
+func init() {
+	// Increase file descriptor limit early to avoid "too many open files" errors
+	var rLimit syscall.Rlimit
+	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to get rlimit: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Current file descriptor limit: soft=%d hard=%d\n", rLimit.Cur, rLimit.Max)
+
+	// Try to set soft limit to 65535
+	targetLimit := uint64(65535)
+	if rLimit.Cur < targetLimit {
+		rLimit.Cur = targetLimit
+		// If hard limit is less than target, try to increase it (may require root)
+		if rLimit.Max < targetLimit {
+			rLimit.Max = targetLimit
+		}
+
+		if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to set rlimit to %d: %v\n", targetLimit, err)
+			return
+		}
+
+		fmt.Printf("Updated file descriptor limit: soft=%d hard=%d\n", rLimit.Cur, rLimit.Max)
+	}
+}
 
 func main() {
 	stopCh := genericapiserver.SetupSignalHandler()

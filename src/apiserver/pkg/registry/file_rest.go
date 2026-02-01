@@ -54,7 +54,6 @@ func NewFileREST(
 	newFunc func() runtime.Object,
 	newListFunc func() runtime.Object,
 	attrFunc storage.AttrFunc,
-	sharedWatcher *fsnotify.Watcher,
 ) (REST, error) {
 	if attrFunc == nil {
 		if isNamespaced {
@@ -62,6 +61,10 @@ func NewFileREST(
 		} else {
 			attrFunc = storage.DefaultClusterScopedAttr
 		}
+	}
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create file watcher for %s: %v", groupResource.Resource, err)
 	}
 	// file REST
 	f := &fileREST{
@@ -75,7 +78,7 @@ func NewFileREST(
 		newFunc:        newFunc,
 		newListFunc:    newListFunc,
 		attrFunc:       attrFunc,
-		dirWatcher:     sharedWatcher,
+		dirWatcher:     watcher,
 		fileWatchers:   make(map[string]*fileWatch, 10),
 	}
 	if err := f.startDirWatcher(); err != nil {
@@ -111,8 +114,9 @@ func (f *fileREST) GetSingularName() string {
 }
 
 func (f *fileREST) Destroy() {
-	// Don't close the watcher as it's shared across all fileREST instances
-	// The watcher will be closed when the server shuts down
+	if f.dirWatcher != nil {
+		_ = f.dirWatcher.Close()
+	}
 }
 
 func (f *fileREST) startDirWatcher() error {
