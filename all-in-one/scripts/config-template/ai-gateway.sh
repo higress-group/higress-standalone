@@ -14,8 +14,8 @@ declare -a GENERATED_INGRESSES
 function initializeLlmProviderConfigs() {
   local EXTRA_CONFIGS=()
 
-  initializeLlmProviderConfig aliyun qwen DASHSCOPE dashscope.aliyuncs.com "443" "https" "" "PRE" 'qwen-'
-  initializeLlmProviderConfig moonshot moonshot MOONSHOT api.moonshot.cn "443" "https" "" "PRE" 'moonshot-'
+  initializeLlmProviderConfig aliyun qwen DASHSCOPE dashscope.aliyuncs.com "443" "https" "" "PRE" 'qwen'
+  initializeLlmProviderConfig moonshot moonshot MOONSHOT api.moonshot.cn "443" "https" "" "REGULAR" 'moonshot-.*|kimi-.*'
   if [ -z "$AZURE_API_KEY" ]; then
     initializeLlmProviderConfig openai openai OPENAI api.openai.com "443" "https" "" "REGULAR" 'gpt-.*|o1-.*|o3-.*'
   fi
