@@ -274,6 +274,72 @@ parseArgs() {
       LLM_ENVS+=("GROK_API_KEY")
       shift 2
       ;;
+    # Model pattern configurations for providers with custom model support
+    --bedrock-models)
+      BEDROCK_MODELS="$2"
+      LLM_ENVS+=("BEDROCK_MODELS")
+      shift 2
+      ;;
+    --vertex-models)
+      VERTEX_MODELS="$2"
+      LLM_ENVS+=("VERTEX_MODELS")
+      shift 2
+      ;;
+    --openrouter-models)
+      OPENROUTER_MODELS="$2"
+      LLM_ENVS+=("OPENROUTER_MODELS")
+      shift 2
+      ;;
+    --cloudflare-models)
+      CLOUDFLARE_MODELS="$2"
+      LLM_ENVS+=("CLOUDFLARE_MODELS")
+      shift 2
+      ;;
+    --deepl-models)
+      DEEPL_MODELS="$2"
+      LLM_ENVS+=("DEEPL_MODELS")
+      shift 2
+      ;;
+    --dify-models)
+      DIFY_MODELS="$2"
+      LLM_ENVS+=("DIFY_MODELS")
+      shift 2
+      ;;
+    --fireworks-models)
+      FIREWORKS_MODELS="$2"
+      LLM_ENVS+=("FIREWORKS_MODELS")
+      shift 2
+      ;;
+    --github-models)
+      GITHUB_MODELS="$2"
+      LLM_ENVS+=("GITHUB_MODELS")
+      shift 2
+      ;;
+    --grok-models)
+      GROK_MODELS="$2"
+      LLM_ENVS+=("GROK_MODELS")
+      shift 2
+      ;;
+    --groq-models)
+      GROQ_MODELS="$2"
+      LLM_ENVS+=("GROQ_MODELS")
+      shift 2
+      ;;
+    --spark-models)
+      SPARK_MODELS="$2"
+      LLM_ENVS+=("SPARK_MODELS")
+      shift 2
+      ;;
+    --hunyuan-models)
+      HUNYUAN_MODELS="$2"
+      LLM_ENVS+=("HUNYUAN_MODELS")
+      shift 2
+      ;;
+    --togetherai-models)
+      TOGETHERAI_MODELS="$2"
+      LLM_ENVS+=("TOGETHERAI_MODELS")
+      shift 2
+      ;;
     # Route command options
     --pattern)
       ROUTE_PATTERN="$2"
@@ -556,7 +622,7 @@ runConfigWizard() {
     "AWS Bedrock|BEDROCK|configureBedrockProvider"
     "Google Vertex AI|VERTEX|configureVertexProvider"
     "OpenAI|OPENAI"
-    "OpenRouter|OPENROUTER"
+    "OpenRouter|OPENROUTER|configureOpenRouterProvider"
     # Other providers (alphabetically ordered)
     "01.AI (Yi)|YI"
     "360 Zhinao|AI360"
@@ -568,17 +634,17 @@ runConfigWizard() {
     "DeepL|DEEPL|configureDeepLProvider"
     "Dify|DIFY|configureDifyProvider"
     "Doubao|DOUBAO"
-    "Fireworks AI|FIREWORKS"
-    "Github Models|GITHUB"
+    "Fireworks AI|FIREWORKS|configureFireworksProvider"
+    "Github Models|GITHUB|configureGitHubProvider"
     "Google Gemini|GEMINI"
-    "Grok|GROK"
-    "Groq|GROQ"
+    "Grok|GROK|configureGrokProvider"
+    "Groq|GROQ|configureGroqProvider"
     "Mistral AI|MISTRAL"
     "Ollama|OLLAMA|configureOllamaProvider"
     "iFlyTek Spark|SPARK|configureSparkProvider"
     "Stepfun|STEPFUN"
     "Tencent Hunyuan|HUNYUAN|configureHunyuanProvider"
-    "Together AI|TOGETHERAI"
+    "Together AI|TOGETHERAI|configureTogetherAIProvider"
   )
 
   local selectedIndex=''
@@ -696,6 +762,16 @@ configureBedrockProvider() {
     fi
   fi
   LLM_ENVS+=("BEDROCK_REGION")
+  
+  # Configure model pattern
+  if [ -z "$BEDROCK_MODELS" ]; then
+    echo "Enter model pattern for routing (regex, e.g., 'claude-.*' for Claude models, '.*' for all):"
+    read -r -u 3 -p "→ Model pattern (default: .*): " BEDROCK_MODELS
+    if [ -z "$BEDROCK_MODELS" ]; then
+      BEDROCK_MODELS=".*"
+    fi
+  fi
+  LLM_ENVS+=("BEDROCK_MODELS")
 }
 
 configureVertexProvider() {
@@ -729,6 +805,16 @@ configureVertexProvider() {
     fi
   fi
   LLM_ENVS+=("VERTEX_REGION" "VERTEX_PROJECT_ID")
+  
+  # Configure model pattern
+  if [ -z "$VERTEX_MODELS" ]; then
+    echo "Enter model pattern for routing (regex, e.g., 'gemini-.*' for Gemini models, '.*' for all):"
+    read -r -u 3 -p "→ Model pattern (default: gemini-.*): " VERTEX_MODELS
+    if [ -z "$VERTEX_MODELS" ]; then
+      VERTEX_MODELS="gemini-.*"
+    fi
+  fi
+  LLM_ENVS+=("VERTEX_MODELS")
 }
 
 configureCloudflareProvider() {
@@ -738,6 +824,16 @@ configureCloudflareProvider() {
     CLOUDFLARE_CONFIGURED="placeholder"
   fi
   LLM_ENVS+=("CLOUDFLARE_API_KEY" "CLOUDFLARE_ACCOUNT_ID")
+  
+  # Configure model pattern
+  if [ -z "$CLOUDFLARE_MODELS" ]; then
+    echo "Enter model pattern for routing (regex, e.g., '@cf/.*' for Cloudflare models, '.*' for all):"
+    read -r -u 3 -p "→ Model pattern (default: .*): " CLOUDFLARE_MODELS
+    if [ -z "$CLOUDFLARE_MODELS" ]; then
+      CLOUDFLARE_MODELS=".*"
+    fi
+  fi
+  LLM_ENVS+=("CLOUDFLARE_MODELS")
 }
 
 configureDeepLProvider() {
@@ -747,6 +843,16 @@ configureDeepLProvider() {
     DEEPL_CONFIGURED="placeholder"
   fi
   LLM_ENVS+=("DEEPL_API_KEY" "DEEPL_TARGET_LANG")
+  
+  # Configure model pattern
+  if [ -z "$DEEPL_MODELS" ]; then
+    echo "Enter model pattern for routing (regex, e.g., 'deepl-.*', '.*' for all):"
+    read -r -u 3 -p "→ Model pattern (default: .*): " DEEPL_MODELS
+    if [ -z "$DEEPL_MODELS" ]; then
+      DEEPL_MODELS=".*"
+    fi
+  fi
+  LLM_ENVS+=("DEEPL_MODELS")
 }
 
 configureDifyProvider() {
@@ -763,6 +869,16 @@ configureDifyProvider() {
     read -r -u 3 -p "→ Enter Dify output variable name: " DIFY_OUTPUT_VARIABLE
     LLM_ENVS+=("DIFY_INPUT_VARIABLE" "DIFY_OUTPUT_VARIABLE")
   fi
+  
+  # Configure model pattern
+  if [ -z "$DIFY_MODELS" ]; then
+    echo "Enter model pattern for routing (regex, e.g., 'dify-.*', '.*' for all):"
+    read -r -u 3 -p "→ Model pattern (default: .*): " DIFY_MODELS
+    if [ -z "$DIFY_MODELS" ]; then
+      DIFY_MODELS=".*"
+    fi
+  fi
+  LLM_ENVS+=("DIFY_MODELS")
 }
 
 configureSparkProvider() {
@@ -774,6 +890,16 @@ configureSparkProvider() {
     SPARK_CONFIGURED="placeholder"
   fi
   LLM_ENVS+=("SPARK_API_KEY")
+  
+  # Configure model pattern
+  if [ -z "$SPARK_MODELS" ]; then
+    echo "Enter model pattern for routing (regex, e.g., 'spark-.*', '.*' for all):"
+    read -r -u 3 -p "→ Model pattern (default: .*): " SPARK_MODELS
+    if [ -z "$SPARK_MODELS" ]; then
+      SPARK_MODELS=".*"
+    fi
+  fi
+  LLM_ENVS+=("SPARK_MODELS")
 }
 
 configureHunyuanProvider() {
@@ -783,6 +909,106 @@ configureHunyuanProvider() {
     HUNYUAN_CONFIGURED="placeholder"
   fi
   LLM_ENVS+=("HUNYUAN_AUTH_ID" "HUNYUAN_AUTH_KEY")
+  
+  # Configure model pattern
+  if [ -z "$HUNYUAN_MODELS" ]; then
+    echo "Enter model pattern for routing (regex, e.g., 'hunyuan-.*', '.*' for all):"
+    read -r -u 3 -p "→ Model pattern (default: hunyuan-.*): " HUNYUAN_MODELS
+    if [ -z "$HUNYUAN_MODELS" ]; then
+      HUNYUAN_MODELS="hunyuan-.*"
+    fi
+  fi
+  LLM_ENVS+=("HUNYUAN_MODELS")
+}
+
+configureOpenRouterProvider() {
+  read -r -u 3 -p "→ Enter API Key for OpenRouter: " OPENROUTER_API_KEY
+  LLM_ENVS+=("OPENROUTER_API_KEY")
+  
+  # Configure model pattern
+  if [ -z "$OPENROUTER_MODELS" ]; then
+    echo "Enter model pattern for routing (regex, '.*' for all models):"
+    read -r -u 3 -p "→ Model pattern (default: .*): " OPENROUTER_MODELS
+    if [ -z "$OPENROUTER_MODELS" ]; then
+      OPENROUTER_MODELS=".*"
+    fi
+  fi
+  LLM_ENVS+=("OPENROUTER_MODELS")
+}
+
+configureFireworksProvider() {
+  read -r -u 3 -p "→ Enter API Key for Fireworks AI: " FIREWORKS_API_KEY
+  LLM_ENVS+=("FIREWORKS_API_KEY")
+  
+  # Configure model pattern
+  if [ -z "$FIREWORKS_MODELS" ]; then
+    echo "Enter model pattern for routing (regex, '.*' for all models):"
+    read -r -u 3 -p "→ Model pattern (default: .*): " FIREWORKS_MODELS
+    if [ -z "$FIREWORKS_MODELS" ]; then
+      FIREWORKS_MODELS=".*"
+    fi
+  fi
+  LLM_ENVS+=("FIREWORKS_MODELS")
+}
+
+configureGitHubProvider() {
+  read -r -u 3 -p "→ Enter API Key for GitHub Models: " GITHUB_API_KEY
+  LLM_ENVS+=("GITHUB_API_KEY")
+  
+  # Configure model pattern
+  if [ -z "$GITHUB_MODELS" ]; then
+    echo "Enter model pattern for routing (regex, '.*' for all models):"
+    read -r -u 3 -p "→ Model pattern (default: .*): " GITHUB_MODELS
+    if [ -z "$GITHUB_MODELS" ]; then
+      GITHUB_MODELS=".*"
+    fi
+  fi
+  LLM_ENVS+=("GITHUB_MODELS")
+}
+
+configureGrokProvider() {
+  read -r -u 3 -p "→ Enter API Key for Grok: " GROK_API_KEY
+  LLM_ENVS+=("GROK_API_KEY")
+  
+  # Configure model pattern
+  if [ -z "$GROK_MODELS" ]; then
+    echo "Enter model pattern for routing (regex, e.g., 'grok-.*'):"
+    read -r -u 3 -p "→ Model pattern (default: grok-.*): " GROK_MODELS
+    if [ -z "$GROK_MODELS" ]; then
+      GROK_MODELS="grok-.*"
+    fi
+  fi
+  LLM_ENVS+=("GROK_MODELS")
+}
+
+configureGroqProvider() {
+  read -r -u 3 -p "→ Enter API Key for Groq: " GROQ_API_KEY
+  LLM_ENVS+=("GROQ_API_KEY")
+  
+  # Configure model pattern
+  if [ -z "$GROQ_MODELS" ]; then
+    echo "Enter model pattern for routing (regex, '.*' for all models):"
+    read -r -u 3 -p "→ Model pattern (default: .*): " GROQ_MODELS
+    if [ -z "$GROQ_MODELS" ]; then
+      GROQ_MODELS=".*"
+    fi
+  fi
+  LLM_ENVS+=("GROQ_MODELS")
+}
+
+configureTogetherAIProvider() {
+  read -r -u 3 -p "→ Enter API Key for Together AI: " TOGETHERAI_API_KEY
+  LLM_ENVS+=("TOGETHERAI_API_KEY")
+  
+  # Configure model pattern
+  if [ -z "$TOGETHERAI_MODELS" ]; then
+    echo "Enter model pattern for routing (regex, '.*' for all models):"
+    read -r -u 3 -p "→ Model pattern (default: .*): " TOGETHERAI_MODELS
+    if [ -z "$TOGETHERAI_MODELS" ]; then
+      TOGETHERAI_MODELS=".*"
+    fi
+  fi
+  LLM_ENVS+=("TOGETHERAI_MODELS")
 }
 
 configureStorage() {
