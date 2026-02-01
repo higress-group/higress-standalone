@@ -183,6 +183,7 @@ services:
   gateway:
     hostname: higress-gateway
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/gateway:${HIGRESS_GATEWAY_TAG}
+    user: "1337:1337"
     command:
       - proxy
       - router
@@ -225,6 +226,8 @@ services:
       - ./volumes/gateway/podinfo:/etc/istio/pod:ro
       - ./volumes/gateway/istio/data:/var/lib/istio/data:rw
       - ./volumes/gateway/log:/var/log/proxy:rw
+      - ./volumes/gateway/secrets:/var/run/secrets:rw
+      - ./volumes/gateway/proxy:/etc/istio/proxy:rw
 
   console:
     hostname: higress-console

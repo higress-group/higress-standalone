@@ -379,8 +379,11 @@ EOF
 
   mkdir -p $VOLUMES_ROOT/gateway/istio/data
 
+  mkdir -p $VOLUMES_ROOT/gateway/secrets
+  mkdir -p $VOLUMES_ROOT/gateway/proxy
   mkdir -p $VOLUMES_ROOT/gateway/log
   touch $VOLUMES_ROOT/gateway/log/access.log
+  chmod a+w -R $VOLUMES_ROOT/gateway
 
   checkConfigExists "higress-system" "networking.istio.io/v1alpha3" "envoyfilters" "higress-gateway-global-custom-response"
   if [ $? -ne 0 ]; then
