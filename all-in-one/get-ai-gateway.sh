@@ -38,13 +38,20 @@ COMMAND_START="start"
 COMMAND_STOP="stop"
 COMMAND_DELETE="delete"
 COMMAND_ROUTE="route"
-KNOWN_COMMANDS=($COMMAND_START, $COMMAND_STOP, $COMMAND_DELETE, $COMMAND_ROUTE)
+COMMAND_CONFIG="config"
+KNOWN_COMMANDS=($COMMAND_START, $COMMAND_STOP, $COMMAND_DELETE, $COMMAND_ROUTE, $COMMAND_CONFIG)
 
 # Route subcommands
 ROUTE_ADD="add"
 ROUTE_LIST="list"
 ROUTE_REMOVE="remove"
 KNOWN_ROUTE_SUBCOMMANDS=($ROUTE_ADD, $ROUTE_LIST, $ROUTE_REMOVE)
+
+# Config subcommands
+CONFIG_ADD="add"
+CONFIG_LIST="list"
+CONFIG_REMOVE="remove"
+KNOWN_CONFIG_SUBCOMMANDS=($CONFIG_ADD, $CONFIG_LIST, $CONFIG_REMOVE)
 
 cd "$(dirname -- "$0")"
 ROOT="$(pwd -P)/higress"
@@ -284,6 +291,15 @@ parseArgs() {
       ROUTE_RULE_ID="$2"
       shift 2
       ;;
+    # Config command options
+    --provider)
+      CONFIG_PROVIDER="$2"
+      shift 2
+      ;;
+    --key)
+      CONFIG_KEY="$2"
+      shift 2
+      ;;
     -* | --*)
       echo "Unknown option $1"
       exit 1
@@ -318,6 +334,24 @@ parseArgs() {
     fi
     if [[ ! ${KNOWN_ROUTE_SUBCOMMANDS[@]} =~ "$ROUTE_SUBCOMMAND" ]]; then
       echo "Unknown route subcommand: $ROUTE_SUBCOMMAND"
+      echo "Available: add, list, remove"
+      exit 1
+    fi
+  fi
+
+  # Parse config subcommand
+  if [ "$COMMAND" == "$COMMAND_CONFIG" ]; then
+    if [ ${#POSITIONAL_ARGS[@]} -gt 0 ]; then
+      CONFIG_SUBCOMMAND="${POSITIONAL_ARGS[0]}"
+    else
+      CONFIG_SUBCOMMAND=""
+    fi
+    if [ -z "$CONFIG_SUBCOMMAND" ]; then
+      echo "Config subcommand required: add, list, remove"
+      exit 1
+    fi
+    if [[ ! ${KNOWN_CONFIG_SUBCOMMANDS[@]} =~ "$CONFIG_SUBCOMMAND" ]]; then
+      echo "Unknown config subcommand: $CONFIG_SUBCOMMAND"
       echo "Available: add, list, remove"
       exit 1
     fi
@@ -847,11 +881,17 @@ Commands:
   stop                      Stop the gateway
   delete                    Delete the gateway container
   route                     Manage auto-routing rules (see below)
+  config                    Manage API key configuration (see below)
 
 Route Subcommands:
   route add                 Add a new routing rule
   route list                List all routing rules
   route remove              Remove a routing rule by ID
+
+Config Subcommands:
+  config add                Add or update an API key
+  config list               List all configured API keys
+  config remove             Remove an API key
 
 Options:
   -h, --help                Show this help message
@@ -876,6 +916,10 @@ Route Options (for route add/remove):
   --trigger PHRASE          Trigger phrase(s), separated by | (e.g., "深入思考|deep thinking")
   --pattern REGEX           Custom regex pattern (alternative to --trigger)
   --rule-id ID              Rule ID to remove (required for remove)
+
+Config Options (for config add/remove):
+  --provider PROVIDER       Provider name (dashscope, deepseek, moonshot, etc.)
+  --key KEY                 API key to set (required for add)
 
 LLM Provider API Keys:
   --dashscope-key KEY       Aliyun Dashscope (Qwen) API key
@@ -931,6 +975,15 @@ Examples:
 
   # Remove a routing rule
   ./get-ai-gateway.sh route remove --rule-id 0
+
+  # List all configured API keys
+  ./get-ai-gateway.sh config list
+
+  # Add or update an API key
+  ./get-ai-gateway.sh config add --provider deepseek --key sk-xxx
+
+  # Remove an API key
+  ./get-ai-gateway.sh config remove --provider deepseek
 '
 }
 
@@ -1435,6 +1488,428 @@ route() {
 }
 
 # ============================================================================
+# Config Command Functions
+# ============================================================================
+
+AI_PROXY_CONFIG_PATH="/data/wasmplugins/ai-proxy.internal.yaml"
+
+# Get provider name from environment variable name
+getProviderName() {
+  local env_var="$1"
+  case "$env_var" in
+    DASHSCOPE_API_KEY) echo "Aliyun Dashscope (Qwen)" ;;
+    DEEPSEEK_API_KEY) echo "DeepSeek" ;;
+    MOONSHOT_API_KEY) echo "Moonshot (Kimi)" ;;
+    ZHIPUAI_API_KEY) echo "Zhipu AI" ;;
+    OPENAI_API_KEY) echo "OpenAI" ;;
+    OPENROUTER_API_KEY) echo "OpenRouter" ;;
+    CLAUDE_API_KEY) echo "Claude" ;;
+    GEMINI_API_KEY) echo "Google Gemini" ;;
+    GROQ_API_KEY) echo "Groq" ;;
+    DOUBAO_API_KEY) echo "Doubao" ;;
+    BAICHUAN_API_KEY) echo "Baichuan AI" ;;
+    YI_API_KEY) echo "01.AI (Yi)" ;;
+    STEPFUN_API_KEY) echo "Stepfun" ;;
+    MINIMAX_API_KEY) echo "Minimax" ;;
+    COHERE_API_KEY) echo "Cohere" ;;
+    MISTRAL_API_KEY) echo "Mistral AI" ;;
+    GITHUB_API_KEY) echo "Github Models" ;;
+    FIREWORKS_API_KEY) echo "Fireworks AI" ;;
+    TOGETHERAI_API_KEY) echo "Together AI" ;;
+    GROK_API_KEY) echo "Grok" ;;
+    *) echo "Unknown ($env_var)" ;;
+  esac
+}
+
+# Get environment variable name from provider shorthand
+getEnvVarName() {
+  local provider="$1"
+  case "$provider" in
+    dashscope|qwen) echo "DASHSCOPE_API_KEY" ;;
+    deepseek) echo "DEEPSEEK_API_KEY" ;;
+    moonshot|kimi) echo "MOONSHOT_API_KEY" ;;
+    zhipuai|zhipu) echo "ZHIPUAI_API_KEY" ;;
+    openai) echo "OPENAI_API_KEY" ;;
+    openrouter) echo "OPENROUTER_API_KEY" ;;
+    claude) echo "CLAUDE_API_KEY" ;;
+    gemini) echo "GEMINI_API_KEY" ;;
+    groq) echo "GROQ_API_KEY" ;;
+    doubao) echo "DOUBAO_API_KEY" ;;
+    baichuan) echo "BAICHUAN_API_KEY" ;;
+    yi) echo "YI_API_KEY" ;;
+    stepfun) echo "STEPFUN_API_KEY" ;;
+    minimax) echo "MINIMAX_API_KEY" ;;
+    cohere) echo "COHERE_API_KEY" ;;
+    mistral) echo "MISTRAL_API_KEY" ;;
+    github) echo "GITHUB_API_KEY" ;;
+    fireworks) echo "FIREWORKS_API_KEY" ;;
+    togetherai|together) echo "TOGETHERAI_API_KEY" ;;
+    grok) echo "GROK_API_KEY" ;;
+    *) echo "" ;;
+  esac
+}
+
+# Get provider ID used in ai-proxy config from provider shorthand
+getProviderId() {
+  local provider="$1"
+  case "$provider" in
+    dashscope|qwen) echo "aliyun" ;;
+    deepseek) echo "deepseek" ;;
+    moonshot|kimi) echo "moonshot" ;;
+    zhipuai|zhipu) echo "zhipuai" ;;
+    openai) echo "openai" ;;
+    openrouter) echo "openrouter" ;;
+    claude) echo "claude" ;;
+    gemini) echo "gemini" ;;
+    groq) echo "groq" ;;
+    doubao) echo "doubao" ;;
+    baichuan) echo "baichuan" ;;
+    yi) echo "yi" ;;
+    stepfun) echo "stepfun" ;;
+    minimax) echo "minimax" ;;
+    cohere) echo "cohere" ;;
+    mistral) echo "mistral" ;;
+    github) echo "github" ;;
+    fireworks) echo "fireworks" ;;
+    togetherai|together) echo "togetherai" ;;
+    grok) echo "grok" ;;
+    *) echo "" ;;
+  esac
+}
+
+# Mask API key for display
+maskApiKey() {
+  local key="$1"
+  if [ -z "$key" ]; then
+    echo "<not set>"
+    return
+  fi
+  local len=${#key}
+  if [ $len -le 8 ]; then
+    echo "${key:0:2}***"
+  else
+    echo "${key:0:4}***${key: -4}"
+  fi
+}
+
+# Config list: List all configured API keys
+configList() {
+  local config_file="$ROOT/$CONFIG_FILENAME"
+  local container_running=$(docker ps --filter "name=^/${CONTAINER_NAME}$" --filter "status=running" --format "{{.Names}}")
+
+  if [ -z "$container_running" ]; then
+    echo "Error: Container '$CONTAINER_NAME' is not running."
+    echo "Start it first with: $0 start"
+    exit 1
+  fi
+
+  echo "Current LLM Provider API Keys:"
+  echo
+
+  # List of known API key environment variables
+  local api_keys=(
+    "DASHSCOPE_API_KEY"
+    "DEEPSEEK_API_KEY"
+    "MOONSHOT_API_KEY"
+    "ZHIPUAI_API_KEY"
+    "OPENAI_API_KEY"
+    "OPENROUTER_API_KEY"
+    "CLAUDE_API_KEY"
+    "GEMINI_API_KEY"
+    "GROQ_API_KEY"
+    "DOUBAO_API_KEY"
+    "BAICHUAN_API_KEY"
+    "YI_API_KEY"
+    "STEPFUN_API_KEY"
+    "MINIMAX_API_KEY"
+    "COHERE_API_KEY"
+    "MISTRAL_API_KEY"
+    "GITHUB_API_KEY"
+    "FIREWORKS_API_KEY"
+    "TOGETHERAI_API_KEY"
+    "GROK_API_KEY"
+  )
+
+  local found=0
+  for env_var in "${api_keys[@]}"; do
+    local value=$(grep "^${env_var}=" "$config_file" 2>/dev/null | cut -d'=' -f2-)
+    if [ -n "$value" ]; then
+      local provider_name=$(getProviderName "$env_var")
+      local masked=$(maskApiKey "$value")
+      printf "  %-25s %s\n" "$provider_name:" "$masked"
+      found=1
+    fi
+  done
+
+  if [ $found -eq 0 ]; then
+    echo "  No API keys configured."
+    echo
+    echo "Add an API key with:"
+    echo "  $0 config add --provider <provider> --key <api-key>"
+  else
+    echo
+    echo "Update an API key with:"
+    echo "  $0 config add --provider <provider> --key <new-api-key>"
+    echo
+    echo "Remove an API key with:"
+    echo "  $0 config remove --provider <provider>"
+  fi
+}
+
+# Config add: Add or update an API key
+configAdd() {
+  checkContainer
+
+  if [ -z "$CONFIG_PROVIDER" ]; then
+    echo "Error: --provider is required"
+    echo
+    echo "Supported providers:"
+    echo "  dashscope, deepseek, moonshot, zhipuai, openai, openrouter,"
+    echo "  claude, gemini, groq, doubao, baichuan, yi, stepfun, minimax,"
+    echo "  cohere, mistral, github, fireworks, togetherai, grok"
+    echo
+    echo "Usage: $0 config add --provider <provider> --key <api-key>"
+    exit 1
+  fi
+
+  if [ -z "$CONFIG_KEY" ]; then
+    echo "Error: --key is required"
+    echo "Usage: $0 config add --provider <provider> --key <api-key>"
+    exit 1
+  fi
+
+  local config_file="$ROOT/$CONFIG_FILENAME"
+  if [ ! -f "$config_file" ]; then
+    echo "Error: Configuration file not found: $config_file"
+    echo "Please start the gateway first with: $0 start"
+    exit 1
+  fi
+
+  local env_var=$(getEnvVarName "$CONFIG_PROVIDER")
+  if [ -z "$env_var" ]; then
+    echo "Error: Unknown provider: $CONFIG_PROVIDER"
+    echo
+    echo "Supported providers:"
+    echo "  dashscope, deepseek, moonshot, zhipuai, openai, openrouter,"
+    echo "  claude, gemini, groq, doubao, baichuan, yi, stepfun, minimax,"
+    echo "  cohere, mistral, github, fireworks, togetherai, grok"
+    exit 1
+  fi
+
+  local provider_name=$(getProviderName "$env_var")
+  local provider_id=$(getProviderId "$CONFIG_PROVIDER")
+
+  # Update config file on host
+  if grep -q "^${env_var}=" "$config_file"; then
+    echo "Updating API key for $provider_name in config file..."
+    sedInPlace "/^${env_var}=/c\\${env_var}=${CONFIG_KEY}" "$config_file"
+  else
+    echo "Adding API key for $provider_name to config file..."
+    echo "${env_var}=${CONFIG_KEY}" >> "$config_file"
+  fi
+
+  # Update ai-proxy config in container
+  echo "Updating AI Gateway configuration..."
+  local temp_file=$(mktemp)
+  docker cp "${CONTAINER_NAME}:${AI_PROXY_CONFIG_PATH}" "$temp_file" 2>/dev/null
+
+  if [ $? -ne 0 ]; then
+    echo "Error: Could not read ai-proxy configuration from container"
+    rm -f "$temp_file"
+    exit 1
+  fi
+
+  # Use Python to update the API key
+  if command -v python3 &>/dev/null; then
+    python3 << EOF
+import yaml
+import sys
+
+with open('$temp_file', 'r') as f:
+    config = yaml.safe_load(f)
+
+# Update or add the provider's API key
+if 'spec' not in config:
+    config['spec'] = {}
+if 'defaultConfig' not in config['spec']:
+    config['spec']['defaultConfig'] = {}
+
+default_config = config['spec']['defaultConfig']
+if 'providers' not in default_config:
+    default_config['providers'] = []
+
+# Find the provider and update its API key
+found = False
+for provider in default_config['providers']:
+    if provider.get('id') == '$provider_id':
+        if 'apiTokens' not in provider:
+            provider['apiTokens'] = []
+        # Update the first token
+        if len(provider['apiTokens']) > 0:
+            provider['apiTokens'][0] = '$CONFIG_KEY'
+        else:
+            provider['apiTokens'] = ['$CONFIG_KEY']
+        found = True
+        break
+
+if not found:
+    # Provider not found, add it
+    default_config['providers'].append({
+        'id': '$provider_id',
+        'apiTokens': ['$CONFIG_KEY']
+    })
+
+with open('$temp_file', 'w') as f:
+    yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+EOF
+  else
+    echo "Error: Python3 is required for updating API keys"
+    rm -f "$temp_file"
+    exit 1
+  fi
+
+  # Copy updated config back to container
+  docker cp "$temp_file" "${CONTAINER_NAME}:${AI_PROXY_CONFIG_PATH}"
+
+  if [ $? -ne 0 ]; then
+    echo "Error: Could not write ai-proxy configuration to container"
+    rm -f "$temp_file"
+    exit 1
+  fi
+
+  # Touch file to trigger reload
+  docker exec "$CONTAINER_NAME" touch "$AI_PROXY_CONFIG_PATH"
+
+  rm -f "$temp_file"
+
+  echo
+  echo "✅ API key updated successfully!"
+  echo
+  echo "Provider: $provider_name"
+  echo "Key: $(maskApiKey "$CONFIG_KEY")"
+  echo
+  echo "Configuration has been hot-reloaded (no restart needed)."
+}
+
+# Config remove: Remove an API key
+configRemove() {
+  checkContainer
+
+  if [ -z "$CONFIG_PROVIDER" ]; then
+    echo "Error: --provider is required"
+    echo "Usage: $0 config remove --provider <provider>"
+    exit 1
+  fi
+
+  local config_file="$ROOT/$CONFIG_FILENAME"
+  if [ ! -f "$config_file" ]; then
+    echo "Error: Configuration file not found: $config_file"
+    echo "Please start the gateway first with: $0 start"
+    exit 1
+  fi
+
+  local env_var=$(getEnvVarName "$CONFIG_PROVIDER")
+  if [ -z "$env_var" ]; then
+    echo "Error: Unknown provider: $CONFIG_PROVIDER"
+    echo
+    echo "Supported providers:"
+    echo "  dashscope, deepseek, moonshot, zhipuai, openai, openrouter,"
+    echo "  claude, gemini, groq, doubao, baichuan, yi, stepfun, minimax,"
+    echo "  cohere, mistral, github, fireworks, togetherai, grok"
+    exit 1
+  fi
+
+  local provider_name=$(getProviderName "$env_var")
+  local provider_id=$(getProviderId "$CONFIG_PROVIDER")
+
+  # Check if the key exists in config file
+  if ! grep -q "^${env_var}=" "$config_file"; then
+    echo "Error: No API key configured for $provider_name"
+    echo
+    echo "Current configuration:"
+    echo "  $0 config list"
+    exit 1
+  fi
+
+  # Remove from config file
+  sedInPlace "/^${env_var}=/d" "$config_file"
+
+  # Update ai-proxy config in container
+  echo "Updating AI Gateway configuration..."
+  local temp_file=$(mktemp)
+  docker cp "${CONTAINER_NAME}:${AI_PROXY_CONFIG_PATH}" "$temp_file" 2>/dev/null
+
+  if [ $? -ne 0 ]; then
+    echo "Error: Could not read ai-proxy configuration from container"
+    rm -f "$temp_file"
+    exit 1
+  fi
+
+  # Use Python to remove the provider
+  if command -v python3 &>/dev/null; then
+    python3 << EOF
+import yaml
+import sys
+
+with open('$temp_file', 'r') as f:
+    config = yaml.safe_load(f)
+
+# Remove the provider from the list
+if 'spec' in config and 'defaultConfig' in config['spec']:
+    default_config = config['spec']['defaultConfig']
+    if 'providers' in default_config:
+        default_config['providers'] = [
+            p for p in default_config['providers']
+            if p.get('id') != '$provider_id'
+        ]
+
+with open('$temp_file', 'w') as f:
+    yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+EOF
+  else
+    echo "Error: Python3 is required for removing API keys"
+    rm -f "$temp_file"
+    exit 1
+  fi
+
+  # Copy updated config back to container
+  docker cp "$temp_file" "${CONTAINER_NAME}:${AI_PROXY_CONFIG_PATH}"
+
+  if [ $? -ne 0 ]; then
+    echo "Error: Could not write ai-proxy configuration to container"
+    rm -f "$temp_file"
+    exit 1
+  fi
+
+  # Touch file to trigger reload
+  docker exec "$CONTAINER_NAME" touch "$AI_PROXY_CONFIG_PATH"
+
+  rm -f "$temp_file"
+
+  echo
+  echo "✅ API key removed successfully!"
+  echo
+  echo "Provider: $provider_name"
+  echo
+  echo "Configuration has been hot-reloaded (no restart needed)."
+}
+
+# Config command dispatcher
+config() {
+  case "$CONFIG_SUBCOMMAND" in
+  "$CONFIG_ADD")
+    configAdd
+    ;;
+  "$CONFIG_LIST")
+    configList
+    ;;
+  "$CONFIG_REMOVE")
+    configRemove
+    ;;
+  esac
+}
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -1458,5 +1933,8 @@ case $COMMAND in
   ;;
 "$COMMAND_ROUTE")
   route
+  ;;
+"$COMMAND_CONFIG")
+  config
   ;;
 esac
