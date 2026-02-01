@@ -37,7 +37,14 @@ CONFIG_FILENAME="default.cfg"
 COMMAND_START="start"
 COMMAND_STOP="stop"
 COMMAND_DELETE="delete"
-KNOWN_COMMANDS=($COMMAND_START, $COMMAND_STOP, $COMMAND_DELETE)
+COMMAND_ROUTE="route"
+KNOWN_COMMANDS=($COMMAND_START, $COMMAND_STOP, $COMMAND_DELETE, $COMMAND_ROUTE)
+
+# Route subcommands
+ROUTE_ADD="add"
+ROUTE_LIST="list"
+ROUTE_REMOVE="remove"
+KNOWN_ROUTE_SUBCOMMANDS=($ROUTE_ADD, $ROUTE_LIST, $ROUTE_REMOVE)
 
 cd "$(dirname -- "$0")"
 ROOT="$(pwd -P)/higress"
@@ -113,6 +120,170 @@ parseArgs() {
       outputUsage
       exit 0
       ;;
+    --non-interactive | --batch)
+      MODE="batch"
+      shift
+      ;;
+    --http-port)
+      GATEWAY_HTTP_PORT="$2"
+      shift 2
+      ;;
+    --https-port)
+      GATEWAY_HTTPS_PORT="$2"
+      shift 2
+      ;;
+    --console-port)
+      CONSOLE_PORT="$2"
+      shift 2
+      ;;
+    --container-name)
+      CONTAINER_NAME="$2"
+      shift 2
+      ;;
+    --image-repo)
+      IMAGE_REPO="$2"
+      shift 2
+      ;;
+    --image-tag)
+      IMAGE_TAG="$2"
+      shift 2
+      ;;
+    --data-folder)
+      DATA_FOLDER="$2"
+      ROOT="$2"
+      shift 2
+      ;;
+    --auto-routing)
+      ENABLE_AUTO_ROUTING="true"
+      shift
+      ;;
+    --auto-routing-default-model)
+      AUTO_ROUTING_DEFAULT_MODEL="$2"
+      shift 2
+      ;;
+    # LLM Provider API Keys
+    --dashscope-key)
+      DASHSCOPE_API_KEY="$2"
+      LLM_ENVS+=("DASHSCOPE_API_KEY")
+      shift 2
+      ;;
+    --deepseek-key)
+      DEEPSEEK_API_KEY="$2"
+      LLM_ENVS+=("DEEPSEEK_API_KEY")
+      shift 2
+      ;;
+    --moonshot-key)
+      MOONSHOT_API_KEY="$2"
+      LLM_ENVS+=("MOONSHOT_API_KEY")
+      shift 2
+      ;;
+    --zhipuai-key)
+      ZHIPUAI_API_KEY="$2"
+      LLM_ENVS+=("ZHIPUAI_API_KEY")
+      shift 2
+      ;;
+    --openai-key)
+      OPENAI_API_KEY="$2"
+      LLM_ENVS+=("OPENAI_API_KEY")
+      shift 2
+      ;;
+    --openrouter-key)
+      OPENROUTER_API_KEY="$2"
+      LLM_ENVS+=("OPENROUTER_API_KEY")
+      shift 2
+      ;;
+    --claude-key)
+      CLAUDE_API_KEY="$2"
+      LLM_ENVS+=("CLAUDE_API_KEY")
+      shift 2
+      ;;
+    --claude-version)
+      CLAUDE_VERSION="$2"
+      LLM_ENVS+=("CLAUDE_VERSION")
+      shift 2
+      ;;
+    --gemini-key)
+      GEMINI_API_KEY="$2"
+      LLM_ENVS+=("GEMINI_API_KEY")
+      shift 2
+      ;;
+    --groq-key)
+      GROQ_API_KEY="$2"
+      LLM_ENVS+=("GROQ_API_KEY")
+      shift 2
+      ;;
+    --doubao-key)
+      DOUBAO_API_KEY="$2"
+      LLM_ENVS+=("DOUBAO_API_KEY")
+      shift 2
+      ;;
+    --baichuan-key)
+      BAICHUAN_API_KEY="$2"
+      LLM_ENVS+=("BAICHUAN_API_KEY")
+      shift 2
+      ;;
+    --yi-key)
+      YI_API_KEY="$2"
+      LLM_ENVS+=("YI_API_KEY")
+      shift 2
+      ;;
+    --stepfun-key)
+      STEPFUN_API_KEY="$2"
+      LLM_ENVS+=("STEPFUN_API_KEY")
+      shift 2
+      ;;
+    --minimax-key)
+      MINIMAX_API_KEY="$2"
+      LLM_ENVS+=("MINIMAX_API_KEY")
+      shift 2
+      ;;
+    --cohere-key)
+      COHERE_API_KEY="$2"
+      LLM_ENVS+=("COHERE_API_KEY")
+      shift 2
+      ;;
+    --mistral-key)
+      MISTRAL_API_KEY="$2"
+      LLM_ENVS+=("MISTRAL_API_KEY")
+      shift 2
+      ;;
+    --github-key)
+      GITHUB_API_KEY="$2"
+      LLM_ENVS+=("GITHUB_API_KEY")
+      shift 2
+      ;;
+    --fireworks-key)
+      FIREWORKS_API_KEY="$2"
+      LLM_ENVS+=("FIREWORKS_API_KEY")
+      shift 2
+      ;;
+    --togetherai-key)
+      TOGETHERAI_API_KEY="$2"
+      LLM_ENVS+=("TOGETHERAI_API_KEY")
+      shift 2
+      ;;
+    --grok-key)
+      GROK_API_KEY="$2"
+      LLM_ENVS+=("GROK_API_KEY")
+      shift 2
+      ;;
+    # Route command options
+    --pattern)
+      ROUTE_PATTERN="$2"
+      shift 2
+      ;;
+    --model)
+      ROUTE_MODEL="$2"
+      shift 2
+      ;;
+    --trigger)
+      ROUTE_TRIGGER="$2"
+      shift 2
+      ;;
+    --rule-id)
+      ROUTE_RULE_ID="$2"
+      shift 2
+      ;;
     -* | --*)
       echo "Unknown option $1"
       exit 1
@@ -132,6 +303,24 @@ parseArgs() {
   if [[ ! ${KNOWN_COMMANDS[@]} =~ "$COMMAND" ]]; then
     echo "Unknown command: $COMMAND"
     exit 1
+  fi
+  
+  # Parse route subcommand
+  if [ "$COMMAND" == "$COMMAND_ROUTE" ]; then
+    if [ ${#POSITIONAL_ARGS[@]} -gt 0 ]; then
+      ROUTE_SUBCOMMAND="${POSITIONAL_ARGS[0]}"
+    else
+      ROUTE_SUBCOMMAND=""
+    fi
+    if [ -z "$ROUTE_SUBCOMMAND" ]; then
+      echo "Route subcommand required: add, list, remove"
+      exit 1
+    fi
+    if [[ ! ${KNOWN_ROUTE_SUBCOMMANDS[@]} =~ "$ROUTE_SUBCOMMAND" ]]; then
+      echo "Unknown route subcommand: $ROUTE_SUBCOMMAND"
+      echo "Available: add, list, remove"
+      exit 1
+    fi
   fi
 }
 
@@ -650,9 +839,99 @@ EOF
 }
 
 outputUsage() {
-  echo -n "Usage: $(basename -- "$0") [OPTIONS...]"
+  echo -n "Usage: $(basename -- "$0") [COMMAND] [OPTIONS...]"
   echo '
- -h, --help                 give this help list'
+
+Commands:
+  start                     Start the gateway (default)
+  stop                      Stop the gateway
+  delete                    Delete the gateway container
+  route                     Manage auto-routing rules (see below)
+
+Route Subcommands:
+  route add                 Add a new routing rule
+  route list                List all routing rules
+  route remove              Remove a routing rule by ID
+
+Options:
+  -h, --help                Show this help message
+
+Configuration Options (for non-interactive mode):
+  --non-interactive         Run in batch mode without prompts
+  --http-port PORT          Gateway HTTP port (default: 8080)
+  --https-port PORT         Gateway HTTPS port (default: 8443)
+  --console-port PORT       Console port (default: 8001)
+  --container-name NAME     Container name (default: higress-ai-gateway)
+  --image-repo REPO         Image repository
+  --image-tag TAG           Image tag (default: latest)
+  --data-folder PATH        Data folder path
+
+Auto-Routing Options:
+  --auto-routing            Enable auto-routing feature
+  --auto-routing-default-model MODEL
+                            Default model when no routing rule matches
+
+Route Options (for route add/remove):
+  --model MODEL             Target model for routing (required for add)
+  --trigger PHRASE          Trigger phrase(s), separated by | (e.g., "深入思考|deep thinking")
+  --pattern REGEX           Custom regex pattern (alternative to --trigger)
+  --rule-id ID              Rule ID to remove (required for remove)
+
+LLM Provider API Keys:
+  --dashscope-key KEY       Aliyun Dashscope (Qwen) API key
+  --deepseek-key KEY        DeepSeek API key
+  --moonshot-key KEY        Moonshot (Kimi) API key
+  --zhipuai-key KEY         Zhipu AI API key
+  --openai-key KEY          OpenAI API key
+  --openrouter-key KEY      OpenRouter API key
+  --claude-key KEY          Claude API key
+  --claude-version VER      Claude API version (default: 2023-06-01)
+  --gemini-key KEY          Google Gemini API key
+  --groq-key KEY            Groq API key
+  --doubao-key KEY          Doubao API key
+  --baichuan-key KEY        Baichuan AI API key
+  --yi-key KEY              01.AI (Yi) API key
+  --stepfun-key KEY         Stepfun API key
+  --minimax-key KEY         Minimax API key
+  --cohere-key KEY          Cohere API key
+  --mistral-key KEY         Mistral AI API key
+  --github-key KEY          Github Models API key
+  --fireworks-key KEY       Fireworks AI API key
+  --togetherai-key KEY      Together AI API key
+  --grok-key KEY            Grok API key
+
+Examples:
+  # Interactive wizard mode
+  ./get-ai-gateway.sh
+
+  # Non-interactive with specific providers
+  ./get-ai-gateway.sh start --non-interactive \\
+    --dashscope-key sk-xxx \\
+    --openai-key sk-xxx \\
+    --http-port 8080
+
+  # Enable auto-routing
+  ./get-ai-gateway.sh start --non-interactive \\
+    --dashscope-key sk-xxx \\
+    --auto-routing \\
+    --auto-routing-default-model qwen-turbo
+
+  # Add a routing rule (route to claude for complex problems)
+  ./get-ai-gateway.sh route add \\
+    --model claude-opus-4.5 \\
+    --trigger "深入思考|deep thinking"
+
+  # Add a routing rule for coding
+  ./get-ai-gateway.sh route add \\
+    --model qwen-coder \\
+    --trigger "写代码|code:"
+
+  # List all routing rules
+  ./get-ai-gateway.sh route list
+
+  # Remove a routing rule
+  ./get-ai-gateway.sh route remove --rule-id 0
+'
 }
 
 outputWelcomeMessage() {
@@ -729,6 +1008,9 @@ outputWelcomeMessage() {
   echo
   echo "Higress Console URL (open with browser):"
   echo "   http://localhost:$CONSOLE_PORT"
+  echo
+  echo "Access logs directory:"
+  echo "   $DATA_FOLDER/logs"
 
   # Show Clawdbot integration info if detected
   if checkClawdbot; then
@@ -785,6 +1067,11 @@ start() {
 
   NORMALIZED_DATA_FOLDER_PATH="$(normalizePath "${DATA_FOLDER}")"
   NORMALIZED_CONFIG_FILE_PATH="$(normalizePath "${DATA_FOLDER}/${CONFIG_FILENAME}")"
+  
+  # Create log folder for mounting /var/log/proxy
+  LOG_FOLDER="${DATA_FOLDER}/logs"
+  mkdir -p "$LOG_FOLDER"
+  NORMALIZED_LOG_FOLDER_PATH="$(normalizePath "${LOG_FOLDER}")"
 
   $DOCKER_COMMAND run --name "${CONTAINER_NAME}" -d \
     -p 127.0.0.1:$GATEWAY_HTTP_PORT:$GATEWAY_HTTP_PORT \
@@ -792,7 +1079,8 @@ start() {
     -p 127.0.0.1:$CONSOLE_PORT:$CONSOLE_PORT \
     --restart=always \
     --env-file "$NORMALIZED_CONFIG_FILE_PATH" \
-    --mount "type=bind,source=$NORMALIZED_DATA_FOLDER_PATH,target=/data" "$IMAGE_REPO:$IMAGE_TAG" >/dev/null
+    --mount "type=bind,source=$NORMALIZED_DATA_FOLDER_PATH,target=/data" \
+    --mount "type=bind,source=$NORMALIZED_LOG_FOLDER_PATH,target=/var/log/proxy" "$IMAGE_REPO:$IMAGE_TAG" >/dev/null
 
   if [ $? -eq 0 ]; then
     # Wait a moment for the container to generate initial config files
@@ -856,6 +1144,300 @@ delete() {
   fi
 }
 
+# ============================================================================
+# Route Command Functions
+# ============================================================================
+
+MODEL_ROUTER_CONFIG_PATH="/data/wasmplugins/model-router.internal.yaml"
+
+# Generate a pattern from trigger phrase
+generatePattern() {
+  local trigger="$1"
+  # Split by | and create regex pattern
+  local patterns=""
+  IFS='|' read -ra TRIGGERS <<< "$trigger"
+  for t in "${TRIGGERS[@]}"; do
+    t=$(echo "$t" | xargs)  # trim whitespace
+    if [ -n "$patterns" ]; then
+      patterns="$patterns|$t"
+    else
+      patterns="$t"
+    fi
+  done
+  echo "(?i)^($patterns)"
+}
+
+# Check if container is running
+checkContainer() {
+  local running=$(docker ps --filter "name=^/${CONTAINER_NAME}$" --filter "status=running" --format "{{.Names}}")
+  if [ -z "$running" ]; then
+    echo "Error: Container '$CONTAINER_NAME' is not running."
+    echo "Start it first with: $0 start"
+    exit 1
+  fi
+}
+
+# Route add: Add a new routing rule
+routeAdd() {
+  checkContainer
+  
+  if [ -z "$ROUTE_MODEL" ]; then
+    echo "Error: --model is required"
+    echo "Usage: $0 route add --model <model-name> --trigger <trigger-phrase>"
+    echo "       $0 route add --model <model-name> --pattern <regex-pattern>"
+    exit 1
+  fi
+  
+  local pattern=""
+  if [ -n "$ROUTE_PATTERN" ]; then
+    pattern="$ROUTE_PATTERN"
+  elif [ -n "$ROUTE_TRIGGER" ]; then
+    pattern=$(generatePattern "$ROUTE_TRIGGER")
+  else
+    echo "Error: Either --trigger or --pattern is required"
+    echo "Usage: $0 route add --model <model-name> --trigger <trigger-phrase>"
+    echo "       $0 route add --model <model-name> --pattern <regex-pattern>"
+    exit 1
+  fi
+  
+  echo "Adding routing rule..."
+  echo "  Pattern: $pattern"
+  echo "  Model: $ROUTE_MODEL"
+  
+  # Copy config from container
+  local temp_file=$(mktemp)
+  docker cp "${CONTAINER_NAME}:${MODEL_ROUTER_CONFIG_PATH}" "$temp_file" 2>/dev/null
+  
+  if [ $? -ne 0 ]; then
+    echo "Error: Could not read model-router configuration from container"
+    rm -f "$temp_file"
+    exit 1
+  fi
+  
+  # Check if autoRouting section exists
+  if ! grep -q "autoRouting:" "$temp_file"; then
+    # Add autoRouting section
+    sedInPlace '/modelToHeader:/a\    autoRouting:\n      enable: true\n      defaultModel: qwen-turbo\n      rules: []' "$temp_file"
+  fi
+  
+  # Check if rules section exists under autoRouting
+  if ! grep -q "rules:" "$temp_file"; then
+    sedInPlace '/autoRouting:/a\      rules: []' "$temp_file"
+  fi
+  
+  # Add new rule - escape special characters for sed
+  local escaped_pattern=$(echo "$pattern" | sed 's/[&/\]/\\&/g')
+  local escaped_model=$(echo "$ROUTE_MODEL" | sed 's/[&/\]/\\&/g')
+  
+  # Use Python for reliable YAML editing if available, otherwise use sed
+  if command -v python3 &>/dev/null; then
+    python3 << EOF
+import yaml
+import sys
+
+with open('$temp_file', 'r') as f:
+    config = yaml.safe_load(f)
+
+if 'spec' not in config:
+    config['spec'] = {}
+if 'defaultConfig' not in config['spec']:
+    config['spec']['defaultConfig'] = {}
+if 'autoRouting' not in config['spec']['defaultConfig']:
+    config['spec']['defaultConfig']['autoRouting'] = {
+        'enable': True,
+        'defaultModel': 'qwen-turbo',
+        'rules': []
+    }
+if 'rules' not in config['spec']['defaultConfig']['autoRouting']:
+    config['spec']['defaultConfig']['autoRouting']['rules'] = []
+
+# Add new rule
+config['spec']['defaultConfig']['autoRouting']['rules'].append({
+    'pattern': '$pattern',
+    'model': '$ROUTE_MODEL'
+})
+
+with open('$temp_file', 'w') as f:
+    yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+EOF
+  else
+    # Fallback to sed (less reliable for YAML)
+    sedInPlace "/rules:/a\\        - pattern: $escaped_pattern\n          model: $escaped_model" "$temp_file"
+  fi
+  
+  # Copy back to container
+  docker cp "$temp_file" "${CONTAINER_NAME}:${MODEL_ROUTER_CONFIG_PATH}"
+  
+  if [ $? -ne 0 ]; then
+    echo "Error: Could not write model-router configuration to container"
+    rm -f "$temp_file"
+    exit 1
+  fi
+  
+  # Touch file to trigger reload
+  docker exec "$CONTAINER_NAME" touch "$MODEL_ROUTER_CONFIG_PATH"
+  
+  rm -f "$temp_file"
+  
+  echo
+  echo "✅ Routing rule added successfully!"
+  echo
+  echo "Configuration has been hot-reloaded (no restart needed)."
+  echo
+  if [ -n "$ROUTE_TRIGGER" ]; then
+    echo "Usage: Start your message with the trigger phrase to route to $ROUTE_MODEL"
+    echo "  Example: $ROUTE_TRIGGER How to solve this problem?"
+  else
+    echo "Pattern: $pattern"
+    echo "Model: $ROUTE_MODEL"
+  fi
+  echo
+  echo "Note: Make sure to use model='higress/auto' in your API request."
+}
+
+# Route list: List all routing rules
+routeList() {
+  checkContainer
+  
+  echo "Current routing rules:"
+  echo
+  
+  # Read config from container
+  local config=$(docker exec "$CONTAINER_NAME" cat "$MODEL_ROUTER_CONFIG_PATH" 2>/dev/null)
+  
+  if [ $? -ne 0 ]; then
+    echo "Error: Could not read model-router configuration from container"
+    exit 1
+  fi
+  
+  # Parse and display rules using Python if available
+  if command -v python3 &>/dev/null; then
+    echo "$config" | python3 << 'EOF'
+import yaml
+import sys
+
+config = yaml.safe_load(sys.stdin.read())
+auto_routing = config.get('spec', {}).get('defaultConfig', {}).get('autoRouting', {})
+
+if not auto_routing.get('enable', False):
+    print("Auto-routing is DISABLED")
+    print()
+    print("Enable it with: ./get-ai-gateway.sh start --auto-routing")
+    sys.exit(0)
+
+default_model = auto_routing.get('defaultModel', 'not set')
+print(f"Default model: {default_model}")
+print()
+
+rules = auto_routing.get('rules', [])
+if not rules:
+    print("No routing rules configured.")
+    print()
+    print("Add a rule with:")
+    print("  ./get-ai-gateway.sh route add --model <model> --trigger '<trigger-phrase>'")
+else:
+    print(f"{'ID':<4} {'Pattern':<40} {'Model':<20}")
+    print("-" * 70)
+    for i, rule in enumerate(rules):
+        pattern = rule.get('pattern', 'N/A')[:38]
+        model = rule.get('model', 'N/A')
+        print(f"{i:<4} {pattern:<40} {model:<20}")
+EOF
+  else
+    # Fallback: just show raw config section
+    echo "$config" | grep -A 100 "autoRouting:" | head -50
+  fi
+}
+
+# Route remove: Remove a routing rule by ID
+routeRemove() {
+  checkContainer
+  
+  if [ -z "$ROUTE_RULE_ID" ]; then
+    echo "Error: --rule-id is required"
+    echo "Usage: $0 route remove --rule-id <id>"
+    echo
+    echo "Use '$0 route list' to see rule IDs"
+    exit 1
+  fi
+  
+  echo "Removing routing rule ID: $ROUTE_RULE_ID"
+  
+  # Copy config from container
+  local temp_file=$(mktemp)
+  docker cp "${CONTAINER_NAME}:${MODEL_ROUTER_CONFIG_PATH}" "$temp_file" 2>/dev/null
+  
+  if [ $? -ne 0 ]; then
+    echo "Error: Could not read model-router configuration from container"
+    rm -f "$temp_file"
+    exit 1
+  fi
+  
+  # Remove rule using Python
+  if command -v python3 &>/dev/null; then
+    python3 << EOF
+import yaml
+import sys
+
+with open('$temp_file', 'r') as f:
+    config = yaml.safe_load(f)
+
+rules = config.get('spec', {}).get('defaultConfig', {}).get('autoRouting', {}).get('rules', [])
+
+rule_id = int('$ROUTE_RULE_ID')
+if rule_id < 0 or rule_id >= len(rules):
+    print(f"Error: Rule ID {rule_id} not found. Use 'route list' to see available rules.")
+    sys.exit(1)
+
+removed = rules.pop(rule_id)
+print(f"Removed rule: pattern='{removed.get('pattern')}', model='{removed.get('model')}'")
+
+with open('$temp_file', 'w') as f:
+    yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+EOF
+    
+    if [ $? -ne 0 ]; then
+      rm -f "$temp_file"
+      exit 1
+    fi
+  else
+    echo "Error: Python3 is required for removing rules"
+    rm -f "$temp_file"
+    exit 1
+  fi
+  
+  # Copy back to container
+  docker cp "$temp_file" "${CONTAINER_NAME}:${MODEL_ROUTER_CONFIG_PATH}"
+  
+  # Touch file to trigger reload
+  docker exec "$CONTAINER_NAME" touch "$MODEL_ROUTER_CONFIG_PATH"
+  
+  rm -f "$temp_file"
+  
+  echo
+  echo "✅ Routing rule removed successfully!"
+  echo "Configuration has been hot-reloaded."
+}
+
+# Route command dispatcher
+route() {
+  case "$ROUTE_SUBCOMMAND" in
+  "$ROUTE_ADD")
+    routeAdd
+    ;;
+  "$ROUTE_LIST")
+    routeList
+    ;;
+  "$ROUTE_REMOVE")
+    routeRemove
+    ;;
+  esac
+}
+
+# ============================================================================
+# Main
+# ============================================================================
+
 initArch
 initOS
 parseArgs "$@"
@@ -873,5 +1455,8 @@ case $COMMAND in
   ;;
 "$COMMAND_DELETE")
   delete
+  ;;
+"$COMMAND_ROUTE")
+  route
   ;;
 esac
