@@ -1497,6 +1497,66 @@ LLM Provider API Keys:
   --togetherai-key KEY      Together AI API key
   --grok-key KEY            Grok API key
 
+Model Pattern Configurations:
+  Configure which models each provider should handle. Supports flexible formats:
+  
+  Format 1: Wildcard prefix       model-*
+    Example: --dashscope-models "qwen-*"
+    Matches: qwen-max, qwen-plus, qwen-turbo, etc.
+  
+  Format 2: Exact model name      model-name
+    Example: --openai-models "gpt-4-turbo"
+    Matches: only gpt-4-turbo
+  
+  Format 3: Multiple wildcards    model1-*,model2-*
+    Example: --moonshot-models "moonshot-*,kimi-*"
+    Matches: moonshot-v1, kimi-2.5, etc.
+  
+  Format 4: Multiple exact names  model1,model2,model3
+    Example: --openai-models "gpt-4-turbo,gpt-4o,gpt-4o-mini"
+    Matches: only these three models
+  
+  Format 5: Mixed patterns        model-*,exact-name
+    Example: --claude-models "claude-3-5-sonnet-*,claude-opus-4-20250514"
+    Matches: claude-3-5-sonnet series + exact opus version
+  
+  Format 6: Match all             *
+    Example: --openrouter-models "*"
+    Matches: all models (catch-all provider)
+
+  Available model pattern options:
+  --dashscope-models PATTERN    Model pattern for Aliyun Dashscope
+  --deepseek-models PATTERN     Model pattern for DeepSeek
+  --moonshot-models PATTERN     Model pattern for Moonshot
+  --zhipuai-models PATTERN      Model pattern for Zhipu AI
+  --minimax-models PATTERN      Model pattern for Minimax
+  --azure-models PATTERN        Model pattern for Azure OpenAI
+  --bedrock-models PATTERN      Model pattern for AWS Bedrock
+  --vertex-models PATTERN       Model pattern for Google Vertex AI
+  --openai-models PATTERN       Model pattern for OpenAI
+  --openrouter-models PATTERN   Model pattern for OpenRouter
+  --yi-models PATTERN           Model pattern for 01.AI (Yi)
+  --ai360-models PATTERN        Model pattern for 360 Zhinao
+  --baichuan-models PATTERN     Model pattern for Baichuan AI
+  --baidu-models PATTERN        Model pattern for Baidu AI Cloud
+  --claude-models PATTERN       Model pattern for Claude
+  --cloudflare-models PATTERN   Model pattern for Cloudflare Workers AI
+  --cohere-models PATTERN       Model pattern for Cohere
+  --deepl-models PATTERN        Model pattern for DeepL
+  --dify-models PATTERN         Model pattern for Dify
+  --doubao-models PATTERN       Model pattern for Doubao
+  --fireworks-models PATTERN    Model pattern for Fireworks AI
+  --github-models PATTERN       Model pattern for GitHub Models
+  --gemini-models PATTERN       Model pattern for Google Gemini
+  --grok-models PATTERN         Model pattern for Grok
+  --groq-models PATTERN         Model pattern for Groq
+  --mistral-models PATTERN      Model pattern for Mistral AI
+  --ollama-models PATTERN       Model pattern for Ollama
+  --spark-models PATTERN        Model pattern for iFlyTek Spark
+  --stepfun-models PATTERN      Model pattern for Stepfun
+  --hunyuan-models PATTERN      Model pattern for Tencent Hunyuan
+  --togetherai-models PATTERN   Model pattern for Together AI
+
 Examples:
   # Interactive wizard mode
   ./get-ai-gateway.sh
@@ -1506,6 +1566,22 @@ Examples:
     --dashscope-key sk-xxx \\
     --openai-key sk-xxx \\
     --http-port 8080
+
+  # Configure with model patterns (route specific models to specific providers)
+  ./get-ai-gateway.sh start --non-interactive \\
+    --openai-key sk-xxx --openai-models "gpt-4-*" \\
+    --deepseek-key sk-xxx --deepseek-models "deepseek-*" \\
+    --claude-key sk-xxx --claude-models "claude-3-5-sonnet-*"
+
+  # Multi-provider setup with exact model names
+  ./get-ai-gateway.sh start --non-interactive \\
+    --openai-key sk-xxx --openai-models "gpt-4-turbo,gpt-4o" \\
+    --claude-key sk-xxx --claude-models "claude-opus-4-20250514"
+
+  # Use OpenRouter as catch-all for other models
+  ./get-ai-gateway.sh start --non-interactive \\
+    --openai-key sk-xxx --openai-models "gpt-4-*" \\
+    --openrouter-key sk-xxx --openrouter-models "*"
 
   # Enable auto-routing
   ./get-ai-gateway.sh start --non-interactive \\
