@@ -562,12 +562,15 @@ resetEnv() {
   DATA_FOLDER="$ROOT"
   CONTAINER_NAME="${CONTAINER_NAME:-$DEFAULT_CONTAINER_NAME}"
 
-  IMAGE_REPO="${IMAGE_REPO:-$DEFAULT_IMAGE_REPO}"
-  IMAGE_TAG="${IMAGE_TAG:-$DEFAULT_IMAGE_TAG}"
-  
-  # Detect and set plugin registry if not already set
+  # Detect and set plugin registry first (before IMAGE_REPO)
   detectPluginRegistry
   PLUGIN_REGISTRY="${PLUGIN_REGISTRY:-$DEFAULT_PLUGIN_REGISTRY}"
+  
+  # Build IMAGE_REPO from PLUGIN_REGISTRY if not explicitly set
+  if [ -z "$IMAGE_REPO" ]; then
+    IMAGE_REPO="${PLUGIN_REGISTRY}/higress/all-in-one"
+  fi
+  IMAGE_TAG="${IMAGE_TAG:-$DEFAULT_IMAGE_TAG}"
 
   GATEWAY_HTTP_PORT="${GATEWAY_HTTP_PORT:-$DEFAULT_GATEWAY_HTTP_PORT}"
   GATEWAY_HTTPS_PORT="${GATEWAY_HTTPS_PORT:-$DEFAULT_GATEWAY_HTTPS_PORT}"
