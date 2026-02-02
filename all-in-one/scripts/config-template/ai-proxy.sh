@@ -125,7 +125,7 @@ spec:
   failStrategy: FAIL_OPEN
   phase: UNSPECIFIED_PHASE
   priority: \"100\"
-  url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/ai-proxy:2.0.0" > "$WASM_PLUGIN_CONFIG_FILE"
+  url: oci://${PLUGIN_REGISTRY:-higress-registry.cn-hangzhou.cr.aliyuncs.com}/plugins/ai-proxy:2.0.0" > "$WASM_PLUGIN_CONFIG_FILE"
 }
 
 function initializeMcpBridge() {

@@ -385,7 +385,7 @@ spec:
   failStrategy: FAIL_OPEN
   phase: UNSPECIFIED_PHASE
   priority: 100
-  url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/ai-proxy:2.0.0" >"$WASM_PLUGIN_CONFIG_FOLDER/ai-proxy.internal.yaml"
+  url: oci://${PLUGIN_REGISTRY:-higress-registry.cn-hangzhou.cr.aliyuncs.com}/plugins/ai-proxy:2.0.0" >"$WASM_PLUGIN_CONFIG_FOLDER/ai-proxy.internal.yaml"
 
   echo -e "\
 apiVersion: extensions.higress.io/v1alpha1
@@ -409,7 +409,7 @@ spec:
   failStrategy: FAIL_OPEN
   phase: UNSPECIFIED_PHASE
   priority: 900
-  url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/ai-statistics:2.0.0" >"$WASM_PLUGIN_CONFIG_FOLDER/ai-statistics-1.0.0.yaml"
+  url: oci://${PLUGIN_REGISTRY:-higress-registry.cn-hangzhou.cr.aliyuncs.com}/plugins/ai-statistics:2.0.0" >"$WASM_PLUGIN_CONFIG_FOLDER/ai-statistics-1.0.0.yaml"
 
   echo -e "\
 apiVersion: extensions.higress.io/v1alpha1
@@ -433,7 +433,7 @@ spec:
   failStrategy: FAIL_OPEN
   phase: AUTHN
   priority: 900
-  url: oci://higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/model-router:2.0.0" >"$WASM_PLUGIN_CONFIG_FOLDER/model-router.internal.yaml"
+  url: oci://${PLUGIN_REGISTRY:-higress-registry.cn-hangzhou.cr.aliyuncs.com}/plugins/model-router:2.0.0" >"$WASM_PLUGIN_CONFIG_FOLDER/model-router.internal.yaml"
 }
 
 function appendAiProxyConfigs() {
