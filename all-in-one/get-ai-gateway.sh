@@ -27,6 +27,7 @@ fi
 
 DEFAULT_CONTAINER_NAME=higress-ai-gateway
 DEFAULT_IMAGE_REPO=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/all-in-one
+DEFAULT_PLUGIN_REGISTRY=higress-registry.cn-hangzhou.cr.aliyuncs.com
 DEFAULT_IMAGE_TAG=latest
 DEFAULT_GATEWAY_HTTP_PORT=8080
 DEFAULT_GATEWAY_HTTPS_PORT=8443
@@ -84,6 +85,45 @@ initOS() {
   # Minimalist GNU for Windows
   mingw* | cygwin*) OS='windows' ;;
   esac
+}
+
+# Auto-detect timezone and select optimal plugin registry
+detectPluginRegistry() {
+  if [ -n "$PLUGIN_REGISTRY" ]; then
+    # User explicitly set PLUGIN_REGISTRY, use it
+    return
+  fi
+
+  # Try to detect timezone
+  local TZ=""
+  if command -v timedatectl &>/dev/null; then
+    TZ=$(timedatectl show --property=Timezone --value 2>/dev/null)
+  elif [ -f /etc/timezone ]; then
+    TZ=$(cat /etc/timezone 2>/dev/null)
+  fi
+
+  # Select registry based on timezone
+  case "$TZ" in
+    Asia/Shanghai|Asia/Hong_Kong|Asia/Taipei|Asia/Chongqing|Asia/Urumqi|Asia/Harbin)
+      # China and nearby regions
+      PLUGIN_REGISTRY="higress-registry.cn-hangzhou.cr.aliyuncs.com"
+      ;;
+    Asia/Singapore|Asia/Jakarta|Asia/Bangkok|Asia/Kuala_Lumpur|Asia/Manila|Asia/Ho_Chi_Minh)
+      # Southeast Asia
+      PLUGIN_REGISTRY="higress-registry.ap-southeast-7.cr.aliyuncs.com"
+      ;;
+    America/*|US/*|Canada/*)
+      # North America
+      PLUGIN_REGISTRY="higress-registry.us-west-1.cr.aliyuncs.com"
+      ;;
+    *)
+      # Default to Hangzhou for other regions
+      PLUGIN_REGISTRY="$DEFAULT_PLUGIN_REGISTRY"
+      ;;
+  esac
+
+  echo "Auto-detected timezone: $TZ"
+  echo "Selected plugin registry: $PLUGIN_REGISTRY"
 }
 
 normalizePath() {
@@ -524,6 +564,10 @@ resetEnv() {
 
   IMAGE_REPO="${IMAGE_REPO:-$DEFAULT_IMAGE_REPO}"
   IMAGE_TAG="${IMAGE_TAG:-$DEFAULT_IMAGE_TAG}"
+  
+  # Detect and set plugin registry if not already set
+  detectPluginRegistry
+  PLUGIN_REGISTRY="${PLUGIN_REGISTRY:-$DEFAULT_PLUGIN_REGISTRY}"
 
   GATEWAY_HTTP_PORT="${GATEWAY_HTTP_PORT:-$DEFAULT_GATEWAY_HTTP_PORT}"
   GATEWAY_HTTPS_PORT="${GATEWAY_HTTPS_PORT:-$DEFAULT_GATEWAY_HTTPS_PORT}"
@@ -1318,6 +1362,7 @@ CONFIG_TEMPLATE=ai-gateway
 GATEWAY_HTTP_PORT=${GATEWAY_HTTP_PORT}
 GATEWAY_HTTPS_PORT=${GATEWAY_HTTPS_PORT}
 CONSOLE_PORT=${CONSOLE_PORT}
+PLUGIN_REGISTRY=${PLUGIN_REGISTRY}
 ${LLM_CONFIGS}${AUTO_ROUTING_CONFIG}
 EOF
 }
