@@ -244,6 +244,11 @@ parseArgs() {
       LLM_ENVS+=("CLAUDE_VERSION")
       shift 2
       ;;
+    --claude-code-key)
+      CLAUDE_CODE_API_KEY="$2"
+      LLM_ENVS+=("CLAUDE_CODE_API_KEY")
+      shift 2
+      ;;
     --gemini-key)
       GEMINI_API_KEY="$2"
       LLM_ENVS+=("GEMINI_API_KEY")
@@ -577,6 +582,42 @@ resetEnv() {
   CONSOLE_PORT="${CONSOLE_PORT:-$DEFAULT_CONSOLE_PORT}"
 
   LLM_ENVS=()
+  
+  # ========== Model Pattern Defaults (can be updated anytime) ==========
+  # Top 10 commonly used providers
+  : "${DASHSCOPE_MODELS:=qwen-*}"
+  : "${DEEPSEEK_MODELS:=deepseek-*}"
+  : "${MOONSHOT_MODELS:=moonshot-*,kimi-*}"
+  : "${ZHIPUAI_MODELS:=GLM-*,glm-*}"
+  : "${MINIMAX_MODELS:=abab-*,MiniMax-*,minimax-*}"
+  : "${AZURE_MODELS:=gpt-*,o1-*,o3-*}"
+  : "${BEDROCK_MODELS:=*}"
+  : "${VERTEX_MODELS:=gemini-*}"
+  : "${OPENAI_MODELS:=gpt-*,o1-*,o3-*}"
+  : "${OPENROUTER_MODELS:=*}"
+  
+  # Other providers (alphabetically ordered)
+  : "${YI_MODELS:=yi-*}"
+  : "${AI360_MODELS:=360GPT-*}"
+  : "${BAICHUAN_MODELS:=Baichuan*}"
+  : "${BAIDU_MODELS:=ERNIE-*}"
+  : "${CLAUDE_MODELS:=claude-*}"
+  : "${CLOUDFLARE_MODELS:=*}"
+  : "${COHERE_MODELS:=command*}"
+  : "${DEEPL_MODELS:=*}"
+  : "${DIFY_MODELS:=*}"
+  : "${DOUBAO_MODELS:=doubao-*}"
+  : "${FIREWORKS_MODELS:=*}"
+  : "${GITHUB_MODELS:=*}"
+  : "${GEMINI_MODELS:=gemini-*}"
+  : "${GROK_MODELS:=grok-*}"
+  : "${GROQ_MODELS:=*}"
+  : "${MISTRAL_MODELS:=mistral-*,open-mistral-*}"
+  : "${OLLAMA_MODELS:=llama*,codellama*}"
+  : "${SPARK_MODELS:=*}"
+  : "${STEPFUN_MODELS:=step-*}"
+  : "${HUNYUAN_MODELS:=hunyuan-*}"
+  : "${TOGETHERAI_MODELS:=*}"
 }
 
 # Load saved configuration from config file
@@ -654,10 +695,11 @@ runConfigWizard() {
     "DeepSeek|DEEPSEEK|configureDeepSeekProvider"
     "Moonshot (Kimi)|MOONSHOT|configureMoonshotProvider"
     "Zhipu AI|ZHIPUAI|configureZhipuAIProvider"
+    "Claude Code|CLAUDE_CODE|configureClaudeCodeProvider"
+    "Claude|CLAUDE|configureClaudeProvider"
     "Minimax|MINIMAX|configureMinimaxProvider"
     "Azure OpenAI|AZURE|configureAzureProvider"
     "AWS Bedrock|BEDROCK|configureBedrockProvider"
-    "Google Vertex AI|VERTEX|configureVertexProvider"
     "OpenAI|OPENAI|configureOpenAIProvider"
     "OpenRouter|OPENROUTER|configureOpenRouterProvider"
     # Other providers (alphabetically ordered)
@@ -781,11 +823,29 @@ configureOllamaProvider() {
 }
 
 configureClaudeProvider() {
-  read -r -u 3 -p "→ Enter API Key for Claude: " CLAUDE_API_KEY
+  read -r -u 3 -p "→ Enter API Key for Claude (or press Enter to skip): " CLAUDE_API_KEY
   local DEFAULT_CLAUDE_VERSION="2023-06-01"
   readWithDefault "→ Enter API version for Claude (Default: $DEFAULT_CLAUDE_VERSION): " $DEFAULT_CLAUDE_VERSION
   CLAUDE_VERSION="$input"
-  LLM_ENVS+=("CLAUDE_API_KEY" "CLAUDE_VERSION")
+  
+  if [ -n "$CLAUDE_API_KEY" ]; then
+    LLM_ENVS+=("CLAUDE_API_KEY" "CLAUDE_VERSION")
+  fi
+  
+  # Ask if using Claude Code mode (OAuth token)
+  local use_claude_code=""
+  read -r -u 3 -p "→ Use Claude Code mode with OAuth token? (y/N): " use_claude_code
+  if [[ "$use_claude_code" =~ ^[Yy]$ ]]; then
+    echo ""
+    echo "Note: To obtain your Claude Code OAuth token, run this command:"
+    echo "  claude setup-token"
+    echo "Copy the token and paste it below."
+    echo ""
+    read -r -u 3 -p "→ Enter OAuth Token for Claude Code: " CLAUDE_CODE_API_KEY
+    if [ -n "$CLAUDE_CODE_API_KEY" ]; then
+      LLM_ENVS+=("CLAUDE_CODE_API_KEY")
+    fi
+  fi
   
   # Configure model pattern
   if [ -z "$CLAUDE_MODELS" ]; then
@@ -1349,6 +1409,21 @@ writeConfiguration() {
     LLM_CONFIGS="$LLM_CONFIGS
 ${env}=${!env}"
   done
+  
+  # Add all *_MODELS variables to config
+  for model_env in DASHSCOPE_MODELS DEEPSEEK_MODELS MOONSHOT_MODELS ZHIPUAI_MODELS \
+                   MINIMAX_MODELS AZURE_MODELS BEDROCK_MODELS VERTEX_MODELS \
+                   OPENAI_MODELS OPENROUTER_MODELS YI_MODELS AI360_MODELS \
+                   BAICHUAN_MODELS BAIDU_MODELS CLAUDE_MODELS CLOUDFLARE_MODELS \
+                   COHERE_MODELS DEEPL_MODELS DIFY_MODELS DOUBAO_MODELS \
+                   FIREWORKS_MODELS GITHUB_MODELS GEMINI_MODELS GROK_MODELS \
+                   GROQ_MODELS MISTRAL_MODELS OLLAMA_MODELS SPARK_MODELS \
+                   STEPFUN_MODELS HUNYUAN_MODELS TOGETHERAI_MODELS; do
+    if [ -n "${!model_env}" ]; then
+      LLM_CONFIGS="$LLM_CONFIGS
+${model_env}=${!model_env}"
+    fi
+  done
 
   # Save auto-routing configuration
   local AUTO_ROUTING_CONFIG=""
@@ -1428,6 +1503,7 @@ LLM Provider API Keys:
   --openrouter-key KEY      OpenRouter API key
   --claude-key KEY          Claude API key
   --claude-version VER      Claude API version (default: 2023-06-01)
+  --claude-code-key KEY     Claude Code OAuth token (enables Code mode)
   --gemini-key KEY          Google Gemini API key
   --groq-key KEY            Groq API key
   --doubao-key KEY          Doubao API key
@@ -1484,7 +1560,7 @@ Model Pattern Configurations:
   --ai360-models PATTERN        Model pattern for 360 Zhinao
   --baichuan-models PATTERN     Model pattern for Baichuan AI
   --baidu-models PATTERN        Model pattern for Baidu AI Cloud
-  --claude-models PATTERN       Model pattern for Claude
+  --claude-models PATTERN       Model pattern for Claude (both standard and Code mode)
   --cloudflare-models PATTERN   Model pattern for Cloudflare Workers AI
   --cohere-models PATTERN       Model pattern for Cohere
   --deepl-models PATTERN        Model pattern for DeepL
