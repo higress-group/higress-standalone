@@ -836,6 +836,11 @@ configureClaudeProvider() {
   local use_claude_code=""
   read -r -u 3 -p "→ Use Claude Code mode with OAuth token? (y/N): " use_claude_code
   if [[ "$use_claude_code" =~ ^[Yy]$ ]]; then
+    echo ""
+    echo "Note: To obtain your Claude Code OAuth token, run this command:"
+    echo "  claude setup-token"
+    echo "Copy the token and paste it below."
+    echo ""
     read -r -u 3 -p "→ Enter OAuth Token for Claude Code: " CLAUDE_CODE_API_KEY
     if [ -n "$CLAUDE_CODE_API_KEY" ]; then
       LLM_ENVS+=("CLAUDE_CODE_API_KEY")
