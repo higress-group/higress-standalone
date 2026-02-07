@@ -440,11 +440,6 @@ parseArgs() {
       LLM_ENVS+=("CLAUDE_MODELS")
       shift 2
       ;;
-    --claude-code-models)
-      CLAUDE_CODE_MODELS="$2"
-      LLM_ENVS+=("CLAUDE_CODE_MODELS")
-      shift 2
-      ;;
     --cohere-models)
       COHERE_MODELS="$2"
       LLM_ENVS+=("COHERE_MODELS")
@@ -607,7 +602,6 @@ resetEnv() {
   : "${BAICHUAN_MODELS:=Baichuan*}"
   : "${BAIDU_MODELS:=ERNIE-*}"
   : "${CLAUDE_MODELS:=claude-*}"
-  : "${CLAUDE_CODE_MODELS:=claude-code-*}"
   : "${CLOUDFLARE_MODELS:=*}"
   : "${COHERE_MODELS:=command*}"
   : "${DEEPL_MODELS:=*}"
@@ -829,11 +823,24 @@ configureOllamaProvider() {
 }
 
 configureClaudeProvider() {
-  read -r -u 3 -p "→ Enter API Key for Claude: " CLAUDE_API_KEY
+  read -r -u 3 -p "→ Enter API Key for Claude (or press Enter to skip): " CLAUDE_API_KEY
   local DEFAULT_CLAUDE_VERSION="2023-06-01"
   readWithDefault "→ Enter API version for Claude (Default: $DEFAULT_CLAUDE_VERSION): " $DEFAULT_CLAUDE_VERSION
   CLAUDE_VERSION="$input"
-  LLM_ENVS+=("CLAUDE_API_KEY" "CLAUDE_VERSION")
+  
+  if [ -n "$CLAUDE_API_KEY" ]; then
+    LLM_ENVS+=("CLAUDE_API_KEY" "CLAUDE_VERSION")
+  fi
+  
+  # Ask if using Claude Code mode (OAuth token)
+  local use_claude_code=""
+  read -r -u 3 -p "→ Use Claude Code mode with OAuth token? (y/N): " use_claude_code
+  if [[ "$use_claude_code" =~ ^[Yy]$ ]]; then
+    read -r -u 3 -p "→ Enter OAuth Token for Claude Code: " CLAUDE_CODE_API_KEY
+    if [ -n "$CLAUDE_CODE_API_KEY" ]; then
+      LLM_ENVS+=("CLAUDE_CODE_API_KEY")
+    fi
+  fi
   
   # Configure model pattern
   if [ -z "$CLAUDE_MODELS" ]; then
@@ -844,21 +851,6 @@ configureClaudeProvider() {
     fi
   fi
   LLM_ENVS+=("CLAUDE_MODELS")
-}
-
-configureClaudeCodeProvider() {
-  read -r -u 3 -p "→ Enter OAuth Token for Claude Code: " CLAUDE_CODE_API_KEY
-  LLM_ENVS+=("CLAUDE_CODE_API_KEY")
-  
-  # Configure model pattern
-  if [ -z "$CLAUDE_CODE_MODELS" ]; then
-    echo "Enter model pattern for routing (prefix match, e.g., 'claude-code-'):"
-    read -r -u 3 -p "→ Model pattern (default: claude-code-*): " CLAUDE_CODE_MODELS
-    if [ -z "$CLAUDE_CODE_MODELS" ]; then
-      CLAUDE_CODE_MODELS="claude-code-*"
-    fi
-  fi
-  LLM_ENVS+=("CLAUDE_CODE_MODELS")
 }
 
 configureMinimaxProvider() {
@@ -1417,7 +1409,7 @@ ${env}=${!env}"
   for model_env in DASHSCOPE_MODELS DEEPSEEK_MODELS MOONSHOT_MODELS ZHIPUAI_MODELS \
                    MINIMAX_MODELS AZURE_MODELS BEDROCK_MODELS VERTEX_MODELS \
                    OPENAI_MODELS OPENROUTER_MODELS YI_MODELS AI360_MODELS \
-                   BAICHUAN_MODELS BAIDU_MODELS CLAUDE_MODELS CLAUDE_CODE_MODELS CLOUDFLARE_MODELS \
+                   BAICHUAN_MODELS BAIDU_MODELS CLAUDE_MODELS CLOUDFLARE_MODELS \
                    COHERE_MODELS DEEPL_MODELS DIFY_MODELS DOUBAO_MODELS \
                    FIREWORKS_MODELS GITHUB_MODELS GEMINI_MODELS GROK_MODELS \
                    GROQ_MODELS MISTRAL_MODELS OLLAMA_MODELS SPARK_MODELS \
@@ -1506,7 +1498,7 @@ LLM Provider API Keys:
   --openrouter-key KEY      OpenRouter API key
   --claude-key KEY          Claude API key
   --claude-version VER      Claude API version (default: 2023-06-01)
-  --claude-code-key KEY     Claude Code OAuth token
+  --claude-code-key KEY     Claude Code OAuth token (enables Code mode)
   --gemini-key KEY          Google Gemini API key
   --groq-key KEY            Groq API key
   --doubao-key KEY          Doubao API key
@@ -1563,8 +1555,7 @@ Model Pattern Configurations:
   --ai360-models PATTERN        Model pattern for 360 Zhinao
   --baichuan-models PATTERN     Model pattern for Baichuan AI
   --baidu-models PATTERN        Model pattern for Baidu AI Cloud
-  --claude-models PATTERN       Model pattern for Claude
-  --claude-code-models PATTERN  Model pattern for Claude Code (OAuth)
+  --claude-models PATTERN       Model pattern for Claude (both standard and Code mode)
   --cloudflare-models PATTERN   Model pattern for Cloudflare Workers AI
   --cohere-models PATTERN       Model pattern for Cohere
   --deepl-models PATTERN        Model pattern for DeepL
