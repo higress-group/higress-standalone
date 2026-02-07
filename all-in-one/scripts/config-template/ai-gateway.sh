@@ -190,6 +190,16 @@ function initializeLlmProviderConfigs() {
   IFS='|' read -r CLAUDE_TYPE CLAUDE_PATTERN <<< "$(normalizeModelPattern "$CLAUDE_MODELS")"
   initializeLlmProviderConfig claude claude CLAUDE api.anthropic.com "443" "https" "" "$CLAUDE_TYPE" "$CLAUDE_PATTERN" "${EXTRA_CONFIGS[@]}"
 
+  # Claude Code (OAuth mode)
+  if [ -n "$CLAUDE_CODE_API_KEY" ]; then
+    EXTRA_CONFIGS=(
+      "claudeCodeMode=true"
+    )
+    local CLAUDE_CODE_MODELS="${CLAUDE_CODE_MODELS}"
+    IFS='|' read -r CLAUDE_CODE_TYPE CLAUDE_CODE_PATTERN <<< "$(normalizeModelPattern "$CLAUDE_CODE_MODELS")"
+    initializeLlmProviderConfig claude-code claude-code CLAUDE_CODE api.anthropic.com "443" "https" "" "$CLAUDE_CODE_TYPE" "$CLAUDE_CODE_PATTERN" "${EXTRA_CONFIGS[@]}"
+  fi
+
   # Cloudflare Workers AI
   if [ -n "$CLOUDFLARE_CONFIGURED" ]; then
     EXTRA_CONFIGS=()

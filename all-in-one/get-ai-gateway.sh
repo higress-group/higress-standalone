@@ -244,6 +244,11 @@ parseArgs() {
       LLM_ENVS+=("CLAUDE_VERSION")
       shift 2
       ;;
+    --claude-code-key)
+      CLAUDE_CODE_API_KEY="$2"
+      LLM_ENVS+=("CLAUDE_CODE_API_KEY")
+      shift 2
+      ;;
     --gemini-key)
       GEMINI_API_KEY="$2"
       LLM_ENVS+=("GEMINI_API_KEY")
@@ -435,6 +440,11 @@ parseArgs() {
       LLM_ENVS+=("CLAUDE_MODELS")
       shift 2
       ;;
+    --claude-code-models)
+      CLAUDE_CODE_MODELS="$2"
+      LLM_ENVS+=("CLAUDE_CODE_MODELS")
+      shift 2
+      ;;
     --cohere-models)
       COHERE_MODELS="$2"
       LLM_ENVS+=("COHERE_MODELS")
@@ -597,6 +607,7 @@ resetEnv() {
   : "${BAICHUAN_MODELS:=Baichuan*}"
   : "${BAIDU_MODELS:=ERNIE-*}"
   : "${CLAUDE_MODELS:=claude-*}"
+  : "${CLAUDE_CODE_MODELS:=claude-code-*}"
   : "${CLOUDFLARE_MODELS:=*}"
   : "${COHERE_MODELS:=command*}"
   : "${DEEPL_MODELS:=*}"
@@ -690,10 +701,11 @@ runConfigWizard() {
     "DeepSeek|DEEPSEEK|configureDeepSeekProvider"
     "Moonshot (Kimi)|MOONSHOT|configureMoonshotProvider"
     "Zhipu AI|ZHIPUAI|configureZhipuAIProvider"
+    "Claude Code|CLAUDE_CODE|configureClaudeCodeProvider"
+    "Claude|CLAUDE|configureClaudeProvider"
     "Minimax|MINIMAX|configureMinimaxProvider"
     "Azure OpenAI|AZURE|configureAzureProvider"
     "AWS Bedrock|BEDROCK|configureBedrockProvider"
-    "Google Vertex AI|VERTEX|configureVertexProvider"
     "OpenAI|OPENAI|configureOpenAIProvider"
     "OpenRouter|OPENROUTER|configureOpenRouterProvider"
     # Other providers (alphabetically ordered)
@@ -832,6 +844,21 @@ configureClaudeProvider() {
     fi
   fi
   LLM_ENVS+=("CLAUDE_MODELS")
+}
+
+configureClaudeCodeProvider() {
+  read -r -u 3 -p "→ Enter OAuth Token for Claude Code: " CLAUDE_CODE_API_KEY
+  LLM_ENVS+=("CLAUDE_CODE_API_KEY")
+  
+  # Configure model pattern
+  if [ -z "$CLAUDE_CODE_MODELS" ]; then
+    echo "Enter model pattern for routing (prefix match, e.g., 'claude-code-'):"
+    read -r -u 3 -p "→ Model pattern (default: claude-code-*): " CLAUDE_CODE_MODELS
+    if [ -z "$CLAUDE_CODE_MODELS" ]; then
+      CLAUDE_CODE_MODELS="claude-code-*"
+    fi
+  fi
+  LLM_ENVS+=("CLAUDE_CODE_MODELS")
 }
 
 configureMinimaxProvider() {
@@ -1390,7 +1417,7 @@ ${env}=${!env}"
   for model_env in DASHSCOPE_MODELS DEEPSEEK_MODELS MOONSHOT_MODELS ZHIPUAI_MODELS \
                    MINIMAX_MODELS AZURE_MODELS BEDROCK_MODELS VERTEX_MODELS \
                    OPENAI_MODELS OPENROUTER_MODELS YI_MODELS AI360_MODELS \
-                   BAICHUAN_MODELS BAIDU_MODELS CLAUDE_MODELS CLOUDFLARE_MODELS \
+                   BAICHUAN_MODELS BAIDU_MODELS CLAUDE_MODELS CLAUDE_CODE_MODELS CLOUDFLARE_MODELS \
                    COHERE_MODELS DEEPL_MODELS DIFY_MODELS DOUBAO_MODELS \
                    FIREWORKS_MODELS GITHUB_MODELS GEMINI_MODELS GROK_MODELS \
                    GROQ_MODELS MISTRAL_MODELS OLLAMA_MODELS SPARK_MODELS \
@@ -1479,6 +1506,7 @@ LLM Provider API Keys:
   --openrouter-key KEY      OpenRouter API key
   --claude-key KEY          Claude API key
   --claude-version VER      Claude API version (default: 2023-06-01)
+  --claude-code-key KEY     Claude Code OAuth token
   --gemini-key KEY          Google Gemini API key
   --groq-key KEY            Groq API key
   --doubao-key KEY          Doubao API key
@@ -1536,6 +1564,7 @@ Model Pattern Configurations:
   --baichuan-models PATTERN     Model pattern for Baichuan AI
   --baidu-models PATTERN        Model pattern for Baidu AI Cloud
   --claude-models PATTERN       Model pattern for Claude
+  --claude-code-models PATTERN  Model pattern for Claude Code (OAuth)
   --cloudflare-models PATTERN   Model pattern for Cloudflare Workers AI
   --cohere-models PATTERN       Model pattern for Cohere
   --deepl-models PATTERN        Model pattern for DeepL
