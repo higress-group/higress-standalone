@@ -577,6 +577,42 @@ resetEnv() {
   CONSOLE_PORT="${CONSOLE_PORT:-$DEFAULT_CONSOLE_PORT}"
 
   LLM_ENVS=()
+  
+  # ========== Model Pattern Defaults (can be updated anytime) ==========
+  # Top 10 commonly used providers
+  : "${DASHSCOPE_MODELS:=qwen-*}"
+  : "${DEEPSEEK_MODELS:=deepseek-*}"
+  : "${MOONSHOT_MODELS:=moonshot-*,kimi-*}"
+  : "${ZHIPUAI_MODELS:=GLM-*}"
+  : "${MINIMAX_MODELS:=abab-*,MiniMax-*}"
+  : "${AZURE_MODELS:=gpt-*,o1-*,o3-*}"
+  : "${BEDROCK_MODELS:=*}"
+  : "${VERTEX_MODELS:=gemini-*}"
+  : "${OPENAI_MODELS:=gpt-*,o1-*,o3-*}"
+  : "${OPENROUTER_MODELS:=*}"
+  
+  # Other providers (alphabetically ordered)
+  : "${YI_MODELS:=yi-*}"
+  : "${AI360_MODELS:=360GPT-*}"
+  : "${BAICHUAN_MODELS:=Baichuan*}"
+  : "${BAIDU_MODELS:=ERNIE-*}"
+  : "${CLAUDE_MODELS:=claude-*}"
+  : "${CLOUDFLARE_MODELS:=*}"
+  : "${COHERE_MODELS:=command*}"
+  : "${DEEPL_MODELS:=*}"
+  : "${DIFY_MODELS:=*}"
+  : "${DOUBAO_MODELS:=doubao-*}"
+  : "${FIREWORKS_MODELS:=*}"
+  : "${GITHUB_MODELS:=*}"
+  : "${GEMINI_MODELS:=gemini-*}"
+  : "${GROK_MODELS:=grok-*}"
+  : "${GROQ_MODELS:=*}"
+  : "${MISTRAL_MODELS:=mistral-*,open-mistral-*}"
+  : "${OLLAMA_MODELS:=llama*,codellama*}"
+  : "${SPARK_MODELS:=*}"
+  : "${STEPFUN_MODELS:=step-*}"
+  : "${HUNYUAN_MODELS:=hunyuan-*}"
+  : "${TOGETHERAI_MODELS:=*}"
 }
 
 # Load saved configuration from config file
@@ -1348,6 +1384,21 @@ writeConfiguration() {
   for env in "${LLM_ENVS[@]}"; do
     LLM_CONFIGS="$LLM_CONFIGS
 ${env}=${!env}"
+  done
+  
+  # Add all *_MODELS variables to config
+  for model_env in DASHSCOPE_MODELS DEEPSEEK_MODELS MOONSHOT_MODELS ZHIPUAI_MODELS \
+                   MINIMAX_MODELS AZURE_MODELS BEDROCK_MODELS VERTEX_MODELS \
+                   OPENAI_MODELS OPENROUTER_MODELS YI_MODELS AI360_MODELS \
+                   BAICHUAN_MODELS BAIDU_MODELS CLAUDE_MODELS CLOUDFLARE_MODELS \
+                   COHERE_MODELS DEEPL_MODELS DIFY_MODELS DOUBAO_MODELS \
+                   FIREWORKS_MODELS GITHUB_MODELS GEMINI_MODELS GROK_MODELS \
+                   GROQ_MODELS MISTRAL_MODELS OLLAMA_MODELS SPARK_MODELS \
+                   STEPFUN_MODELS HUNYUAN_MODELS TOGETHERAI_MODELS; do
+    if [ -n "${!model_env}" ]; then
+      LLM_CONFIGS="$LLM_CONFIGS
+${model_env}=${!model_env}"
+    fi
   done
 
   # Save auto-routing configuration
