@@ -72,9 +72,37 @@ normalizeModelPattern() {
   echo "$match_type|$match_value"
 }
 
-function initializeLlmProviderConfigs() {
-  local EXTRA_CONFIGS=()
+# Parse EXTRA_CONFIGS from environment variable (comma-separated key=value pairs)
+# Usage: parseExtraConfigs "PROVIDER_EXTRA_CONFIGS"
+# Sets global EXTRA_CONFIGS array
+parseExtraConfigs() {
+  local env_var_name="$1"
+  local env_value="${!env_var_name}"
+  EXTRA_CONFIGS=()
+  if [ -n "$env_value" ]; then
+    IFS=',' read -ra configs <<< "$env_value"
+    EXTRA_CONFIGS=("${configs[@]}")
+  fi
+}
 
+# Extract a config value from EXTRA_CONFIGS array
+# Usage: getExtraConfigValue "keyName" "defaultValue"
+getExtraConfigValue() {
+  local key="$1"
+  local default="$2"
+  for config in "${EXTRA_CONFIGS[@]}"; do
+    if [[ "$config" == ${key}=* ]]; then
+      local value="${config#${key}=}"
+      # Remove surrounding quotes
+      value="${value//\"/}"
+      echo "$value"
+      return
+    fi
+  done
+  echo "$default"
+}
+
+function initializeLlmProviderConfigs() {
   # Top commonly used providers (defaults set in get-ai-gateway.sh)
   local DASHSCOPE_MODELS="${DASHSCOPE_MODELS}"
   IFS='|' read -r DASHSCOPE_TYPE DASHSCOPE_PATTERN <<< "$(normalizeModelPattern "$DASHSCOPE_MODELS")"
@@ -88,27 +116,28 @@ function initializeLlmProviderConfigs() {
   IFS='|' read -r MOONSHOT_TYPE MOONSHOT_PATTERN <<< "$(normalizeModelPattern "$MOONSHOT_MODELS")"
   initializeLlmProviderConfig moonshot moonshot MOONSHOT api.moonshot.cn "443" "https" "" "$MOONSHOT_TYPE" "$MOONSHOT_PATTERN"
   
+  # ZhipuAI - supports domain and code plan mode via EXTRA_CONFIGS
   local ZHIPUAI_MODELS="${ZHIPUAI_MODELS}"
   IFS='|' read -r ZHIPUAI_TYPE ZHIPUAI_PATTERN <<< "$(normalizeModelPattern "$ZHIPUAI_MODELS")"
-  initializeLlmProviderConfig zhipuai zhipuai ZHIPUAI open.bigmodel.cn "443" "https" "" "$ZHIPUAI_TYPE" "$ZHIPUAI_PATTERN"
+  parseExtraConfigs "ZHIPUAI_EXTRA_CONFIGS"
+  local ZHIPUAI_HOST=$(getExtraConfigValue "zhipuDomain" "open.bigmodel.cn")
+  initializeLlmProviderConfig zhipuai zhipuai ZHIPUAI "$ZHIPUAI_HOST" "443" "https" "" "$ZHIPUAI_TYPE" "$ZHIPUAI_PATTERN" "${EXTRA_CONFIGS[@]}"
   
-  EXTRA_CONFIGS=(
-    "minimaxGroupId=\"$MINIMAX_GROUP_ID\""
-  )
+  # Minimax
   local MINIMAX_MODELS="${MINIMAX_MODELS}"
   IFS='|' read -r MINIMAX_TYPE MINIMAX_PATTERN <<< "$(normalizeModelPattern "$MINIMAX_MODELS")"
+  parseExtraConfigs "MINIMAX_EXTRA_CONFIGS"
   initializeLlmProviderConfig minimax minimax MINIMAX api.minimax.chat "443" "https" "" "$MINIMAX_TYPE" "$MINIMAX_PATTERN" "${EXTRA_CONFIGS[@]}"
 
   # Azure OpenAI
   if [ -z "$OPENAI_API_KEY" ]; then
-    if [ -z "$AZURE_SERVICE_URL" ]; then
-      AZURE_SERVICE_URL="https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=2024-06-01"
+    parseExtraConfigs "AZURE_EXTRA_CONFIGS"
+    local AZURE_SERVICE_URL_VAL=$(getExtraConfigValue "azureServiceUrl" "")
+    if [ -z "$AZURE_SERVICE_URL_VAL" ]; then
+      AZURE_SERVICE_URL_VAL="https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=2024-06-01"
     fi
-    extractHostFromUrl "$AZURE_SERVICE_URL"
+    extractHostFromUrl "$AZURE_SERVICE_URL_VAL"
     local AZURE_SERVICE_DOMAIN="$HOST"
-    EXTRA_CONFIGS=(
-      "azureServiceUrl=$AZURE_SERVICE_URL"
-    )
     local AZURE_MODELS="${AZURE_MODELS}"
     IFS='|' read -r AZURE_TYPE AZURE_PATTERN <<< "$(normalizeModelPattern "$AZURE_MODELS")"
     initializeLlmProviderConfig azure azure AZURE "$AZURE_SERVICE_DOMAIN" "443" "https" "" "$AZURE_TYPE" "$AZURE_PATTERN" "${EXTRA_CONFIGS[@]}"
@@ -116,37 +145,20 @@ function initializeLlmProviderConfigs() {
 
   # AWS Bedrock - requires region configuration
   if [ -n "$BEDROCK_CONFIGURED" ]; then
-    EXTRA_CONFIGS=()
-    if [ -n "$BEDROCK_REGION" ]; then
-      EXTRA_CONFIGS+=("region=\"$BEDROCK_REGION\"")
-    fi
-    if [ -n "$BEDROCK_ACCESS_KEY" ] && [ -n "$BEDROCK_SECRET_KEY" ]; then
-      EXTRA_CONFIGS+=("accessKeyId=\"$BEDROCK_ACCESS_KEY\"")
-      EXTRA_CONFIGS+=("secretAccessKey=\"$BEDROCK_SECRET_KEY\"")
-    fi
+    parseExtraConfigs "BEDROCK_EXTRA_CONFIGS"
+    local BEDROCK_REGION_VAL=$(getExtraConfigValue "awsRegion" "us-east-1")
     local BEDROCK_MODELS="${BEDROCK_MODELS}"
     IFS='|' read -r BEDROCK_TYPE BEDROCK_PATTERN <<< "$(normalizeModelPattern "$BEDROCK_MODELS")"
-    initializeLlmProviderConfig bedrock bedrock BEDROCK bedrock-runtime.${BEDROCK_REGION:-us-east-1}.amazonaws.com "443" "https" "" "$BEDROCK_TYPE" "$BEDROCK_PATTERN" "${EXTRA_CONFIGS[@]}"
+    initializeLlmProviderConfig bedrock bedrock BEDROCK bedrock-runtime.${BEDROCK_REGION_VAL}.amazonaws.com "443" "https" "" "$BEDROCK_TYPE" "$BEDROCK_PATTERN" "${EXTRA_CONFIGS[@]}"
   fi
 
   # Google Vertex AI - requires project and region configuration
   if [ -n "$VERTEX_CONFIGURED" ]; then
-    EXTRA_CONFIGS=()
-    if [ -n "$VERTEX_PROJECT_ID" ]; then
-      EXTRA_CONFIGS+=("gcpProject=\"$VERTEX_PROJECT_ID\"")
-    fi
-    if [ -n "$VERTEX_REGION" ]; then
-      EXTRA_CONFIGS+=("gcpRegion=\"$VERTEX_REGION\"")
-    fi
-    if [ -n "$VERTEX_AUTH_KEY" ]; then
-      EXTRA_CONFIGS+=("serviceAccount=\"$VERTEX_AUTH_KEY\"")
-    fi
-    if [ -n "$VERTEX_AUTH_SERVICE_NAME" ]; then
-      EXTRA_CONFIGS+=("serviceAccountName=\"$VERTEX_AUTH_SERVICE_NAME\"")
-    fi
+    parseExtraConfigs "VERTEX_EXTRA_CONFIGS"
+    local VERTEX_REGION_VAL=$(getExtraConfigValue "vertexRegion" "us-central1")
     local VERTEX_MODELS="${VERTEX_MODELS}"
     IFS='|' read -r VERTEX_TYPE VERTEX_PATTERN <<< "$(normalizeModelPattern "$VERTEX_MODELS")"
-    initializeLlmProviderConfig vertex vertex VERTEX ${VERTEX_REGION:-us-central1}-aiplatform.googleapis.com "443" "https" "" "$VERTEX_TYPE" "$VERTEX_PATTERN" "${EXTRA_CONFIGS[@]}"
+    initializeLlmProviderConfig vertex vertex VERTEX ${VERTEX_REGION_VAL}-aiplatform.googleapis.com "443" "https" "" "$VERTEX_TYPE" "$VERTEX_PATTERN" "${EXTRA_CONFIGS[@]}"
   fi
 
   # OpenAI (if Azure is not configured)
@@ -180,28 +192,17 @@ function initializeLlmProviderConfigs() {
   IFS='|' read -r BAIDU_TYPE BAIDU_PATTERN <<< "$(normalizeModelPattern "$BAIDU_MODELS")"
   initializeLlmProviderConfig baidu baidu BAIDU qianfan.baidubce.com "443" "https" "" "$BAIDU_TYPE" "$BAIDU_PATTERN"
   
-  if [ -z "$CLAUDE_VERSION" ]; then
-    CLAUDE_VERSION="2023-06-01"
-  fi
-  EXTRA_CONFIGS=(
-    "claudeVersion=\"$CLAUDE_VERSION\""
-  )
-  # Enable Claude Code mode if OAuth token is provided
-  if [ -n "$CLAUDE_CODE_API_KEY" ]; then
-    EXTRA_CONFIGS+=("claudeCodeMode=true")
-  fi
+  # Claude
   local CLAUDE_MODELS="${CLAUDE_MODELS}"
   IFS='|' read -r CLAUDE_TYPE CLAUDE_PATTERN <<< "$(normalizeModelPattern "$CLAUDE_MODELS")"
+  parseExtraConfigs "CLAUDE_EXTRA_CONFIGS"
   initializeLlmProviderConfig claude claude CLAUDE api.anthropic.com "443" "https" "" "$CLAUDE_TYPE" "$CLAUDE_PATTERN" "${EXTRA_CONFIGS[@]}"
 
   # Cloudflare Workers AI
   if [ -n "$CLOUDFLARE_CONFIGURED" ]; then
-    EXTRA_CONFIGS=()
-    if [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
-      EXTRA_CONFIGS+=("accountId=\"$CLOUDFLARE_ACCOUNT_ID\"")
-    fi
     local CLOUDFLARE_MODELS="${CLOUDFLARE_MODELS}"
     IFS='|' read -r CLOUDFLARE_TYPE CLOUDFLARE_PATTERN <<< "$(normalizeModelPattern "$CLOUDFLARE_MODELS")"
+    parseExtraConfigs "CLOUDFLARE_EXTRA_CONFIGS"
     initializeLlmProviderConfig cloudflare cloudflare CLOUDFLARE api.cloudflare.com "443" "https" "" "$CLOUDFLARE_TYPE" "$CLOUDFLARE_PATTERN" "${EXTRA_CONFIGS[@]}"
   fi
 
@@ -211,32 +212,20 @@ function initializeLlmProviderConfigs() {
 
   # DeepL - translation service
   if [ -n "$DEEPL_CONFIGURED" ]; then
-    EXTRA_CONFIGS=()
-    if [ -n "$DEEPL_TARGET_LANG" ]; then
-      EXTRA_CONFIGS+=("targetLang=\"$DEEPL_TARGET_LANG\"")
-    fi
     local DEEPL_MODELS="${DEEPL_MODELS}"
     IFS='|' read -r DEEPL_TYPE DEEPL_PATTERN <<< "$(normalizeModelPattern "$DEEPL_MODELS")"
+    parseExtraConfigs "DEEPL_EXTRA_CONFIGS"
     initializeLlmProviderConfig deepl deepl DEEPL api.deepl.com "443" "https" "" "$DEEPL_TYPE" "$DEEPL_PATTERN" "${EXTRA_CONFIGS[@]}"
   fi
 
   # Dify - AI workflow platform
   if [ -n "$DIFY_API_KEY" ]; then
-    EXTRA_CONFIGS=()
-    if [ -n "$DIFY_API_URL" ]; then
-      extractHostFromUrl "$DIFY_API_URL"
-      local DIFY_DOMAIN="$HOST"
-    else
-      local DIFY_DOMAIN="api.dify.ai"
-    fi
-    if [ -n "$DIFY_BOT_TYPE" ]; then
-      EXTRA_CONFIGS+=("botType=\"$DIFY_BOT_TYPE\"")
-    fi
-    if [ -n "$DIFY_INPUT_VARIABLE" ]; then
-      EXTRA_CONFIGS+=("inputVariable=\"$DIFY_INPUT_VARIABLE\"")
-    fi
-    if [ -n "$DIFY_OUTPUT_VARIABLE" ]; then
-      EXTRA_CONFIGS+=("outputVariable=\"$DIFY_OUTPUT_VARIABLE\"")
+    parseExtraConfigs "DIFY_EXTRA_CONFIGS"
+    local DIFY_DOMAIN=$(getExtraConfigValue "difyApiUrl" "api.dify.ai")
+    # If it's a full URL, extract host
+    if [[ "$DIFY_DOMAIN" == http* ]]; then
+      extractHostFromUrl "$DIFY_DOMAIN"
+      DIFY_DOMAIN="$HOST"
     fi
     local DIFY_MODELS="${DIFY_MODELS}"
     IFS='|' read -r DIFY_TYPE DIFY_PATTERN <<< "$(normalizeModelPattern "$DIFY_MODELS")"
@@ -283,17 +272,13 @@ function initializeLlmProviderConfigs() {
   IFS='|' read -r MISTRAL_TYPE MISTRAL_PATTERN <<< "$(normalizeModelPattern "$MISTRAL_MODELS")"
   initializeLlmProviderConfig mistral mistral MISTRAL api.mistral.ai "443" "https" "" "$MISTRAL_TYPE" "$MISTRAL_PATTERN"
 
-  if [ -z "$OLLAMA_SERVER_HOST" ]; then
-    OLLAMA_SERVER_HOST="YOUR_OLLAMA_SERVER_HOST"
-  fi
-  OLLAMA_SERVER_PORT="${OLLAMA_SERVER_PORT:-11434}"
-  EXTRA_CONFIGS=(
-    "ollamaServerHost=\"$OLLAMA_SERVER_HOST\""
-    "ollamaServerPort=$OLLAMA_SERVER_PORT"
-  )
+  # Ollama
+  parseExtraConfigs "OLLAMA_EXTRA_CONFIGS"
+  local OLLAMA_HOST=$(getExtraConfigValue "ollamaServerHost" "YOUR_OLLAMA_SERVER_HOST")
+  local OLLAMA_PORT=$(getExtraConfigValue "ollamaServerPort" "11434")
   local OLLAMA_MODELS="${OLLAMA_MODELS}"
   IFS='|' read -r OLLAMA_TYPE OLLAMA_PATTERN <<< "$(normalizeModelPattern "$OLLAMA_MODELS")"
-  initializeLlmProviderConfig ollama ollama OLLAMA "$OLLAMA_SERVER_HOST" "$OLLAMA_SERVER_PORT" "http" "" "$OLLAMA_TYPE" "$OLLAMA_PATTERN" "${EXTRA_CONFIGS[@]}"
+  initializeLlmProviderConfig ollama ollama OLLAMA "$OLLAMA_HOST" "$OLLAMA_PORT" "http" "" "$OLLAMA_TYPE" "$OLLAMA_PATTERN" "${EXTRA_CONFIGS[@]}"
 
   # iFlyTek Spark
   if [ -n "$SPARK_CONFIGURED" ]; then
@@ -308,15 +293,9 @@ function initializeLlmProviderConfigs() {
 
   # Tencent Hunyuan
   if [ -n "$HUNYUAN_CONFIGURED" ]; then
-    EXTRA_CONFIGS=()
-    if [ -n "$HUNYUAN_AUTH_ID" ]; then
-      EXTRA_CONFIGS+=("authId=\"$HUNYUAN_AUTH_ID\"")
-    fi
-    if [ -n "$HUNYUAN_AUTH_KEY" ]; then
-      EXTRA_CONFIGS+=("authKey=\"$HUNYUAN_AUTH_KEY\"")
-    fi
     local HUNYUAN_MODELS="${HUNYUAN_MODELS}"
     IFS='|' read -r HUNYUAN_TYPE HUNYUAN_PATTERN <<< "$(normalizeModelPattern "$HUNYUAN_MODELS")"
+    parseExtraConfigs "HUNYUAN_EXTRA_CONFIGS"
     initializeLlmProviderConfig hunyuan hunyuan HUNYUAN hunyuan.tencentcloudapi.com "443" "https" "" "$HUNYUAN_TYPE" "$HUNYUAN_PATTERN" "${EXTRA_CONFIGS[@]}"
   fi
 
@@ -382,14 +361,14 @@ metadata:
   namespace: higress-system
   resourceVersion: \"1\"
 spec:
+  defaultConfigDisable: true
+  matchRules: ${AI_PROXY_MATCH_RULES:-[]}
   defaultConfig:
-    providers:${AI_PROXY_PROVIDERS}
-  defaultConfigDisable: false
-  matchRules:${AI_PROXY_MATCH_RULES}
-  failStrategy: FAIL_OPEN
+    providers: ${AI_PROXY_PROVIDERS:-[]}
   phase: UNSPECIFIED_PHASE
   priority: 100
-  url: oci://${PLUGIN_REGISTRY:-higress-registry.cn-hangzhou.cr.aliyuncs.com}/plugins/ai-proxy:2.0.0" >"$WASM_PLUGIN_CONFIG_FOLDER/ai-proxy.internal.yaml"
+  url: oci://${PLUGIN_REGISTRY}/higress/ai-proxy:${AI_PROXY_VERSION}
+" >"${WASM_PLUGIN_CONFIG_FOLDER}/ai-proxy.yaml"
 
   echo -e "\
 apiVersion: extensions.higress.io/v1alpha1
@@ -403,24 +382,24 @@ metadata:
     higress.io/wasm-plugin-category: ai
     higress.io/wasm-plugin-name: ai-statistics
     higress.io/wasm-plugin-version: 1.0.0
-  name: ai-statistics-1.0.0
+  name: ai-statistics.internal
   namespace: higress-system
   resourceVersion: \"1\"
 spec:
-  defaultConfig:
-    use_default_attributes: true
   defaultConfigDisable: false
-  failStrategy: FAIL_OPEN
+  defaultConfig:
+    enable: true
   phase: UNSPECIFIED_PHASE
-  priority: 900
-  url: oci://${PLUGIN_REGISTRY:-higress-registry.cn-hangzhou.cr.aliyuncs.com}/plugins/ai-statistics:2.0.0" >"$WASM_PLUGIN_CONFIG_FOLDER/ai-statistics-1.0.0.yaml"
+  priority: 200
+  url: oci://${PLUGIN_REGISTRY}/higress/ai-statistics:${AI_STATISTICS_VERSION}
+" >"${WASM_PLUGIN_CONFIG_FOLDER}/ai-statistics.yaml"
 
   echo -e "\
 apiVersion: extensions.higress.io/v1alpha1
 kind: WasmPlugin
 metadata:
   annotations:
-    higress.io/wasm-plugin-title: AI Model Router
+    higress.io/wasm-plugin-title: Model Router
   labels:
     higress.io/resource-definer: higress
     higress.io/wasm-plugin-built-in: \"true\"
@@ -431,13 +410,51 @@ metadata:
   namespace: higress-system
   resourceVersion: \"1\"
 spec:
-  defaultConfig:
-    modelToHeader: x-higress-llm-model
   defaultConfigDisable: false
-  failStrategy: FAIL_OPEN
-  phase: AUTHN
-  priority: 900
-  url: oci://${PLUGIN_REGISTRY:-higress-registry.cn-hangzhou.cr.aliyuncs.com}/plugins/model-router:2.0.0" >"$WASM_PLUGIN_CONFIG_FOLDER/model-router.internal.yaml"
+  defaultConfig:
+    enable: true
+    addProviderHeader: X-LLM-Provider
+  phase: UNSPECIFIED_PHASE
+  priority: 500
+  url: oci://${PLUGIN_REGISTRY}/higress/model-router:${MODEL_ROUTER_VERSION}
+" >"${WASM_PLUGIN_CONFIG_FOLDER}/model-router.yaml"
+}
+
+function initializeMcpBridge() {
+  mkdir -p /data/mcpbridges
+  cd /data/mcpbridges
+
+  sed -i -z -E 's|# AI_REGISTRIES_START.+# AI_REGISTRIES_END|# AI_REGISTRIES_PLACEHOLDER|' default.yaml
+  awk -v r="# AI_REGISTRIES_START${AI_REGISTRIES}
+  # AI_REGISTRIES_END" '{gsub(/# AI_REGISTRIES_PLACEHOLDER/,r)}1' default.yaml >default-new.yaml
+  mv default-new.yaml default.yaml
+  cd -
+}
+
+function initializeConsole() {
+  sed -i -E 's|index.redirect-target:.*$|index.redirect-target: /ai/route|' /data/configmaps/higress-console.yaml
+}
+
+function appendAiRegistry() {
+  local PROVIDER_NAME="$1"
+  local DOMAIN="$2"
+  local PORT="$3"
+  local PROTOCOL="$4"
+
+  if [ -z "$PORT"]; then
+    PORT="443"
+  fi
+  if [ -z "$PROTOCOL" ]; then
+    PROTOCOL="https"
+  fi
+  local SERVICE_NAME="${PROVIDER_NAME}.dns"
+  AI_REGISTRIES="$AI_REGISTRIES
+  - domain: ${DOMAIN}
+    name: ${SERVICE_NAME}
+    port: ${PORT}
+    type: dns"
+
+  LAST_SERVICE_NAME="$SERVICE_NAME"
 }
 
 function appendAiProxyConfigs() {
@@ -486,85 +503,37 @@ function appendAiProxyConfigs() {
   fi
 }
 
-function initializeMcpBridge() {
-  mkdir -p /data/mcpbridges
-  cd /data/mcpbridges
-
-  sed -i -z -E 's|# AI_REGISTRIES_START.+# AI_REGISTRIES_END|# AI_REGISTRIES_PLACEHOLDER|' default.yaml
-  awk -v r="# AI_REGISTRIES_START${AI_REGISTRIES}
-  # AI_REGISTRIES_END" '{gsub(/# AI_REGISTRIES_PLACEHOLDER/,r)}1' default.yaml >default-new.yaml
-  mv default-new.yaml default.yaml
-  cd -
-}
-
-function initializeConsole() {
-  sed -i -E 's|index.redirect-target:.*$|index.redirect-target: /ai/route|' /data/configmaps/higress-console.yaml
-}
-
-function appendAiRegistry() {
-  local PROVIDER_NAME="$1"
-  local DOMAIN="$2"
-  local PORT="$3"
-  local PROTOCOL="$4"
-
-  if [ -z "$PORT"]; then
-    PORT="443"
-  fi
-  if [ -z "$PROTOCOL"]; then
-    PROTOCOL="https"
-  fi
-
-  local TYPE="dns"
-  if [[ "$DOMAIN" =~ (25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3} ]]; then
-    TYPE="static"
-  fi
-
-  if [ "$TYPE" == "static" ]; then
-    DOMAIN="$DOMAIN:$PORT"
-    PORT="80"
-  fi
-
-  AI_REGISTRIES="${AI_REGISTRIES}
-  - name: llm-$PROVIDER_NAME.internal
-    type: $TYPE
-    protocol: $PROTOCOL
-    domain: $DOMAIN
-    port: $PORT"
-
-  LAST_SERVICE_NAME="llm-${PROVIDER_NAME}.internal.${TYPE}"
-  LAST_SERVICE_PORT="$PORT"
-}
-
 function generateAiIngress() {
   local PROVIDER_NAME="$1"
   local MODEL_MATCH_TYPE="$2"
   local MODEL_MATCH_VALUE="$3"
 
-  local INGRESS_NAME="ai-route-$PROVIDER_NAME.internal"
-  local INGRESS_FILE="/data/ingresses/$INGRESS_NAME.yaml"
+  local PROVIDER_ID="${PROVIDER_NAME}"
+  local INGRESS_NAME="ai-route-${PROVIDER_ID}"
+
+  # Check if ingress with same name already exists
+  for existing in "${GENERATED_INGRESSES[@]}"; do
+    if [ "$existing" == "$INGRESS_NAME" ]; then
+      return
+    fi
+  done
+  GENERATED_INGRESSES+=("$INGRESS_NAME")
 
   mkdir -p /data/ingresses
+  cd /data/ingresses
 
-  local HEADER_MATCH_ANNOTATION_PREFIX="unknown"
-  if [ "$MODEL_MATCH_TYPE" == "PRE" ]; then
-    HEADER_MATCH_ANNOTATION_PREFIX="prefix"
-  elif [ "$MODEL_MATCH_TYPE" == "REGULAR" ]; then
-    HEADER_MATCH_ANNOTATION_PREFIX="regex"
-  fi
-
-  cat <<EOF >"$INGRESS_FILE"
+  echo -e "\
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   annotations:
-    higress.io/destination: "$LAST_SERVICE_NAME:$LAST_SERVICE_PORT"
-    higress.io/ignore-path-case: "false"
-    higress.io/$HEADER_MATCH_ANNOTATION_PREFIX-match-header-x-higress-llm-model: "$MODEL_MATCH_VALUE"
+    higress.io/destination: ${PROVIDER_NAME}.dns
+    higress.io/ignore-path-case: \"false\"
   labels:
     higress.io/resource-definer: higress
-  name: $INGRESS_NAME
+  name: ${INGRESS_NAME}
   namespace: higress-system
-  resourceVersion: "1"
+  resourceVersion: \"1\"
 spec:
   ingressClassName: higress
   rules:
@@ -577,70 +546,48 @@ spec:
             name: default
         path: /
         pathType: Prefix
-EOF
+" >"${INGRESS_NAME}.yaml"
 
-  GENERATED_INGRESSES+=("$INGRESS_NAME")
+  cd -
 }
 
 function generateAiRoute() {
-  local ROUTE_NAME="$1"
+  local PROVIDER_NAME="$1"
   local MODEL_MATCH_TYPE="$2"
   local MODEL_MATCH_VALUE="$3"
+  
+  local PROVIDER_ID="${PROVIDER_NAME}"
+  local ROUTE_NAME="ai-route-${PROVIDER_ID}"
 
-  local CONFIG_MAP_NAME="ai-route-$ROUTE_NAME"
-  local CONFIG_MAP_FILE="/data/configmaps/$CONFIG_MAP_NAME.yaml"
+  mkdir -p /data/http2rpcs
+  cd /data/http2rpcs
 
-  mkdir -p /data/configmaps
-
-  cat <<EOF >"$CONFIG_MAP_FILE"
-apiVersion: v1
-kind: ConfigMap
+  echo -e "\
+apiVersion: networking.higress.io/v1
+kind: Http2Rpc
 metadata:
   labels:
-    higress.io/config-map-type: ai-route
     higress.io/resource-definer: higress
-  name: $CONFIG_MAP_NAME
+  name: ${ROUTE_NAME}
   namespace: higress-system
-  resourceVersion: "1"
-data:
-  data: |
-    {
-      "name": "$ROUTE_NAME",
-      "upstreams": [
-        {
-          "provider": "$ROUTE_NAME"
-        }
-      ],
-      "modelPredicates": [
-        {
-          "matchType": "$MODEL_MATCH_TYPE",
-          "matchValue": "$MODEL_MATCH_VALUE"
-        }
-      ],
-      "version": "1"
-    }
-EOF
+  resourceVersion: \"1\"
+spec:
+  modelService:
+    isDefault: false
+    match:
+      type: ${MODEL_MATCH_TYPE}
+      value: \"${MODEL_MATCH_VALUE}\"
+    target:
+      primary:
+        weight: 100
+        destination:
+          ingressName: ${ROUTE_NAME}
+" >"${ROUTE_NAME}.yaml"
+
+  cd -
 }
 
-extractHostFromUrl() {
-  local url="$1"
-  local regex='https?://(([a-zA-Z0-9_-]+)(\.[a-zA-Z0-9._-]+))'
-  HOST=""
-  if [[ "$url" =~ $regex ]]; then
-    HOST="${BASH_REMATCH[1]}"
-  fi
-}
-
-mkdir -p /data
-
-CONFIGURED_MARKER="/data/.ai-gateway-configured"
-
-if [ -f "$CONFIGURED_MARKER" ]; then
-  echo "AI Gateway has been configured already."
-  exit 0
-fi
+source $ROOT/ai-gateway.sh
 
 initializeLlmProviderConfigs
 initializeSharedConfigs
-
-touch "$CONFIGURED_MARKER"
