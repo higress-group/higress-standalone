@@ -335,6 +335,14 @@ parseArgs() {
       LLM_ENVS+=("ZHIPUAI_MODELS")
       shift 2
       ;;
+    --zhipuai-domain)
+      ZHIPUAI_DOMAIN="$2"
+      shift 2
+      ;;
+    --zhipuai-code-plan-mode)
+      ZHIPUAI_CODE_PLAN_MODE="true"
+      shift
+      ;;
     --minimax-models)
       MINIMAX_MODELS="$2"
       LLM_ENVS+=("MINIMAX_MODELS")
@@ -1200,6 +1208,18 @@ configureZhipuAIProvider() {
     fi
   fi
   LLM_ENVS+=("ZHIPUAI_MODELS")
+
+  if [ -z "$ZHIPUAI_DOMAIN" ]; then
+    echo "Choose domain (China: open.bigmodel.cn, International: api.z.ai):"
+    read -r -u 3 -p "→ Domain (default: open.bigmodel.cn): " ZHIPUAI_DOMAIN
+  fi
+
+  if [ -z "$ZHIPUAI_CODE_PLAN_MODE" ]; then
+    read -r -u 3 -p "→ Enable Code Plan Mode? (y/N): " ENABLE_CODE_PLAN
+    if [[ "$ENABLE_CODE_PLAN" =~ ^[Yy] ]]; then
+      ZHIPUAI_CODE_PLAN_MODE="true"
+    fi
+  fi
 }
 
 configureOpenAIProvider() {
@@ -1403,7 +1423,134 @@ validatePort() {
   fi
 }
 
+# ========== Build EXTRA_CONFIGS for providers ==========
+buildZhipuAIExtraConfigs() {
+  local configs=()
+  [ -n "$ZHIPUAI_DOMAIN" ] && configs+=("zhipuDomain=\"$ZHIPUAI_DOMAIN\"")
+  [ "$ZHIPUAI_CODE_PLAN_MODE" = "true" ] && configs+=("zhipuCodePlanMode=true")
+  if [ ${#configs[@]} -gt 0 ]; then
+    ZHIPUAI_EXTRA_CONFIGS=$(IFS=','; echo "${configs[*]}")
+    LLM_ENVS+=("ZHIPUAI_EXTRA_CONFIGS")
+  fi
+}
+
+buildMinimaxExtraConfigs() {
+  local configs=()
+  [ -n "$MINIMAX_GROUP_ID" ] && configs+=("minimaxGroupId=\"$MINIMAX_GROUP_ID\"")
+  if [ ${#configs[@]} -gt 0 ]; then
+    MINIMAX_EXTRA_CONFIGS=$(IFS=','; echo "${configs[*]}")
+    LLM_ENVS+=("MINIMAX_EXTRA_CONFIGS")
+  fi
+}
+
+buildAzureExtraConfigs() {
+  local configs=()
+  [ -n "$AZURE_SERVICE_URL" ] && configs+=("azureServiceUrl=$AZURE_SERVICE_URL")
+  if [ ${#configs[@]} -gt 0 ]; then
+    AZURE_EXTRA_CONFIGS=$(IFS=','; echo "${configs[*]}")
+    LLM_ENVS+=("AZURE_EXTRA_CONFIGS")
+  fi
+}
+
+buildBedrockExtraConfigs() {
+  local configs=()
+  [ -n "$BEDROCK_REGION" ] && configs+=("awsRegion=\"$BEDROCK_REGION\"")
+  [ -n "$BEDROCK_ACCESS_KEY" ] && configs+=("awsAccessKey=\"$BEDROCK_ACCESS_KEY\"")
+  [ -n "$BEDROCK_SECRET_KEY" ] && configs+=("awsSecretKey=\"$BEDROCK_SECRET_KEY\"")
+  if [ ${#configs[@]} -gt 0 ]; then
+    BEDROCK_EXTRA_CONFIGS=$(IFS=','; echo "${configs[*]}")
+    LLM_ENVS+=("BEDROCK_EXTRA_CONFIGS")
+  fi
+}
+
+buildVertexExtraConfigs() {
+  local configs=()
+  [ -n "$VERTEX_PROJECT_ID" ] && configs+=("vertexProjectId=\"$VERTEX_PROJECT_ID\"")
+  [ -n "$VERTEX_REGION" ] && configs+=("vertexRegion=\"$VERTEX_REGION\"")
+  [ -n "$VERTEX_AUTH_KEY" ] && configs+=("vertexAuthKey=\"$VERTEX_AUTH_KEY\"")
+  [ -n "$VERTEX_AUTH_SERVICE_NAME" ] && configs+=("vertexAuthServiceName=\"$VERTEX_AUTH_SERVICE_NAME\"")
+  if [ ${#configs[@]} -gt 0 ]; then
+    VERTEX_EXTRA_CONFIGS=$(IFS=','; echo "${configs[*]}")
+    LLM_ENVS+=("VERTEX_EXTRA_CONFIGS")
+  fi
+}
+
+buildClaudeExtraConfigs() {
+  local configs=()
+  configs+=("claudeVersion=\"${CLAUDE_VERSION:-2023-06-01}\"")
+  [ -n "$CLAUDE_CODE_API_KEY" ] && configs+=("claudeCodeMode=true")
+  CLAUDE_EXTRA_CONFIGS=$(IFS=','; echo "${configs[*]}")
+  LLM_ENVS+=("CLAUDE_EXTRA_CONFIGS")
+}
+
+buildCloudflareExtraConfigs() {
+  local configs=()
+  [ -n "$CLOUDFLARE_ACCOUNT_ID" ] && configs+=("cloudflareAccountId=\"$CLOUDFLARE_ACCOUNT_ID\"")
+  if [ ${#configs[@]} -gt 0 ]; then
+    CLOUDFLARE_EXTRA_CONFIGS=$(IFS=','; echo "${configs[*]}")
+    LLM_ENVS+=("CLOUDFLARE_EXTRA_CONFIGS")
+  fi
+}
+
+buildDeepLExtraConfigs() {
+  local configs=()
+  [ -n "$DEEPL_TARGET_LANG" ] && configs+=("targetLang=\"$DEEPL_TARGET_LANG\"")
+  if [ ${#configs[@]} -gt 0 ]; then
+    DEEPL_EXTRA_CONFIGS=$(IFS=','; echo "${configs[*]}")
+    LLM_ENVS+=("DEEPL_EXTRA_CONFIGS")
+  fi
+}
+
+buildDifyExtraConfigs() {
+  local configs=()
+  [ -n "$DIFY_API_URL" ] && configs+=("difyApiUrl=\"$DIFY_API_URL\"")
+  [ -n "$DIFY_BOT_TYPE" ] && configs+=("botType=\"$DIFY_BOT_TYPE\"")
+  [ -n "$DIFY_INPUT_VARIABLE" ] && configs+=("inputVariable=\"$DIFY_INPUT_VARIABLE\"")
+  [ -n "$DIFY_OUTPUT_VARIABLE" ] && configs+=("outputVariable=\"$DIFY_OUTPUT_VARIABLE\"")
+  if [ ${#configs[@]} -gt 0 ]; then
+    DIFY_EXTRA_CONFIGS=$(IFS=','; echo "${configs[*]}")
+    LLM_ENVS+=("DIFY_EXTRA_CONFIGS")
+  fi
+}
+
+buildOllamaExtraConfigs() {
+  local configs=()
+  [ -n "$OLLAMA_SERVER_HOST" ] && configs+=("ollamaServerHost=\"$OLLAMA_SERVER_HOST\"")
+  [ -n "$OLLAMA_SERVER_PORT" ] && configs+=("ollamaServerPort=$OLLAMA_SERVER_PORT")
+  if [ ${#configs[@]} -gt 0 ]; then
+    OLLAMA_EXTRA_CONFIGS=$(IFS=','; echo "${configs[*]}")
+    LLM_ENVS+=("OLLAMA_EXTRA_CONFIGS")
+  fi
+}
+
+buildHunyuanExtraConfigs() {
+  local configs=()
+  [ -n "$HUNYUAN_AUTH_ID" ] && configs+=("hunyuanAuthId=\"$HUNYUAN_AUTH_ID\"")
+  [ -n "$HUNYUAN_AUTH_KEY" ] && configs+=("hunyuanAuthKey=\"$HUNYUAN_AUTH_KEY\"")
+  if [ ${#configs[@]} -gt 0 ]; then
+    HUNYUAN_EXTRA_CONFIGS=$(IFS=','; echo "${configs[*]}")
+    LLM_ENVS+=("HUNYUAN_EXTRA_CONFIGS")
+  fi
+}
+
+buildAllExtraConfigs() {
+  buildZhipuAIExtraConfigs
+  buildMinimaxExtraConfigs
+  buildAzureExtraConfigs
+  buildBedrockExtraConfigs
+  buildVertexExtraConfigs
+  buildClaudeExtraConfigs
+  buildCloudflareExtraConfigs
+  buildDeepLExtraConfigs
+  buildDifyExtraConfigs
+  buildOllamaExtraConfigs
+  buildHunyuanExtraConfigs
+}
+
 writeConfiguration() {
+  # Build all provider extra configs before writing
+  buildAllExtraConfigs
+  
   local LLM_CONFIGS=""
   for env in "${LLM_ENVS[@]}"; do
     LLM_CONFIGS="$LLM_CONFIGS
@@ -1550,6 +1697,8 @@ Model Pattern Configurations:
   --deepseek-models PATTERN     Model pattern for DeepSeek
   --moonshot-models PATTERN     Model pattern for Moonshot
   --zhipuai-models PATTERN      Model pattern for Zhipu AI
+  --zhipuai-domain DOMAIN       Zhipu AI domain (default: open.bigmodel.cn, international: api.z.ai)
+  --zhipuai-code-plan-mode      Enable Zhipu AI Code Plan mode
   --minimax-models PATTERN      Model pattern for Minimax
   --azure-models PATTERN        Model pattern for Azure OpenAI
   --bedrock-models PATTERN      Model pattern for AWS Bedrock

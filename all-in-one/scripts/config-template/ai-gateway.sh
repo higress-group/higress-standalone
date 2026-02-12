@@ -72,6 +72,35 @@ normalizeModelPattern() {
   echo "$match_type|$match_value"
 }
 
+# Parse EXTRA_CONFIGS from environment variable (comma-separated key=value pairs)
+# Usage: parseExtraConfigs "PROVIDER_EXTRA_CONFIGS"
+# Sets global EXTRA_CONFIGS array
+parseExtraConfigs() {
+  local env_var_name="$1"
+  local env_value="${!env_var_name}"
+  EXTRA_CONFIGS=()
+  if [ -n "$env_value" ]; then
+    IFS=',' read -ra configs <<< "$env_value"
+    EXTRA_CONFIGS=("${configs[@]}")
+  fi
+}
+
+# Extract a config value from EXTRA_CONFIGS array
+# Usage: getExtraConfigValue "keyName" "defaultValue"
+getExtraConfigValue() {
+  local key="$1"
+  local default="$2"
+  for config in "${EXTRA_CONFIGS[@]}"; do
+    if [[ "$config" == ${key}=* ]]; then
+      local value="${config#${key}=}"
+      value="${value//\"/}"
+      echo "$value"
+      return
+    fi
+  done
+  echo "$default"
+}
+
 function initializeLlmProviderConfigs() {
   local EXTRA_CONFIGS=()
 
@@ -90,25 +119,31 @@ function initializeLlmProviderConfigs() {
   
   local ZHIPUAI_MODELS="${ZHIPUAI_MODELS}"
   IFS='|' read -r ZHIPUAI_TYPE ZHIPUAI_PATTERN <<< "$(normalizeModelPattern "$ZHIPUAI_MODELS")"
-  initializeLlmProviderConfig zhipuai zhipuai ZHIPUAI open.bigmodel.cn "443" "https" "" "$ZHIPUAI_TYPE" "$ZHIPUAI_PATTERN"
+  parseExtraConfigs "ZHIPUAI_EXTRA_CONFIGS"
+  local ZHIPUAI_HOST=$(getExtraConfigValue "zhipuDomain" "open.bigmodel.cn")
+  initializeLlmProviderConfig zhipuai zhipuai ZHIPUAI "$ZHIPUAI_HOST" "443" "https" "" "$ZHIPUAI_TYPE" "$ZHIPUAI_PATTERN" "${EXTRA_CONFIGS[@]}"
   
-  EXTRA_CONFIGS=(
-    "minimaxGroupId=\"$MINIMAX_GROUP_ID\""
-  )
+  parseExtraConfigs "MINIMAX_EXTRA_CONFIGS"
+  if [ ${#EXTRA_CONFIGS[@]} -eq 0 ] && [ -n "$MINIMAX_GROUP_ID" ]; then
+    EXTRA_CONFIGS=("minimaxGroupId=\"$MINIMAX_GROUP_ID\"")
+  fi
   local MINIMAX_MODELS="${MINIMAX_MODELS}"
   IFS='|' read -r MINIMAX_TYPE MINIMAX_PATTERN <<< "$(normalizeModelPattern "$MINIMAX_MODELS")"
   initializeLlmProviderConfig minimax minimax MINIMAX api.minimax.chat "443" "https" "" "$MINIMAX_TYPE" "$MINIMAX_PATTERN" "${EXTRA_CONFIGS[@]}"
 
   # Azure OpenAI
   if [ -z "$OPENAI_API_KEY" ]; then
-    if [ -z "$AZURE_SERVICE_URL" ]; then
-      AZURE_SERVICE_URL="https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=2024-06-01"
+    parseExtraConfigs "AZURE_EXTRA_CONFIGS"
+    local AZURE_SERVICE_URL_VAL=$(getExtraConfigValue "azureServiceUrl" "")
+    if [ -z "$AZURE_SERVICE_URL_VAL" ] && [ -n "$AZURE_SERVICE_URL" ]; then
+      AZURE_SERVICE_URL_VAL="$AZURE_SERVICE_URL"
+      EXTRA_CONFIGS=("azureServiceUrl=$AZURE_SERVICE_URL")
+    elif [ -z "$AZURE_SERVICE_URL_VAL" ]; then
+      AZURE_SERVICE_URL_VAL="https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=2024-06-01"
+      EXTRA_CONFIGS=("azureServiceUrl=$AZURE_SERVICE_URL_VAL")
     fi
-    extractHostFromUrl "$AZURE_SERVICE_URL"
+    extractHostFromUrl "$AZURE_SERVICE_URL_VAL"
     local AZURE_SERVICE_DOMAIN="$HOST"
-    EXTRA_CONFIGS=(
-      "azureServiceUrl=$AZURE_SERVICE_URL"
-    )
     local AZURE_MODELS="${AZURE_MODELS}"
     IFS='|' read -r AZURE_TYPE AZURE_PATTERN <<< "$(normalizeModelPattern "$AZURE_MODELS")"
     initializeLlmProviderConfig azure azure AZURE "$AZURE_SERVICE_DOMAIN" "443" "https" "" "$AZURE_TYPE" "$AZURE_PATTERN" "${EXTRA_CONFIGS[@]}"
@@ -116,37 +151,45 @@ function initializeLlmProviderConfigs() {
 
   # AWS Bedrock - requires region configuration
   if [ -n "$BEDROCK_CONFIGURED" ]; then
-    EXTRA_CONFIGS=()
-    if [ -n "$BEDROCK_REGION" ]; then
-      EXTRA_CONFIGS+=("region=\"$BEDROCK_REGION\"")
+    parseExtraConfigs "BEDROCK_EXTRA_CONFIGS"
+    if [ ${#EXTRA_CONFIGS[@]} -eq 0 ]; then
+      # Fallback to individual env vars for backward compatibility
+      if [ -n "$BEDROCK_REGION" ]; then
+        EXTRA_CONFIGS+=("awsRegion=\"$BEDROCK_REGION\"")
+      fi
+      if [ -n "$BEDROCK_ACCESS_KEY" ] && [ -n "$BEDROCK_SECRET_KEY" ]; then
+        EXTRA_CONFIGS+=("awsAccessKey=\"$BEDROCK_ACCESS_KEY\"")
+        EXTRA_CONFIGS+=("awsSecretKey=\"$BEDROCK_SECRET_KEY\"")
+      fi
     fi
-    if [ -n "$BEDROCK_ACCESS_KEY" ] && [ -n "$BEDROCK_SECRET_KEY" ]; then
-      EXTRA_CONFIGS+=("accessKeyId=\"$BEDROCK_ACCESS_KEY\"")
-      EXTRA_CONFIGS+=("secretAccessKey=\"$BEDROCK_SECRET_KEY\"")
-    fi
+    local BEDROCK_REGION_VAL=$(getExtraConfigValue "awsRegion" "${BEDROCK_REGION:-us-east-1}")
     local BEDROCK_MODELS="${BEDROCK_MODELS}"
     IFS='|' read -r BEDROCK_TYPE BEDROCK_PATTERN <<< "$(normalizeModelPattern "$BEDROCK_MODELS")"
-    initializeLlmProviderConfig bedrock bedrock BEDROCK bedrock-runtime.${BEDROCK_REGION:-us-east-1}.amazonaws.com "443" "https" "" "$BEDROCK_TYPE" "$BEDROCK_PATTERN" "${EXTRA_CONFIGS[@]}"
+    initializeLlmProviderConfig bedrock bedrock BEDROCK bedrock-runtime.${BEDROCK_REGION_VAL}.amazonaws.com "443" "https" "" "$BEDROCK_TYPE" "$BEDROCK_PATTERN" "${EXTRA_CONFIGS[@]}"
   fi
 
   # Google Vertex AI - requires project and region configuration
   if [ -n "$VERTEX_CONFIGURED" ]; then
-    EXTRA_CONFIGS=()
-    if [ -n "$VERTEX_PROJECT_ID" ]; then
-      EXTRA_CONFIGS+=("gcpProject=\"$VERTEX_PROJECT_ID\"")
+    parseExtraConfigs "VERTEX_EXTRA_CONFIGS"
+    if [ ${#EXTRA_CONFIGS[@]} -eq 0 ]; then
+      # Fallback to individual env vars for backward compatibility
+      if [ -n "$VERTEX_PROJECT_ID" ]; then
+        EXTRA_CONFIGS+=("vertexProjectId=\"$VERTEX_PROJECT_ID\"")
+      fi
+      if [ -n "$VERTEX_REGION" ]; then
+        EXTRA_CONFIGS+=("vertexRegion=\"$VERTEX_REGION\"")
+      fi
+      if [ -n "$VERTEX_AUTH_KEY" ]; then
+        EXTRA_CONFIGS+=("vertexAuthKey=\"$VERTEX_AUTH_KEY\"")
+      fi
+      if [ -n "$VERTEX_AUTH_SERVICE_NAME" ]; then
+        EXTRA_CONFIGS+=("vertexAuthServiceName=\"$VERTEX_AUTH_SERVICE_NAME\"")
+      fi
     fi
-    if [ -n "$VERTEX_REGION" ]; then
-      EXTRA_CONFIGS+=("gcpRegion=\"$VERTEX_REGION\"")
-    fi
-    if [ -n "$VERTEX_AUTH_KEY" ]; then
-      EXTRA_CONFIGS+=("serviceAccount=\"$VERTEX_AUTH_KEY\"")
-    fi
-    if [ -n "$VERTEX_AUTH_SERVICE_NAME" ]; then
-      EXTRA_CONFIGS+=("serviceAccountName=\"$VERTEX_AUTH_SERVICE_NAME\"")
-    fi
+    local VERTEX_REGION_VAL=$(getExtraConfigValue "vertexRegion" "${VERTEX_REGION:-us-central1}")
     local VERTEX_MODELS="${VERTEX_MODELS}"
     IFS='|' read -r VERTEX_TYPE VERTEX_PATTERN <<< "$(normalizeModelPattern "$VERTEX_MODELS")"
-    initializeLlmProviderConfig vertex vertex VERTEX ${VERTEX_REGION:-us-central1}-aiplatform.googleapis.com "443" "https" "" "$VERTEX_TYPE" "$VERTEX_PATTERN" "${EXTRA_CONFIGS[@]}"
+    initializeLlmProviderConfig vertex vertex VERTEX ${VERTEX_REGION_VAL}-aiplatform.googleapis.com "443" "https" "" "$VERTEX_TYPE" "$VERTEX_PATTERN" "${EXTRA_CONFIGS[@]}"
   fi
 
   # OpenAI (if Azure is not configured)
@@ -180,15 +223,16 @@ function initializeLlmProviderConfigs() {
   IFS='|' read -r BAIDU_TYPE BAIDU_PATTERN <<< "$(normalizeModelPattern "$BAIDU_MODELS")"
   initializeLlmProviderConfig baidu baidu BAIDU qianfan.baidubce.com "443" "https" "" "$BAIDU_TYPE" "$BAIDU_PATTERN"
   
-  if [ -z "$CLAUDE_VERSION" ]; then
-    CLAUDE_VERSION="2023-06-01"
-  fi
-  EXTRA_CONFIGS=(
-    "claudeVersion=\"$CLAUDE_VERSION\""
-  )
-  # Enable Claude Code mode if OAuth token is provided
-  if [ -n "$CLAUDE_CODE_API_KEY" ]; then
-    EXTRA_CONFIGS+=("claudeCodeMode=true")
+  parseExtraConfigs "CLAUDE_EXTRA_CONFIGS"
+  if [ ${#EXTRA_CONFIGS[@]} -eq 0 ]; then
+    # Fallback to individual env vars for backward compatibility
+    if [ -z "$CLAUDE_VERSION" ]; then
+      CLAUDE_VERSION="2023-06-01"
+    fi
+    EXTRA_CONFIGS=("claudeVersion=\"$CLAUDE_VERSION\"")
+    if [ -n "$CLAUDE_CODE_API_KEY" ]; then
+      EXTRA_CONFIGS+=("claudeCodeMode=true")
+    fi
   fi
   local CLAUDE_MODELS="${CLAUDE_MODELS}"
   IFS='|' read -r CLAUDE_TYPE CLAUDE_PATTERN <<< "$(normalizeModelPattern "$CLAUDE_MODELS")"
@@ -196,9 +240,9 @@ function initializeLlmProviderConfigs() {
 
   # Cloudflare Workers AI
   if [ -n "$CLOUDFLARE_CONFIGURED" ]; then
-    EXTRA_CONFIGS=()
-    if [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
-      EXTRA_CONFIGS+=("accountId=\"$CLOUDFLARE_ACCOUNT_ID\"")
+    parseExtraConfigs "CLOUDFLARE_EXTRA_CONFIGS"
+    if [ ${#EXTRA_CONFIGS[@]} -eq 0 ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+      EXTRA_CONFIGS=("cloudflareAccountId=\"$CLOUDFLARE_ACCOUNT_ID\"")
     fi
     local CLOUDFLARE_MODELS="${CLOUDFLARE_MODELS}"
     IFS='|' read -r CLOUDFLARE_TYPE CLOUDFLARE_PATTERN <<< "$(normalizeModelPattern "$CLOUDFLARE_MODELS")"
@@ -211,9 +255,9 @@ function initializeLlmProviderConfigs() {
 
   # DeepL - translation service
   if [ -n "$DEEPL_CONFIGURED" ]; then
-    EXTRA_CONFIGS=()
-    if [ -n "$DEEPL_TARGET_LANG" ]; then
-      EXTRA_CONFIGS+=("targetLang=\"$DEEPL_TARGET_LANG\"")
+    parseExtraConfigs "DEEPL_EXTRA_CONFIGS"
+    if [ ${#EXTRA_CONFIGS[@]} -eq 0 ] && [ -n "$DEEPL_TARGET_LANG" ]; then
+      EXTRA_CONFIGS=("targetLang=\"$DEEPL_TARGET_LANG\"")
     fi
     local DEEPL_MODELS="${DEEPL_MODELS}"
     IFS='|' read -r DEEPL_TYPE DEEPL_PATTERN <<< "$(normalizeModelPattern "$DEEPL_MODELS")"
@@ -222,21 +266,25 @@ function initializeLlmProviderConfigs() {
 
   # Dify - AI workflow platform
   if [ -n "$DIFY_API_KEY" ]; then
-    EXTRA_CONFIGS=()
-    if [ -n "$DIFY_API_URL" ]; then
-      extractHostFromUrl "$DIFY_API_URL"
+    parseExtraConfigs "DIFY_EXTRA_CONFIGS"
+    local DIFY_URL_VAL=$(getExtraConfigValue "difyApiUrl" "$DIFY_API_URL")
+    if [ -n "$DIFY_URL_VAL" ]; then
+      extractHostFromUrl "$DIFY_URL_VAL"
       local DIFY_DOMAIN="$HOST"
     else
       local DIFY_DOMAIN="api.dify.ai"
     fi
-    if [ -n "$DIFY_BOT_TYPE" ]; then
-      EXTRA_CONFIGS+=("botType=\"$DIFY_BOT_TYPE\"")
-    fi
-    if [ -n "$DIFY_INPUT_VARIABLE" ]; then
-      EXTRA_CONFIGS+=("inputVariable=\"$DIFY_INPUT_VARIABLE\"")
-    fi
-    if [ -n "$DIFY_OUTPUT_VARIABLE" ]; then
-      EXTRA_CONFIGS+=("outputVariable=\"$DIFY_OUTPUT_VARIABLE\"")
+    if [ ${#EXTRA_CONFIGS[@]} -eq 0 ]; then
+      # Fallback to individual env vars for backward compatibility
+      if [ -n "$DIFY_BOT_TYPE" ]; then
+        EXTRA_CONFIGS+=("botType=\"$DIFY_BOT_TYPE\"")
+      fi
+      if [ -n "$DIFY_INPUT_VARIABLE" ]; then
+        EXTRA_CONFIGS+=("inputVariable=\"$DIFY_INPUT_VARIABLE\"")
+      fi
+      if [ -n "$DIFY_OUTPUT_VARIABLE" ]; then
+        EXTRA_CONFIGS+=("outputVariable=\"$DIFY_OUTPUT_VARIABLE\"")
+      fi
     fi
     local DIFY_MODELS="${DIFY_MODELS}"
     IFS='|' read -r DIFY_TYPE DIFY_PATTERN <<< "$(normalizeModelPattern "$DIFY_MODELS")"
@@ -283,17 +331,18 @@ function initializeLlmProviderConfigs() {
   IFS='|' read -r MISTRAL_TYPE MISTRAL_PATTERN <<< "$(normalizeModelPattern "$MISTRAL_MODELS")"
   initializeLlmProviderConfig mistral mistral MISTRAL api.mistral.ai "443" "https" "" "$MISTRAL_TYPE" "$MISTRAL_PATTERN"
 
-  if [ -z "$OLLAMA_SERVER_HOST" ]; then
-    OLLAMA_SERVER_HOST="YOUR_OLLAMA_SERVER_HOST"
+  parseExtraConfigs "OLLAMA_EXTRA_CONFIGS"
+  local OLLAMA_HOST_VAL=$(getExtraConfigValue "ollamaServerHost" "${OLLAMA_SERVER_HOST:-YOUR_OLLAMA_SERVER_HOST}")
+  local OLLAMA_PORT_VAL=$(getExtraConfigValue "ollamaServerPort" "${OLLAMA_SERVER_PORT:-11434}")
+  if [ ${#EXTRA_CONFIGS[@]} -eq 0 ]; then
+    EXTRA_CONFIGS=(
+      "ollamaServerHost=\"$OLLAMA_HOST_VAL\""
+      "ollamaServerPort=$OLLAMA_PORT_VAL"
+    )
   fi
-  OLLAMA_SERVER_PORT="${OLLAMA_SERVER_PORT:-11434}"
-  EXTRA_CONFIGS=(
-    "ollamaServerHost=\"$OLLAMA_SERVER_HOST\""
-    "ollamaServerPort=$OLLAMA_SERVER_PORT"
-  )
   local OLLAMA_MODELS="${OLLAMA_MODELS}"
   IFS='|' read -r OLLAMA_TYPE OLLAMA_PATTERN <<< "$(normalizeModelPattern "$OLLAMA_MODELS")"
-  initializeLlmProviderConfig ollama ollama OLLAMA "$OLLAMA_SERVER_HOST" "$OLLAMA_SERVER_PORT" "http" "" "$OLLAMA_TYPE" "$OLLAMA_PATTERN" "${EXTRA_CONFIGS[@]}"
+  initializeLlmProviderConfig ollama ollama OLLAMA "$OLLAMA_HOST_VAL" "$OLLAMA_PORT_VAL" "http" "" "$OLLAMA_TYPE" "$OLLAMA_PATTERN" "${EXTRA_CONFIGS[@]}"
 
   # iFlyTek Spark
   if [ -n "$SPARK_CONFIGURED" ]; then
@@ -308,12 +357,15 @@ function initializeLlmProviderConfigs() {
 
   # Tencent Hunyuan
   if [ -n "$HUNYUAN_CONFIGURED" ]; then
-    EXTRA_CONFIGS=()
-    if [ -n "$HUNYUAN_AUTH_ID" ]; then
-      EXTRA_CONFIGS+=("authId=\"$HUNYUAN_AUTH_ID\"")
-    fi
-    if [ -n "$HUNYUAN_AUTH_KEY" ]; then
-      EXTRA_CONFIGS+=("authKey=\"$HUNYUAN_AUTH_KEY\"")
+    parseExtraConfigs "HUNYUAN_EXTRA_CONFIGS"
+    if [ ${#EXTRA_CONFIGS[@]} -eq 0 ]; then
+      # Fallback to individual env vars for backward compatibility
+      if [ -n "$HUNYUAN_AUTH_ID" ]; then
+        EXTRA_CONFIGS+=("hunyuanAuthId=\"$HUNYUAN_AUTH_ID\"")
+      fi
+      if [ -n "$HUNYUAN_AUTH_KEY" ]; then
+        EXTRA_CONFIGS+=("hunyuanAuthKey=\"$HUNYUAN_AUTH_KEY\"")
+      fi
     fi
     local HUNYUAN_MODELS="${HUNYUAN_MODELS}"
     IFS='|' read -r HUNYUAN_TYPE HUNYUAN_PATTERN <<< "$(normalizeModelPattern "$HUNYUAN_MODELS")"
