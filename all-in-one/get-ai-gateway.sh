@@ -335,6 +335,14 @@ parseArgs() {
       LLM_ENVS+=("ZHIPUAI_MODELS")
       shift 2
       ;;
+    --zhipuai-domain)
+      ZHIPUAI_DOMAIN="$2"
+      shift 2
+      ;;
+    --zhipuai-code-plan-mode)
+      ZHIPUAI_CODE_PLAN_MODE="true"
+      shift
+      ;;
     --minimax-models)
       MINIMAX_MODELS="$2"
       LLM_ENVS+=("MINIMAX_MODELS")
@@ -1188,6 +1196,21 @@ configureMoonshotProvider() {
   LLM_ENVS+=("MOONSHOT_MODELS")
 }
 
+# Build ZHIPUAI_EXTRA_CONFIGS from individual settings
+buildZhipuAIExtraConfigs() {
+  local configs=()
+  if [ -n "$ZHIPUAI_DOMAIN" ]; then
+    configs+=("zhipuDomain=\"$ZHIPUAI_DOMAIN\"")
+  fi
+  if [ "$ZHIPUAI_CODE_PLAN_MODE" = "true" ]; then
+    configs+=("zhipuCodePlanMode=true")
+  fi
+  if [ ${#configs[@]} -gt 0 ]; then
+    ZHIPUAI_EXTRA_CONFIGS=$(IFS=','; echo "${configs[*]}")
+    LLM_ENVS+=("ZHIPUAI_EXTRA_CONFIGS")
+  fi
+}
+
 configureZhipuAIProvider() {
   read -r -u 3 -p "→ Enter API Key for Zhipu AI: " ZHIPUAI_API_KEY
   LLM_ENVS+=("ZHIPUAI_API_KEY")
@@ -1200,6 +1223,20 @@ configureZhipuAIProvider() {
     fi
   fi
   LLM_ENVS+=("ZHIPUAI_MODELS")
+
+  if [ -z "$ZHIPUAI_DOMAIN" ]; then
+    echo "Choose domain (China: open.bigmodel.cn, International: api.z.ai):"
+    read -r -u 3 -p "→ Domain (default: open.bigmodel.cn): " ZHIPUAI_DOMAIN
+  fi
+
+  if [ -z "$ZHIPUAI_CODE_PLAN_MODE" ]; then
+    read -r -u 3 -p "→ Enable Code Plan Mode? (y/N): " ENABLE_CODE_PLAN
+    if [[ "$ENABLE_CODE_PLAN" =~ ^[Yy] ]]; then
+      ZHIPUAI_CODE_PLAN_MODE="true"
+    fi
+  fi
+
+  buildZhipuAIExtraConfigs
 }
 
 configureOpenAIProvider() {
@@ -1404,6 +1441,9 @@ validatePort() {
 }
 
 writeConfiguration() {
+  # Build extra configs for providers that support them
+  buildZhipuAIExtraConfigs
+  
   local LLM_CONFIGS=""
   for env in "${LLM_ENVS[@]}"; do
     LLM_CONFIGS="$LLM_CONFIGS
@@ -1550,6 +1590,8 @@ Model Pattern Configurations:
   --deepseek-models PATTERN     Model pattern for DeepSeek
   --moonshot-models PATTERN     Model pattern for Moonshot
   --zhipuai-models PATTERN      Model pattern for Zhipu AI
+  --zhipuai-domain DOMAIN       Zhipu AI domain (default: open.bigmodel.cn, international: api.z.ai)
+  --zhipuai-code-plan-mode      Enable Zhipu AI Code Plan mode (uses /api/coding/paas/v4/chat/completions)
   --minimax-models PATTERN      Model pattern for Minimax
   --azure-models PATTERN        Model pattern for Azure OpenAI
   --bedrock-models PATTERN      Model pattern for AWS Bedrock
