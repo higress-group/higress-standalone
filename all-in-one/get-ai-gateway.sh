@@ -335,6 +335,16 @@ parseArgs() {
       LLM_ENVS+=("ZHIPUAI_MODELS")
       shift 2
       ;;
+    --zhipuai-domain)
+      ZHIPUAI_DOMAIN="$2"
+      LLM_ENVS+=("ZHIPUAI_DOMAIN")
+      shift 2
+      ;;
+    --zhipuai-code-plan-mode)
+      ZHIPUAI_CODE_PLAN_MODE="true"
+      LLM_ENVS+=("ZHIPUAI_CODE_PLAN_MODE")
+      shift
+      ;;
     --minimax-models)
       MINIMAX_MODELS="$2"
       LLM_ENVS+=("MINIMAX_MODELS")
@@ -1200,6 +1210,22 @@ configureZhipuAIProvider() {
     fi
   fi
   LLM_ENVS+=("ZHIPUAI_MODELS")
+
+  if [ -z "$ZHIPUAI_DOMAIN" ]; then
+    echo "Choose domain (China: open.bigmodel.cn, International: api.z.ai):"
+    read -r -u 3 -p "→ Domain (default: open.bigmodel.cn): " ZHIPUAI_DOMAIN
+  fi
+  if [ -n "$ZHIPUAI_DOMAIN" ]; then
+    LLM_ENVS+=("ZHIPUAI_DOMAIN")
+  fi
+
+  if [ -z "$ZHIPUAI_CODE_PLAN_MODE" ]; then
+    read -r -u 3 -p "→ Enable Code Plan Mode? (y/N): " ENABLE_CODE_PLAN
+    if [[ "$ENABLE_CODE_PLAN" =~ ^[Yy] ]]; then
+      ZHIPUAI_CODE_PLAN_MODE="true"
+      LLM_ENVS+=("ZHIPUAI_CODE_PLAN_MODE")
+    fi
+  fi
 }
 
 configureOpenAIProvider() {
@@ -1550,6 +1576,8 @@ Model Pattern Configurations:
   --deepseek-models PATTERN     Model pattern for DeepSeek
   --moonshot-models PATTERN     Model pattern for Moonshot
   --zhipuai-models PATTERN      Model pattern for Zhipu AI
+  --zhipuai-domain DOMAIN       Zhipu AI domain (default: open.bigmodel.cn, international: api.z.ai)
+  --zhipuai-code-plan-mode      Enable Zhipu AI Code Plan mode (uses /api/coding/paas/v4/chat/completions)
   --minimax-models PATTERN      Model pattern for Minimax
   --azure-models PATTERN        Model pattern for Azure OpenAI
   --bedrock-models PATTERN      Model pattern for AWS Bedrock

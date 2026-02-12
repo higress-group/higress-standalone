@@ -90,7 +90,15 @@ function initializeLlmProviderConfigs() {
   
   local ZHIPUAI_MODELS="${ZHIPUAI_MODELS}"
   IFS='|' read -r ZHIPUAI_TYPE ZHIPUAI_PATTERN <<< "$(normalizeModelPattern "$ZHIPUAI_MODELS")"
-  initializeLlmProviderConfig zhipuai zhipuai ZHIPUAI open.bigmodel.cn "443" "https" "" "$ZHIPUAI_TYPE" "$ZHIPUAI_PATTERN"
+  local ZHIPUAI_HOST="${ZHIPUAI_DOMAIN:-open.bigmodel.cn}"
+  EXTRA_CONFIGS=()
+  if [ -n "$ZHIPUAI_DOMAIN" ]; then
+    EXTRA_CONFIGS+=("zhipuDomain=\"$ZHIPUAI_DOMAIN\"")
+  fi
+  if [ "$ZHIPUAI_CODE_PLAN_MODE" = "true" ]; then
+    EXTRA_CONFIGS+=("zhipuCodePlanMode=true")
+  fi
+  initializeLlmProviderConfig zhipuai zhipuai ZHIPUAI "$ZHIPUAI_HOST" "443" "https" "" "$ZHIPUAI_TYPE" "$ZHIPUAI_PATTERN" "${EXTRA_CONFIGS[@]}"
   
   EXTRA_CONFIGS=(
     "minimaxGroupId=\"$MINIMAX_GROUP_ID\""
