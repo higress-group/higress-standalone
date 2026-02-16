@@ -593,7 +593,7 @@ resetEnv() {
   
   # ========== Model Pattern Defaults (can be updated anytime) ==========
   # Top 10 commonly used providers
-  : "${DASHSCOPE_MODELS:=qwen-*}"
+  : "${DASHSCOPE_MODELS:=qwen*}"
   : "${DEEPSEEK_MODELS:=deepseek-*}"
   : "${MOONSHOT_MODELS:=moonshot-*,kimi-*}"
   : "${ZHIPUAI_MODELS:=GLM-*,glm-*}"
