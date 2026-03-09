@@ -40,12 +40,16 @@ case $MODE in
 esac
 echo "Mode=$MODE"
 
+# Always disable O11Y since we have removed all related components from the image.
+# TODO: Support O11Y again.
+O11Y=off
+
 case $O11Y in
     true|TRUE|on|ON|yes|YES)
         O11Y=on
         ;;
     *)
-        # Default to full mode
+        # Default to off
         O11Y=off
         ;;
 esac
