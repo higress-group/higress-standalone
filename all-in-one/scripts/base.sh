@@ -29,6 +29,14 @@ function createDir() {
     sudo mkdir -p "$1"
 }
 
+function isO11yInstalled() {
+    if [ -f "/usr/local/bin/promtail" ] && [ -f "/usr/local/bin/prometheus" ] && [ -f "/usr/local/bin/grafana.sh" ] && [ -f "/usr/local/bin/loki" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 case $MODE in
     gateway|console|full)
         # Known modes
@@ -40,9 +48,11 @@ case $MODE in
 esac
 echo "Mode=$MODE"
 
-# Always disable O11Y since we have removed all related components from the image.
-# TODO: Support O11Y again.
-O11Y=off
+if ! isO11yInstalled; then
+    echo "O11Y components are not installed."
+    # Disable O11Y
+    O11Y=off
+fi
 
 case $O11Y in
     true|TRUE|on|ON|yes|YES)

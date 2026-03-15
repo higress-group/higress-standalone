@@ -1,0 +1,33 @@
+ARG HUB=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress
+ARG BASE_IMAGE=${HUB}/all-in-one:latest
+ARG PROMETHEUS_VERSION=v2.40.7
+ARG PROMTAIL_VERSION=2.9.4
+ARG LOKI_VERSION=2.9.4
+ARG GRAFANA_VERSION=9.3.6
+
+FROM ${HUB}/prometheus:${PROMETHEUS_VERSION} AS prometheus
+FROM ${HUB}/promtail:${PROMTAIL_VERSION} AS promtail
+FROM ${HUB}/loki:${LOKI_VERSION} AS loki
+FROM ${HUB}/grafana:${GRAFANA_VERSION} AS grafana
+
+FROM ${BASE_IMAGE}
+
+ENV O11Y=on
+
+# Install Prometheus
+COPY --from=prometheus /bin/prometheus /usr/local/bin/prometheus
+
+# Install Promtail
+COPY --from=promtail /usr/bin/promtail /usr/local/bin/promtail
+
+# Install Loki
+COPY --from=loki /usr/bin/loki /usr/local/bin/loki
+
+# Install Grafana
+COPY --from=grafana /usr/share/grafana /usr/share/grafana
+COPY --from=grafana /run.sh /usr/local/bin/grafana.sh
+
+COPY ./prometheus /etc/prometheus
+COPY ./promtail /etc/promtail
+COPY ./loki /etc/loki
+COPY ./grafana /etc/grafana

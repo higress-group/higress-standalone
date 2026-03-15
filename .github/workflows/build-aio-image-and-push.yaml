@@ -60,9 +60,10 @@ jobs:
           for image in ${IMAGES[@]}; do
             echo "Image: $image"
             if [ -z "$baseImage" ]; then
-              IMG="${image}" make docker-buildx-push
+              IMG="${image}" make docker-buildx-push docker-buildx-o11y-push
               baseImage="$image"
             else
               docker buildx imagetools create "$baseImage" --tag "$image"
+              docker buildx imagetools create "${baseImage}-o11y" --tag "${image}-o11y"
             fi
           done
