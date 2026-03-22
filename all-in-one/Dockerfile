@@ -1,9 +1,10 @@
 ARG HUB=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress
 ARG BASE_VERSION=2022-10-27T19-02-22
-ARG CORE_VERSION=2.1.11
-ARG CONSOLE_VERSION=2.1.11
+ARG CORE_VERSION=2.2.1
+ARG CONSOLE_VERSION=2.2.1
 ARG APISERVER_VERSION=0.0.29
-ARG ENVOY_VERSION=2.1.11
+ARG ENVOY_VERSION=2.2.1
+ARG PLUGIN_SERVER_VERSION=2.2.1
 
 FROM ${HUB}/api-server:${APISERVER_VERSION} AS apiserver
 FROM ${HUB}/higress:${CORE_VERSION} AS controller
@@ -11,6 +12,7 @@ FROM ${HUB}/pilot:${CORE_VERSION} AS pilot
 FROM ${HUB}/gateway:${CORE_VERSION} AS gateway
 FROM ${HUB}/console:${CONSOLE_VERSION} AS console
 FROM ${HUB}/eclipse-temurin:21-jre AS jdk
+FROM ${HUB}/plugin-server:${PLUGIN_SERVER_VERSION} AS plugin-server
 
 FROM ${HUB}/base:${BASE_VERSION}
 
@@ -37,6 +39,9 @@ COPY --from=gateway /usr/local/bin/supercronic* /usr/local/bin/
 # Install console
 COPY --from=console /app /app
 
+# Install plugin-server (nginx with wasm plugins)
+COPY --from=plugin-server /usr/share/nginx/html/plugins /usr/share/nginx/html/plugins
+
 # Install JDK required by console
 ENV JAVA_HOME=/opt/java/openjdk
 COPY --from=jdk $JAVA_HOME $JAVA_HOME
@@ -53,7 +58,7 @@ RUN arch="$(dpkg --print-architecture)"; \
   esac; \
   apt-get update --allow-unauthenticated; \
   apt-get install --no-install-recommends -y --allow-unauthenticated \
-    wget supervisor logrotate cron; \
+    wget supervisor logrotate cron nginx; \
   apt-get upgrade -y --allow-unauthenticated; \
   apt-get clean; \
   rm -rf /var/log/*log /var/lib/apt/lists/* /var/log/apt/* /var/lib/dpkg/*-old /var/cache/debconf/*-old; \
@@ -74,7 +79,8 @@ COPY ./gateway/podinfo /etc/istio/pod
 COPY ./scripts /usr/local/bin
 COPY ./apiserver/config /app/kubeconfig
 COPY ./config /opt/data/defaultConfig
+COPY ./plugin-server/nginx.conf /etc/nginx/plugin-server/nginx.conf
 
-EXPOSE 8080 8443 8001
+EXPOSE 8080 8443 8001 8002
 
 ENTRYPOINT ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

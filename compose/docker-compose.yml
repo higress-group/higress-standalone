@@ -130,9 +130,14 @@ services:
       - --ingressClass=
     env_file:
       - ./env/controller.env
+    environment:
+      MCP_SERVER_WASM_IMAGE_URL: "${MCP_SERVER_WASM_URL:-}"
     depends_on:
       prepare:
         condition: service_completed_successfully
+      plugin-server:
+        condition: service_healthy
+        required: false
     networks:
       higress-net:
         aliases:
@@ -183,7 +188,6 @@ services:
   gateway:
     hostname: higress-gateway
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/gateway:${HIGRESS_GATEWAY_TAG}
-    user: "1337:1337"
     command:
       - proxy
       - router
@@ -229,11 +233,30 @@ services:
       - ./volumes/gateway/secrets:/var/run/secrets:rw
       - ./volumes/gateway/proxy:/etc/istio/proxy:rw
 
+  plugin-server:
+    hostname: higress-plugin-server
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/plugin-server:${HIGRESS_PLUGIN_SERVER_TAG}
+    profiles: [ "plugin-server" ]
+    networks:
+      higress-net:
+        aliases:
+          - plugin-server.svc
+    restart: always
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -sf http://127.0.0.1:8002/healthz || exit 1" ]
+      interval: 1s
+      timeout: 3s
+      retries: 60
+    volumes:
+      - ./volumes/plugin-server/nginx.conf:/etc/nginx/nginx.conf:ro
+
   console:
     hostname: higress-console
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/console:${HIGRESS_CONSOLE_TAG}
     env_file:
       - ./env/console.env
+    environment:
+      HIGRESS_ADMIN_WASM_PLUGIN_CUSTOM_IMAGE_URL_PATTERN: "${WASM_PLUGIN_URL_PATTERN:-}"
     depends_on:
       controller:
         condition: service_healthy

@@ -99,6 +99,14 @@ docker compose
 
     Higress Console 在服务器本地监听的端口。默认值为 8080。
 
+  * --use-plugin-server
+
+    使用内置的 Plugin Server 通过 HTTP 方式分发 WASM 插件。此为默认行为。
+
+  * --no-plugin-server
+
+    禁用内置的 Plugin Server，WASM 插件将通过 OCI 镜像方式加载。
+
   * -r, --rerun
 
     在 Higress 已配置完成后重新执行配置流程。
@@ -139,6 +147,48 @@ higress-precheck-1     "/bin/bash ./prechec…"   precheck            exited (0)
 ### logs.sh
 
 查看 Higress 各组件的运行日志。
+
+## Docker All-in-One 模式
+
+除了 Docker Compose 多容器部署外，Higress 还提供了 All-in-One 单容器部署模式，将所有组件打包在一个 Docker 镜像中运行。
+
+### 构建镜像
+
+```bash
+docker build -t higress-all-in-one ./all-in-one
+```
+
+### 启动容器
+
+```bash
+docker run -d --name higress \
+  -p 8080:8080 -p 8443:8443 -p 8001:8001 \
+  higress-all-in-one
+```
+
+### 环境变量
+
+All-in-One 模式通过环境变量控制各组件的行为，可在 `docker run` 时通过 `-e` 参数传入：
+
+  * `MODE`
+
+    运行模式。可选值为 `full`（默认）、`gateway`、`console`。
+
+  * `O11Y`
+
+    是否启用可观测性组件（Prometheus、Grafana 等）。可选值为 `on`、`off`（默认）。需镜像中已包含相关组件。
+
+  * `USE_PLUGIN_SERVER`
+
+    是否启用内置的 Plugin Server 通过 HTTP 方式分发 WASM 插件。默认启用。设置为 `false`、`off`、`no` 或 `N` 可禁用，禁用后 WASM 插件将通过 OCI 镜像方式加载。
+
+    ```bash
+    # 禁用 Plugin Server
+    docker run -d --name higress \
+      -e USE_PLUGIN_SERVER=off \
+      -p 8080:8080 -p 8443:8443 -p 8001:8001 \
+      higress-all-in-one
+    ```
 
 ## 设计文档
 

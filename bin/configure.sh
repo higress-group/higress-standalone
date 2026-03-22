@@ -22,6 +22,7 @@ DEFAULT_GATEWAY_HTTP_PORT=80
 DEFAULT_GATEWAY_HTTPS_PORT=443
 DEFAULT_GATEWAY_METRICS_PORT=15020
 DEFAULT_CONSOLE_PORT=8080
+DEFAULT_USE_PLUGIN_SERVER="Y"
 
 COMMAND_PREPARE="prepare"
 COMMAND_INIT="init"
@@ -35,6 +36,8 @@ cd - >/dev/null
 source "$ROOT/bin/base.sh"
 
 source "$COMPOSE_ROOT/.env"
+
+HIGRESS_PLUGIN_SERVER_TAG=${HIGRESS_PLUGIN_SERVER_TAG:-2.2.1}
 
 CONFIGURED_MARK="$COMPOSE_ROOT/.configured"
 
@@ -171,6 +174,16 @@ parseArgs() {
       MODE="params"
       shift
       ;;
+    --use-plugin-server)
+      USE_PLUGIN_SERVER="Y"
+      MODE="params"
+      shift
+      ;;
+    --no-plugin-server)
+      USE_PLUGIN_SERVER="N"
+      MODE="params"
+      shift
+      ;;
     -h | --help)
       outputUsage
       exit 0
@@ -212,6 +225,7 @@ configure() {
       configureByArgs
     else
       configureStorage
+      configurePluginServer
       configureConsole
       configurePorts
     fi
@@ -243,6 +257,7 @@ resetEnv() {
   GATEWAY_HTTPS_PORT=$DEFAULT_GATEWAY_HTTPS_PORT
   GATEWAY_METRICS_PORT=$DEFAULT_GATEWAY_METRICS_PORT
   CONSOLE_PORT=$DEFAULT_CONSOLE_PORT
+  USE_PLUGIN_SERVER=""
 }
 
 configureByArgs() {
@@ -255,6 +270,9 @@ configureByArgs() {
     exit -1
   fi
   configureConsoleByArgs
+  if [ -z "$USE_PLUGIN_SERVER" ]; then
+    USE_PLUGIN_SERVER="$DEFAULT_USE_PLUGIN_SERVER"
+  fi
   configurePortsByArgs
 }
 
@@ -499,6 +517,16 @@ configureFileStorage() {
   done
 }
 
+configurePluginServer() {
+  echo "==== Configure Plugin Server ===="
+  readWithDefault "Use built-in plugin server for WASM plugin distribution? (Y/N) [${DEFAULT_USE_PLUGIN_SERVER}]: " "$DEFAULT_USE_PLUGIN_SERVER"
+  if [ "$input" == "Y" ] || [ "$input" == "y" ]; then
+    USE_PLUGIN_SERVER="Y"
+  else
+    USE_PLUGIN_SERVER="N"
+  fi
+}
+
 configureConsole() {
   # echo "==== Configure Higress Console ===="
   :
@@ -569,6 +597,10 @@ outputUsage() {
      --console-port=CONSOLE-PORT
                             the port used to visit Higress Console
                             default to 8080 if unspecified
+     --use-plugin-server    use the built-in plugin server for WASM plugin
+                            distribution via HTTP (default)
+     --no-plugin-server     disable the built-in plugin server, WASM plugins
+                            will be loaded from OCI images instead
  -r, --rerun                re-run the configuration workflow even if
                             Higress is already configured
  -h, --help                 give this help list'
@@ -612,6 +644,24 @@ writeConfiguration() {
     NACOS_SERVER_HTTP_URL=${NACOS_SERVER_HTTP_URL%/}/nacos
   fi
 
+  # Build COMPOSE_PROFILES with plugin-server support
+  if [ "$USE_PLUGIN_SERVER" == "Y" ]; then
+    if [ -n "$COMPOSE_PROFILES" ]; then
+      COMPOSE_PROFILES="${COMPOSE_PROFILES},plugin-server"
+    else
+      COMPOSE_PROFILES="plugin-server"
+    fi
+  fi
+
+  # Generate wasm plugin URL variables
+  if [ "$USE_PLUGIN_SERVER" == "Y" ]; then
+    WASM_PLUGIN_URL_PATTERN="http://plugin-server:8002/plugins/\${name}/\${version}/plugin.wasm"
+    MCP_SERVER_WASM_URL="http://plugin-server:8002/plugins/mcp-server/1.0.0/plugin.wasm"
+  else
+    WASM_PLUGIN_URL_PATTERN=''
+    MCP_SERVER_WASM_URL=''
+  fi
+
   cat <<EOF >$COMPOSE_ROOT/.env
 COMPOSE_PROFILES='${COMPOSE_PROFILES}'
 CONFIG_STORAGE='${CONFIG_STORAGE}'
@@ -629,6 +679,9 @@ HIGRESS_CONTROLLER_TAG='${HIGRESS_CONTROLLER_TAG}'
 HIGRESS_PILOT_TAG='${HIGRESS_PILOT_TAG}'
 HIGRESS_GATEWAY_TAG='${HIGRESS_GATEWAY_TAG}'
 HIGRESS_CONSOLE_TAG='${HIGRESS_CONSOLE_TAG}'
+HIGRESS_PLUGIN_SERVER_TAG='${HIGRESS_PLUGIN_SERVER_TAG}'
+WASM_PLUGIN_URL_PATTERN='${WASM_PLUGIN_URL_PATTERN}'
+MCP_SERVER_WASM_URL='${MCP_SERVER_WASM_URL}'
 PROMETHEUS_TAG='${PROMETHEUS_TAG}'
 PROMTAIL_TAG='${PROMTAIL_TAG}'
 LOKI_TAG='${LOKI_TAG}'
@@ -649,7 +702,7 @@ runInitializer() {
 
   echo "==== Build Configurations ==== "
 
-  if [ "$COMPOSE_PROFILES" == "nacos" ]; then
+  if [[ "$COMPOSE_PROFILES" == *"nacos"* ]]; then
     echo "Starting built-in Nacos service..."
     cd "$COMPOSE_ROOT" && runDockerCompose -p higress up -d nacos
     retVal=$?
@@ -666,7 +719,7 @@ runInitializer() {
     exit -1
   fi
 
-  if [ "$COMPOSE_PROFILES" == "nacos" ] && [ "${AUTO_START}" != "Y" ]; then
+  if [[ "$COMPOSE_PROFILES" == *"nacos"* ]] && [ "${AUTO_START}" != "Y" ]; then
     echo "Stopping built-in Nacos service..."
     cd "$COMPOSE_ROOT" && runDockerCompose -p higress down --remove-orphans
     local retVal=$?
