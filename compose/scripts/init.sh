@@ -73,7 +73,7 @@ initializeNacos() {
       nacosReady=true
       break
     fi
-    if [ $(($i % 5)) == 0 -a "$COMPOSE_PROFILES" != "nacos" ]; then
+    if [ $(($i % 5)) == 0 ] && [[ "$COMPOSE_PROFILES" != *"nacos"* ]]; then
       # No status echo for built-in nacos
       echo "$healthCheckUrl returns $statusCode"
     fi

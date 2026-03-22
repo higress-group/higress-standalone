@@ -3,3 +3,4 @@
 /*.bat
 /docker-compose.yml
 /higress
+.idea

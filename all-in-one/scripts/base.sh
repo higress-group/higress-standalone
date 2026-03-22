@@ -65,6 +65,17 @@ case $O11Y in
 esac
 echo "O11Y=$O11Y"
 
+case $USE_PLUGIN_SERVER in
+    false|FALSE|off|OFF|no|NO|N|n)
+        USE_PLUGIN_SERVER=off
+        ;;
+    *)
+        # Default to on
+        USE_PLUGIN_SERVER=on
+        ;;
+esac
+echo "USE_PLUGIN_SERVER=$USE_PLUGIN_SERVER"
+
 CONSOLE_USED_MARKER='/data/.console-used'
 CONSOLE_USED='false'
 if [ -f "$CONSOLE_USED_MARKER" ]; then

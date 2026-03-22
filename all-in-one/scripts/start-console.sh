@@ -30,6 +30,10 @@ if [ "$O11Y" == "on" ]; then
     export HIGRESS_CONSOLE_DASHBOARD_DATASOURCE_LOKI_URL="http://localhost:3100"
 fi
 
+if [ "$USE_PLUGIN_SERVER" == "on" ]; then
+    export HIGRESS_ADMIN_WASM_PLUGIN_CUSTOM_IMAGE_URL_PATTERN="http://localhost:8002/plugins/\${name}/\${version}/plugin.wasm"
+fi
+
 HIGRESS_CONSOLE_KUBE_CONFIG="/app/kubeconfig" \
     HIGRESS_CONSOLE_SERVICE_HOST="higress-console.static" \
     HIGRESS_CONSOLE_SERVICE_PORT=80 \
