@@ -31,5 +31,4 @@ fi
     --domain=higress-system.svc.cluster.local \
     --proxyLogLevel=${GATEWAY_LOG_LEVEL:-warning} \
     --proxyComponentLogLevel=${GATEWAY_COMPONENT_LOG_LEVEL:-misc:error} \
-    --log_output_level=all:info \
     --serviceCluster=higress-gateway
