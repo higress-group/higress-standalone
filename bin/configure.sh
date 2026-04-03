@@ -655,8 +655,8 @@ writeConfiguration() {
 
   # Generate wasm plugin URL variables
   if [ "$USE_PLUGIN_SERVER" == "Y" ]; then
-    WASM_PLUGIN_URL_PATTERN="http://plugin-server:8002/plugins/\${name}/\${version}/plugin.wasm"
-    MCP_SERVER_WASM_URL="http://plugin-server:8002/plugins/mcp-server/1.0.0/plugin.wasm"
+    WASM_PLUGIN_URL_PATTERN="http://plugin-server:8080/plugins/\${name}/\${version}/plugin.wasm"
+    MCP_SERVER_WASM_URL="http://plugin-server:8080/plugins/mcp-server/1.0.0/plugin.wasm"
   else
     WASM_PLUGIN_URL_PATTERN=''
     MCP_SERVER_WASM_URL=''

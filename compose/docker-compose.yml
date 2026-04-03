@@ -135,9 +135,6 @@ services:
     depends_on:
       prepare:
         condition: service_completed_successfully
-      plugin-server:
-        condition: service_healthy
-        required: false
     networks:
       higress-net:
         aliases:
@@ -204,6 +201,8 @@ services:
     depends_on:
       pilot:
         condition: service_healthy
+      plugin-server:
+        condition: service_healthy
     networks:
       higress-net:
         aliases:
@@ -237,18 +236,19 @@ services:
     hostname: higress-plugin-server
     image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/plugin-server:${HIGRESS_PLUGIN_SERVER_TAG}
     profiles: [ "plugin-server" ]
+    depends_on:
+      prepare:
+        condition: service_completed_successfully
     networks:
       higress-net:
         aliases:
           - plugin-server.svc
     restart: always
     healthcheck:
-      test: [ "CMD-SHELL", "curl -sf http://127.0.0.1:8002/healthz || exit 1" ]
+      test: [ "CMD-SHELL", "curl -sf http://127.0.0.1:8080/ || exit 1" ]
       interval: 1s
       timeout: 3s
       retries: 60
-    volumes:
-      - ./volumes/plugin-server/nginx.conf:/etc/nginx/nginx.conf:ro
 
   console:
     hostname: higress-console

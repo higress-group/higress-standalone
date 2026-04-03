@@ -727,67 +727,9 @@ checkO11y() {
   checkGrafana
 }
 
-checkPluginServer() {
-  echo "Checking plugin-server configurations..."
-
-  mkdir -p $VOLUMES_ROOT/plugin-server
-
-  if [ ! -f $VOLUMES_ROOT/plugin-server/nginx.conf ]; then
-    cat <<'EOF' >$VOLUMES_ROOT/plugin-server/nginx.conf
-daemon off;
-user www-data;
-worker_processes auto;
-pid /run/nginx.pid;
-error_log /var/log/nginx/error.log notice;
-
-events {
-    worker_connections 1024;
-}
-
-http {
-    include /etc/nginx/mime.types;
-    default_type application/octet-stream;
-
-    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
-                    '$status $body_bytes_sent "$http_referer" '
-                    '"$http_user_agent"';
-
-    access_log /var/log/nginx/access.log main;
-
-    sendfile on;
-    keepalive_timeout 65;
-
-    server {
-        listen 8002;
-        server_name localhost;
-
-        # Static files root directory
-        root /usr/share/nginx/html;
-
-        # Hide Nginx version
-        server_tokens off;
-
-        # Health check endpoint
-        location = /healthz {
-            return 200 'ok';
-            add_header Content-Type text/plain;
-        }
-
-        # Error pages
-        error_page 500 502 503 504 /50x.html;
-        location = /50x.html {
-            root /usr/share/nginx/html;
-        }
-    }
-}
-EOF
-  fi
-}
-
 checkStorage
 checkPilot
 checkGateway
 checkConsole
 checkGatewayApi
 checkO11y
-checkPluginServer

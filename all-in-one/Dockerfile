@@ -1,6 +1,6 @@
 ARG HUB=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress
 ARG BASE_VERSION=2022-10-27T19-02-22
-ARG CORE_VERSION=2.2.1
+ARG CORE_VERSION=2.2.0
 ARG CONSOLE_VERSION=2.2.1
 ARG APISERVER_VERSION=0.0.29
 ARG ENVOY_VERSION=2.2.1
@@ -81,6 +81,6 @@ COPY ./apiserver/config /app/kubeconfig
 COPY ./config /opt/data/defaultConfig
 COPY ./plugin-server/nginx.conf /etc/nginx/plugin-server/nginx.conf
 
-EXPOSE 8080 8443 8001 8002
+EXPOSE 8080 8443 8001
 
 ENTRYPOINT ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
