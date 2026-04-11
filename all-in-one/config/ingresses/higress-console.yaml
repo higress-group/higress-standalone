@@ -5,6 +5,9 @@ metadata:
   namespace: higress-system
   creationTimestamp: "2000-01-01T00:00:00Z"
   resourceVersion: "1"
+  labels:
+    higress.io/domain_higress-default-domain: "true"
+    higress.io/resource-definer: higress
   annotations:
     higress.io/destination: higress-console.static
     higress.io/ignore-path-case: "false"
