@@ -32,4 +32,6 @@ export MCP_SERVER_WASM_IMAGE_URL
     --gatewaySelectorValue=higress-system-higress-gateway \
     --gatewayHttpPort=$GATEWAY_HTTP_PORT \
     --gatewayHttpsPort=$GATEWAY_HTTPS_PORT \
-    --ingressClass=
+    --ingressClass= \
+    --enableAutomaticHttps=${GATEWAY_AUTO_HTTPS_ENABLED:-true} \
+    --automaticHttpsEmail=$GATEWAY_AUTO_HTTPS_EMAIL
