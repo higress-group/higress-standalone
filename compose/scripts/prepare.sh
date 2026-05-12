@@ -189,6 +189,44 @@ EOF
   fi
 }
 
+checkController() {
+  echo "Checking controller configurations..."
+
+  checkConfigExists "higress-system" "networking.istio.io/v1alpha3" "envoyfilters" "higress-http-resolver-cluster"
+  if [ $? -ne 0 ]; then
+    echo "  The EnvoyFilter resource \"higress-http-resolver-cluster\" doesn't exist. Create it now..."
+    read -r -d '' content <<EOF
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: higress-http-resolver-cluster
+  namespace: higress-system
+spec:
+  configPatches:
+    - applyTo: CLUSTER
+      match:
+        context: GATEWAY
+      patch:
+        operation: ADD
+        value:
+          name: "outbound|8889||higress-controller.higress-system.svc.cluster.local"
+          type: STRICT_DNS
+          connect_timeout: 5s
+          lb_policy: ROUND_ROBIN
+          load_assignment:
+            cluster_name: "outbound|8889||higress-controller.higress-system.svc.cluster.local"
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: controller.svc
+                          port_value: 8889
+EOF
+    publishConfig "higress-system" "networking.istio.io/v1alpha3" "envoyfilters" "higress-http-resolver-cluster" "$content"
+  fi
+}
+
 checkPilot() {
   echo "Checking pilot configurations..."
 
@@ -728,6 +766,7 @@ checkO11y() {
 }
 
 checkStorage
+checkController
 checkPilot
 checkGateway
 checkConsole
