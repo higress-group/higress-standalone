@@ -21,8 +21,13 @@ if [ "${HAS_DOCKER}" != "true" ]; then
   echo "Docker is required"
   exit 1
 fi
-if [ "${HAS_DOCKER_COMPOSE}" != "true" -a "${HAS_DOCKER_DASH_COMPOSE}" != "true" ]; then
-  echo "Docker Compose is required"
+
+if [ "${HAS_DOCKER_COMPOSE}" != "true" -a  ]; then
+  if ["${HAS_DOCKER_DASH_COMPOSE}" == "true"]; then
+    echo "Found Docker Compose v1, which isn't supported. Please upgrade to Docker Compose v2 or a higher version."
+  else
+    echo "Docker Compose is required"
+  fi
   exit 1
 fi
 
