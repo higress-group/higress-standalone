@@ -22,6 +22,7 @@ import (
 	"net"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/endpoints/openapi"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -36,6 +37,10 @@ import (
 	"github.com/alibaba/higress/api-server/pkg/options"
 )
 
+const (
+	defaultMaxRequestBodyBytes = 100 * 1024 * 1024
+)
+
 // HigressServerOptions contains state for master/api server
 type HigressServerOptions struct {
 	RecommendedOptions *genericoptions.RecommendedOptions
@@ -47,6 +52,8 @@ type HigressServerOptions struct {
 	StdErr                io.Writer
 
 	AlternateDNS []string
+
+	MaxRequestBodyBytes int64
 }
 
 // NewHigressServerOptions returns a new HigressServerOptions
@@ -56,12 +63,21 @@ func NewHigressServerOptions(out, errOut io.Writer) *HigressServerOptions {
 			"",
 			apiserver.Codecs.LegacyCodec(),
 		),
-		AuthOptions:    options.CreateAuthOptions(),
-		StorageOptions: options.CreateStorageOptions(),
-		StdOut:         out,
-		StdErr:         errOut,
+		AuthOptions:         options.CreateAuthOptions(),
+		StorageOptions:      options.CreateStorageOptions(),
+		StdOut:              out,
+		StdErr:              errOut,
+		MaxRequestBodyBytes: defaultMaxRequestBodyBytes,
 	}
 	return o
+}
+
+func (o *HigressServerOptions) AddFlags(fs *pflag.FlagSet) {
+	if o == nil {
+		return
+	}
+
+	fs.Int64Var(&o.MaxRequestBodyBytes, "max-request-body-bytes", o.MaxRequestBodyBytes, "The maximum size in bytes of a request body accepted on write requests. 0 means no limit.")
 }
 
 // Validate validates HigressServerOptions
@@ -70,6 +86,9 @@ func (o *HigressServerOptions) Validate(args []string) error {
 	errors = append(errors, validate(o.RecommendedOptions)...)
 	errors = append(errors, o.AuthOptions.Validate()...)
 	errors = append(errors, o.StorageOptions.Validate()...)
+	if o.MaxRequestBodyBytes < 0 {
+		errors = append(errors, fmt.Errorf("--max-request-body-bytes can not be a negative value"))
+	}
 	return utilerrors.NewAggregate(errors)
 }
 
@@ -130,6 +149,8 @@ func (o *HigressServerOptions) Config() (*apiserver.Config, error) {
 	}
 
 	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
+
+	serverConfig.MaxRequestBodyBytes = o.MaxRequestBodyBytes
 
 	serverConfig.SkipOpenAPIInstallation = true
 
@@ -242,6 +263,7 @@ func NewCommandStartHigressServer(defaults *HigressServerOptions, stopCh <-chan 
 	}
 
 	flags := cmd.Flags()
+	o.AddFlags(flags)
 	o.RecommendedOptions.AddFlags(flags)
 	o.AuthOptions.AddFlags(flags)
 	o.StorageOptions.AddFlags(flags)
