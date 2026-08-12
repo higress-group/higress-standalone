@@ -5,14 +5,18 @@ ARG CONSOLE_VERSION=2.2.3
 ARG APISERVER_VERSION=0.1.0
 ARG ENVOY_VERSION=2.2.3
 ARG PLUGIN_SERVER_VERSION=2.2.3
+ARG CONTROLLER_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress:2.2.3
+ARG PILOT_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/pilot:2.2.3
+ARG GATEWAY_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/gateway:2.2.3
+ARG PLUGIN_SERVER_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/plugin-server:2.2.3
 
 FROM ${HUB}/api-server:${APISERVER_VERSION} AS apiserver
-FROM ${HUB}/higress:${CORE_VERSION} AS controller
-FROM ${HUB}/pilot:${CORE_VERSION} AS pilot
-FROM ${HUB}/gateway:${CORE_VERSION} AS gateway
+FROM ${CONTROLLER_IMAGE} AS controller
+FROM ${PILOT_IMAGE} AS pilot
+FROM ${GATEWAY_IMAGE} AS gateway
 FROM ${HUB}/console:${CONSOLE_VERSION} AS console
 FROM ${HUB}/eclipse-temurin:21-jre AS jdk
-FROM ${HUB}/plugin-server:${PLUGIN_SERVER_VERSION} AS plugin-server
+FROM ${PLUGIN_SERVER_IMAGE} AS plugin-server
 
 FROM ${HUB}/base:${BASE_VERSION}
 

@@ -121,7 +121,7 @@ services:
 
   controller:
     hostname: higress-controller
-    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress:${HIGRESS_CONTROLLER_TAG}
+    image: ${HIGRESS_CONTROLLER_IMAGE}
     command:
       - serve
       - --kubeconfig=/home/higress/.kube/config
@@ -153,7 +153,7 @@ services:
 
   pilot:
     hostname: higress-pilot
-    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/pilot:${HIGRESS_PILOT_TAG}
+    image: ${HIGRESS_PILOT_IMAGE}
     command:
       - discovery
       - --monitoringAddr=:15014
@@ -186,7 +186,7 @@ services:
 
   gateway:
     hostname: higress-gateway
-    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/gateway:${HIGRESS_GATEWAY_TAG}
+    image: ${HIGRESS_GATEWAY_IMAGE}
     command:
       - proxy
       - router
@@ -236,7 +236,7 @@ services:
 
   plugin-server:
     hostname: higress-plugin-server
-    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/plugin-server:${HIGRESS_PLUGIN_SERVER_TAG}
+    image: ${HIGRESS_PLUGIN_SERVER_IMAGE}
     profiles: [ "plugin-server" ]
     depends_on:
       prepare:

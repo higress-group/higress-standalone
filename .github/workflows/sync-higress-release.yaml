@@ -1,0 +1,109 @@
+name: Sync Exact Higress Release Pins
+on:
+  repository_dispatch:
+    types: [higress-release-published]
+  workflow_dispatch:
+    inputs:
+      release_input: {required: true, type: string, description: "Verified immutable release input JSON"}
+      dry_run: {required: true, default: true, type: boolean}
+permissions:
+  contents: read
+concurrency:
+  group: standalone-release-${{ github.event.client_payload.idempotencyKey || github.run_id }}
+  cancel-in-progress: false
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        if: ${{ !inputs.dry_run }}
+        id: app-token
+        with:
+          app-id: ${{ vars.STANDALONE_RELEASE_APP_ID }}
+          private-key: ${{ secrets.STANDALONE_RELEASE_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          token: ${{ inputs.dry_run && github.token || steps.app-token.outputs.token }}
+      - uses: oras-project/setup-oras@ca28077386065e263c03428f4ae0c09024817c93 # v1.2.0
+        with:
+          version: 1.2.3
+      - name: Validate immutable event and independently resolve upstreams
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ toJson(github.event.client_payload) }}
+          INPUT: ${{ inputs.release_input }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = repository_dispatch ]; then evidence=$(jq -r .evidence <<<"$EVENT"); received_sha=$(jq -r .evidenceSha256 <<<"$EVENT"); received_key=$(jq -r .idempotencyKey <<<"$EVENT"); else evidence="$INPUT"; received_sha=$(printf '%s' "$INPUT" | sha256sum | awk '{print $1}'); received_key=$received_sha; fi
+          printf '%s' "$evidence" | jq -cS . >/tmp/release.json
+          test "$(sha256sum /tmp/release.json | awk '{print $1}')" = "$received_sha"; test "$received_key" = "$received_sha"
+          PYTHONPATH=tools python3 -c 'import json,sys; from release_evidence import validate,evidence_hash; value=json.load(open("/tmp/release.json")); validate(value); assert evidence_hash(value)==sys.argv[1]' "$received_sha"
+          jq -e '(.schemaVersion == 1) and (.gatewayVersion|test("^[0-9]+\\.[0-9]+\\.[0-9]+$")) and (.higress.releaseId|type == "number") and (.higress.tag|test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")) and (.higress.commit|test("^[0-9a-f]{40}$")) and (.snapshot.sha256|test("^[0-9a-f]{64}$")) and (.console.releaseId|type == "number") and (.console.commit|test("^[0-9a-f]{40}$")) and (.console.chartDigest|test("^sha256:[0-9a-f]{64}$")) and (.pluginServer.digest|test("^sha256:[0-9a-f]{64}$"))' /tmp/release.json
+          tag=$(jq -r .higress.tag /tmp/release.json); commit=$(jq -r .higress.commit /tmp/release.json)
+          expected_snapshot="plugins/release/snapshots/$(jq -r .gatewayVersion /tmp/release.json).json"
+          test "$(jq -r .snapshot.path /tmp/release.json)" = "$expected_snapshot"
+          higress_release=$(gh api "repos/higress-group/higress/releases/$(jq -r .higress.releaseId /tmp/release.json)")
+          test "$(jq -r .tag_name <<<"$higress_release")" = "$tag"
+          test "$(jq -r .draft <<<"$higress_release")" = false; test "$(jq -r .prerelease <<<"$higress_release")" = false
+          tag_ref=$(gh api "repos/higress-group/higress/git/ref/tags/$tag")
+          tag_type=$(jq -er .object.type <<<"$tag_ref"); tag_object=$(jq -er .object.sha <<<"$tag_ref")
+          if [ "$tag_type" = tag ]; then resolved=$(gh api "repos/higress-group/higress/git/tags/$tag_object" --jq .object.sha); else test "$tag_type" = commit; resolved=$tag_object; fi
+          test "$resolved" = "$commit"
+          curl --fail --silent --show-error "https://raw.githubusercontent.com/higress-group/higress/$commit/$expected_snapshot" -o /tmp/snapshot.json
+          test "$(sha256sum /tmp/snapshot.json | awk '{print $1}')" = "$(jq -r .snapshot.sha256 /tmp/release.json)"
+          mcp=$(jq -r '.plugins[] | select(.logicalId == "mcp-server") | .version' /tmp/snapshot.json); test -n "$mcp"
+          console=$(jq -r .console.chartRef /tmp/release.json); console=${console##*:}; [[ "$console" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          console_release=$(gh api "repos/higress-group/higress-console/releases/$(jq -r .console.releaseId /tmp/release.json)")
+          test "$(jq -r .tag_name <<<"$console_release")" = "$(jq -r .console.tag /tmp/release.json)"
+          test "$(jq -r .draft <<<"$console_release")" = false; test "$(jq -r .prerelease <<<"$console_release")" = false
+          asset_id=$(jq -r .console.provenanceAssetId /tmp/release.json)
+          jq -e --argjson asset "$asset_id" '.assets[] | select(.id == $asset and .name == "plugin-release-provenance.json")' <<<"$console_release" >/dev/null
+          gh api "repos/higress-group/higress-console/releases/assets/$asset_id" -H 'Accept: application/octet-stream' > /tmp/console-provenance.json
+          test "$(sha256sum /tmp/console-provenance.json | awk '{print $1}')" = "$(jq -r .console.provenanceAssetSha256 /tmp/release.json)"
+          console_ref=$(gh api "repos/higress-group/higress-console/git/ref/tags/$(jq -r .console.tag /tmp/release.json)"); console_type=$(jq -er .object.type <<<"$console_ref"); console_object=$(jq -er .object.sha <<<"$console_ref"); if [ "$console_type" = tag ]; then console_commit=$(gh api "repos/higress-group/higress-console/git/tags/$console_object" --jq .object.sha); else test "$console_type" = commit; console_commit=$console_object; fi
+          test "$console_commit" = "$(jq -r .console.commit /tmp/release.json)"
+          snapshot_source=$(jq -r .sourceCommit /tmp/snapshot.json)
+          jq -e --arg snapshot "$(jq -r .snapshot.sha256 /tmp/release.json)" --arg chart "$(jq -r .console.chartDigest /tmp/release.json)" --arg chartRef "$(jq -r .console.chartRef /tmp/release.json)" --arg source "$snapshot_source" --arg commit "$console_commit" --arg tag "$(jq -r .console.tag /tmp/release.json)" '.schemaVersion == 1 and .tag == $tag and .commit == $commit and .pluginLock.snapshotSha256 == $snapshot and .pluginLock.sourceCommit == $source and .chart.ref == $chartRef and .chart.digest == $chart' /tmp/console-provenance.json >/dev/null
+          jq -cS '[.plugins[] | select(.consumers.console != null) | {key:.consumers.console.propertyKey,resourceDir:.consumers.console.resourceDir,version,ociRef:("oci://" + .ociRef),digest}] | sort_by(.key)' /tmp/snapshot.json >/tmp/snapshot-console-map.json
+          jq -cS '[.pluginLock.plugins | to_entries[] | {key:.key,resourceDir:.value.resourceDir,version:.value.version,ociRef:.value.ociRef,digest:.value.digest}] | sort_by(.key)' /tmp/console-provenance.json >/tmp/console-map.json
+          cmp /tmp/snapshot-console-map.json /tmp/console-map.json
+          verify_plugin_server() { expected=$(jq -c .pluginServer /tmp/release.json); ref=$(jq -r .ref <<<"$expected"); digest=$(jq -r .digest <<<"$expected"); test "$(oras manifest fetch "$ref" --descriptor --format json | jq -r .digest)" = "$digest"; oras manifest fetch "$ref@$digest" --raw >/tmp/index.json; platforms=$(jq -c '[.manifests[] | .platform.os + "/" + .platform.architecture] | sort' /tmp/index.json); labels='{}'; while IFS=$'\t' read -r child platform; do manifest=$(oras manifest fetch "$ref@$child"); config=$(jq -r .config.digest <<<"$manifest"); value=$(oras blob fetch "$ref@$child" "$config" -o - | jq -c '.config.Labels // {}'); labels=$(jq --arg platform "$platform" --argjson value "$value" '.[$platform]=$value' <<<"$labels"); done < <(jq -r '.manifests[] | [.digest, (.platform.os + "/" + .platform.architecture)] | @tsv' /tmp/index.json); jq -cn --arg ref "$ref" --arg digest "$digest" --argjson platforms "$platforms" --argjson labels "$labels" '{ref:$ref,digest:$digest,platforms:$platforms,labelsByPlatform:$labels}' >/tmp/resolved.json; PYTHONPATH=tools python3 -c 'import json; from release_evidence import verify_resolved_image; verify_resolved_image(json.load(open("/tmp/release.json"))["pluginServer"],json.load(open("/tmp/resolved.json")))'; }
+          verify_gateway_image() { name=$1; expected=$(jq -c --arg name "$name" '.gatewayImages[$name]' /tmp/release.json); ref=$(jq -r .ref <<<"$expected"); digest=$(jq -r .digest <<<"$expected"); test "$(oras manifest fetch "$ref" --descriptor --format json | jq -r .digest)" = "$digest"; oras manifest fetch "$ref@$digest" --raw >/tmp/index.json; platforms=$(jq -c '[.manifests[] | .platform.os + "/" + .platform.architecture] | sort' /tmp/index.json); annotations='{}'; while IFS=$'\t' read -r platform value; do annotations=$(jq --arg platform "$platform" --argjson value "$value" '.[$platform]=$value' <<<"$annotations"); done < <(jq -r '.manifests[] | [(.platform.os + "/" + .platform.architecture), ((.annotations // {}) | tojson)] | @tsv' /tmp/index.json); jq -cn --arg ref "$ref" --arg digest "$digest" --argjson platforms "$platforms" --argjson annotations "$annotations" '{ref:$ref,digest:$digest,platforms:$platforms,annotationsByPlatform:$annotations}' >/tmp/resolved.json; PYTHONPATH=tools python3 -c 'import json; from release_evidence import verify_resolved_image; verify_resolved_image(json.load(open("/tmp/release.json"))["gatewayImages"]["'"$name"'"],json.load(open("/tmp/resolved.json")))'; }
+          verify_plugin_server; verify_gateway_image controller; verify_gateway_image pilot; verify_gateway_image gateway
+          PYTHONPATH=tools python3 -c 'import json; from release_evidence import derive_pins; value=json.load(open("/tmp/release.json")); value.update(derive_pins(value)); json.dump(value,open("/tmp/verified-pins.json","w"),sort_keys=True)'
+          plugin=$(jq -r .pluginServer.ref /tmp/release.json); plugin=${plugin##*:}; test "$plugin" = "$(jq -r .gatewayVersion /tmp/release.json)"
+          jq --arg console "$console" --arg mcp "$mcp" --arg plugin "$plugin" --arg key "$received_key" '.consoleVersion=$console | .mcpServerVersion=$mcp | .pluginServerVersion=$plugin | .idempotencyKey=$key' /tmp/verified-pins.json >/tmp/render.json
+      - name: Render release pins
+        run: |
+          set -euo pipefail
+          python3 tools/render_release_pins.py --input /tmp/render.json
+          git diff --check
+      - name: Dry-run summary
+        if: ${{ inputs.dry_run }}
+        run: |
+          echo "Dry run: immutable inputs verified and rendered; no PR was created." >> "$GITHUB_STEP_SUMMARY"
+      - name: Create or update deterministic release dependency PR
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          key=$(jq -r .idempotencyKey /tmp/render.json); branch="release/higress-${key:0:12}"
+          base=$(jq -r .standaloneBaseCommit /tmp/render.json)
+          lookup=/tmp/branch-lookup.err
+          if remote=$(gh api "repos/higress-group/higress-standalone/git/ref/heads/$branch" 2>"$lookup"); then
+            remote_sha=$(jq -r .object.sha <<<"$remote")
+            git fetch origin "$branch"; git checkout -B "$branch" "$remote_sha"
+            jq -e --arg key "$key" --arg base "$base" '.idempotencyKey == $key and .standaloneBaseCommit == $base' release-provenance.json >/dev/null
+          elif grep -Eqi 'HTTP 404|Not Found' "$lookup"; then
+            git fetch origin "$base"; test "$(git rev-parse "$base^{commit}")" = "$base"; git checkout -B "$branch" "$base"
+          else
+            cat "$lookup" >&2; echo "deterministic branch lookup failed" >&2; exit 1
+          fi
+          git config user.name "higress-standalone-release-bot"; git config user.email "release-bot@higress.io"
+          git add all-in-one/Dockerfile compose/.env bin/configure.sh all-in-one/scripts/start-controller.sh release-provenance.json
+          git commit -m "chore: pin immutable Higress release" || true
+          git push --force-with-lease origin "$branch"
+          existing=$(gh pr list --head "$branch" --base main --state open --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then gh pr edit "$existing" --title "chore: pin immutable Higress release" --body "Immutable idempotency key: $key"; else gh pr create --base main --head "$branch" --title "chore: pin immutable Higress release" --body "Immutable idempotency key: $key"; fi
