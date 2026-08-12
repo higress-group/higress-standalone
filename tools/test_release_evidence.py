@@ -1,3 +1,4 @@
+import pathlib
 import unittest
 from release_evidence import derive_pins, evidence_hash, validate, verify_resolved_image
 
@@ -49,6 +50,12 @@ class EvidenceTest(unittest.TestCase):
         bad = dict(expected); bad["annotationsByPlatform"] = {"linux/amd64": {}}
         with self.assertRaisesRegex(ValueError, "provenance"):
             verify_resolved_image(expected, bad)
+
+    def test_release_receiver_pairs_oras_setup_metadata_with_pinned_cli(self):
+        workflow = (pathlib.Path(__file__).resolve().parents[1] / ".github/workflows/sync-higress-release.yaml").read_text(encoding="utf-8")
+        self.assertNotIn("oras-project/setup-oras@ca28077386065e263c03428f4ae0c09024817c93", workflow)
+        self.assertEqual(1, workflow.count("version: 1.2.3"))
+        self.assertEqual(1, workflow.count("oras-project/setup-oras@8d34698a59f5ffe24821f0b48ab62a3de8b64b20 # v1.2.3\n        with:\n          version: 1.2.3"))
 
 
 if __name__ == "__main__":
