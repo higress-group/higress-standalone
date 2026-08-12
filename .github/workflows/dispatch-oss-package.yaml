@@ -1,0 +1,38 @@
+name: Dispatch Exact Standalone Release to Higress OSS Packaging
+on:
+  release:
+    types: [published]
+permissions:
+  contents: read
+jobs:
+  dispatch:
+    if: ${{ startsWith(github.event.release.tag_name, 'v') }}
+    runs-on: ubuntu-latest
+    environment: higress-oss-dispatch
+    steps:
+      - uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        id: app-token
+        with:
+          app-id: ${{ vars.HIGRESS_OSS_DISPATCH_APP_ID }}
+          private-key: ${{ secrets.HIGRESS_OSS_DISPATCH_APP_PRIVATE_KEY }}
+          owner: higress-group
+          repositories: higress
+      - name: Resolve exact tag and dispatch checksums
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TAG: ${{ github.event.release.tag_name }}
+          RELEASE_ID: ${{ github.event.release.id }}
+        run: |
+          set -euo pipefail
+          release=$(gh api "repos/higress-group/higress-standalone/releases/$RELEASE_ID"); test "$(jq -r .tag_name <<<"$release")" = "$TAG"
+          commit=$(git ls-remote https://github.com/higress-group/higress-standalone.git "refs/tags/$TAG^{}" | awk '{print $1}')
+          if [ -z "$commit" ]; then commit=$(git ls-remote https://github.com/higress-group/higress-standalone.git "refs/tags/$TAG" | awk '{print $1}'); fi
+          test -n "$commit"
+          archive="https://github.com/higress-group/higress-standalone/archive/refs/tags/$TAG.tar.gz"
+          installer="https://raw.githubusercontent.com/higress-group/higress-standalone/$TAG/src/get-higress.sh"
+          curl --fail --silent --show-error --location "$archive" -o /tmp/archive.tgz
+          curl --fail --silent --show-error --location "$installer" -o /tmp/get-higress.sh
+          archive_sha=$(sha256sum /tmp/archive.tgz | awk '{print $1}'); installer_sha=$(sha256sum /tmp/get-higress.sh | awk '{print $1}')
+          payload=$(jq -cn --argjson releaseId "$RELEASE_ID" --arg tag "$TAG" --arg commit "$commit" --arg archive "$archive_sha" --arg installer "$installer_sha" '{releaseId:$releaseId,tag:$tag,commit:$commit,archiveSha256:$archive,installerSha256:$installer,dryRun:false}')
+          canonical=$(printf '%s' "$payload" | jq -cS .); key=$(printf '%s' "$canonical" | sha256sum | awk '{print $1}')
+          gh api repos/higress-group/higress/dispatches -f event_type=standalone-package-ready -f "client_payload[tag]=$TAG" -f "client_payload[releaseId]=$RELEASE_ID" -f "client_payload[commit]=$commit" -f "client_payload[archiveSha256]=$archive_sha" -f "client_payload[installerSha256]=$installer_sha" -f "client_payload[dryRun]=false" -f "client_payload[idempotencyKey]=$key"
