@@ -14,6 +14,8 @@ concurrency:
 jobs:
   render:
     runs-on: ubuntu-latest
+    # STANDALONE_RELEASE_APP_PRIVATE_KEY is scoped to this protected environment.
+    environment: standalone-release-sync
     steps:
       - uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
         if: ${{ !inputs.dry_run }}
