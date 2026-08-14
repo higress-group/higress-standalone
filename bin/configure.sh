@@ -37,11 +37,11 @@ source "$ROOT/bin/base.sh"
 
 source "$COMPOSE_ROOT/.env"
 
-HIGRESS_PLUGIN_SERVER_TAG=${HIGRESS_PLUGIN_SERVER_TAG:-2.2.3}
-HIGRESS_CONTROLLER_IMAGE=${HIGRESS_CONTROLLER_IMAGE:-higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress:${HIGRESS_CONTROLLER_TAG}}
-HIGRESS_PILOT_IMAGE=${HIGRESS_PILOT_IMAGE:-higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/pilot:${HIGRESS_PILOT_TAG}}
-HIGRESS_GATEWAY_IMAGE=${HIGRESS_GATEWAY_IMAGE:-higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/gateway:${HIGRESS_GATEWAY_TAG}}
-HIGRESS_PLUGIN_SERVER_IMAGE=${HIGRESS_PLUGIN_SERVER_IMAGE:-higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/plugin-server:${HIGRESS_PLUGIN_SERVER_TAG}}
+HIGRESS_PLUGIN_SERVER_TAG=${HIGRESS_PLUGIN_SERVER_TAG:-2.2.4}
+HIGRESS_CONTROLLER_IMAGE=${HIGRESS_CONTROLLER_IMAGE:-higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress:2.2.4@sha256:0a5b7809a107cbec150f41352a156e31160b8a92df787798e2a9a06cdd5587da}
+HIGRESS_PILOT_IMAGE=${HIGRESS_PILOT_IMAGE:-higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/pilot:2.2.4@sha256:f742ed20f938c5c1eaf6f8c36c6481a87052d06e903ab6cb0c079165ac0c8284}
+HIGRESS_GATEWAY_IMAGE=${HIGRESS_GATEWAY_IMAGE:-higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/gateway:2.2.4@sha256:3dbd609df5db3fca61653eafe0e2310705e485190c4f8cd02d9aab8f07dcf329}
+HIGRESS_PLUGIN_SERVER_IMAGE=${HIGRESS_PLUGIN_SERVER_IMAGE:-higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/plugin-server:2.2.4@sha256:05a3e3615434befdb89928e491a8833255733c099dd24faefe82fea4d63165bb}
 
 CONFIGURED_MARK="$COMPOSE_ROOT/.configured"
 
@@ -660,7 +660,7 @@ writeConfiguration() {
   # Generate wasm plugin URL variables
   if [ "$USE_PLUGIN_SERVER" == "Y" ]; then
     WASM_PLUGIN_URL_PATTERN="http://plugin-server:8080/plugins/\${name}/\${version}/plugin.wasm"
-    MCP_SERVER_WASM_URL="http://plugin-server:8080/plugins/mcp-server/1.0.0/plugin.wasm"
+    MCP_SERVER_WASM_URL="http://plugin-server:8080/plugins/mcp-server/2.0.1/plugin.wasm"
   else
     WASM_PLUGIN_URL_PATTERN=''
     MCP_SERVER_WASM_URL=''
