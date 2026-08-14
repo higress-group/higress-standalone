@@ -1,6 +1,6 @@
 import pathlib
 import unittest
-from release_evidence import derive_pins, evidence_hash, validate, verify_resolved_image
+from release_evidence import canonical_bytes, derive_pins, evidence_hash, validate, verify_resolved_image
 
 
 def evidence():
@@ -16,6 +16,8 @@ class EvidenceTest(unittest.TestCase):
         item = evidence()
         self.assertEqual(evidence_hash(item), evidence_hash(dict(reversed(list(item.items())))))
         self.assertEqual(derive_pins(item)["pluginServerDigest"], "sha256:" + "e" * 64)
+        self.assertEqual(canonical_bytes({"z": "雪", "a": 1}), b'{"a":1,"z":"\\u96ea"}')
+        self.assertFalse(canonical_bytes(item).endswith(b"\n"))
 
     def test_rejects_missing_and_drifted_identity(self):
         item = evidence(); item["console"].pop("chartDigest")
@@ -56,6 +58,17 @@ class EvidenceTest(unittest.TestCase):
         self.assertNotIn("oras-project/setup-oras@ca28077386065e263c03428f4ae0c09024817c93", workflow)
         self.assertEqual(1, workflow.count("version: 1.2.3"))
         self.assertEqual(1, workflow.count("oras-project/setup-oras@8d34698a59f5ffe24821f0b48ab62a3de8b64b20 # v1.2.3\n        with:\n          version: 1.2.3"))
+
+    def test_release_receiver_hashes_no_newline_canonical_json(self):
+        workflow = (pathlib.Path(__file__).resolve().parents[1] / ".github/workflows/sync-higress-release.yaml").read_text(encoding="utf-8")
+        self.assertIn('canonical=$(printf \'%s\' "$evidence" | PYTHONPATH=tools python3', workflow)
+        self.assertIn('from release_evidence import canonical_bytes', workflow)
+        self.assertIn('canonical_bytes(json.load(sys.stdin))', workflow)
+        self.assertIn('printf \'%s\' "$canonical" >/tmp/release.json', workflow)
+        self.assertIn('canonical_sha=$(printf \'%s\' "$canonical" | sha256sum', workflow)
+        self.assertIn('test "$received_sha" = "$canonical_sha"; test "$received_key" = "$canonical_sha"', workflow)
+        self.assertNotIn('jq -cS . >/tmp/release.json', workflow)
+        self.assertNotIn('canonical=$(printf \'%s\' "$evidence" | jq', workflow)
 
     def test_release_receiver_uses_oras_12_and_accepts_only_paired_attestations(self):
         workflow = (pathlib.Path(__file__).resolve().parents[1] / ".github/workflows/sync-higress-release.yaml").read_text(encoding="utf-8")
