@@ -37,9 +37,11 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
-          if [ "$EVENT_NAME" = repository_dispatch ]; then evidence=$(jq -r .evidence <<<"$EVENT"); received_sha=$(jq -r .evidenceSha256 <<<"$EVENT"); received_key=$(jq -r .idempotencyKey <<<"$EVENT"); else evidence="$INPUT"; received_sha=$(printf '%s' "$INPUT" | sha256sum | awk '{print $1}'); received_key=$received_sha; fi
-          printf '%s' "$evidence" | jq -cS . >/tmp/release.json
-          test "$(sha256sum /tmp/release.json | awk '{print $1}')" = "$received_sha"; test "$received_key" = "$received_sha"
+          if [ "$EVENT_NAME" = repository_dispatch ]; then evidence=$(jq -r .evidence <<<"$EVENT"); received_sha=$(jq -r .evidenceSha256 <<<"$EVENT"); received_key=$(jq -r .idempotencyKey <<<"$EVENT"); else evidence="$INPUT"; received_sha=""; received_key=""; fi
+          canonical=$(printf '%s' "$evidence" | PYTHONPATH=tools python3 -c 'import json,sys; from release_evidence import canonical_bytes; sys.stdout.buffer.write(canonical_bytes(json.load(sys.stdin)))')
+          printf '%s' "$canonical" >/tmp/release.json
+          canonical_sha=$(printf '%s' "$canonical" | sha256sum | awk '{print $1}')
+          if [ "$EVENT_NAME" = repository_dispatch ]; then test "$received_sha" = "$canonical_sha"; test "$received_key" = "$canonical_sha"; else received_sha=$canonical_sha; received_key=$canonical_sha; fi
           PYTHONPATH=tools python3 -c 'import json,sys; from release_evidence import validate,evidence_hash; value=json.load(open("/tmp/release.json")); validate(value); assert evidence_hash(value)==sys.argv[1]' "$received_sha"
           jq -e '(.schemaVersion == 1) and (.gatewayVersion|test("^[0-9]+\\.[0-9]+\\.[0-9]+$")) and (.higress.releaseId|type == "number") and (.higress.tag|test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")) and (.higress.commit|test("^[0-9a-f]{40}$")) and (.snapshot.sha256|test("^[0-9a-f]{64}$")) and (.console.releaseId|type == "number") and (.console.commit|test("^[0-9a-f]{40}$")) and (.console.chartDigest|test("^sha256:[0-9a-f]{64}$")) and (.pluginServer.digest|test("^sha256:[0-9a-f]{64}$"))' /tmp/release.json
           tag=$(jq -r .higress.tag /tmp/release.json); commit=$(jq -r .higress.commit /tmp/release.json)
