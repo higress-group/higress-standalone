@@ -1,14 +1,14 @@
 ARG HUB=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress
 ARG BASE_VERSION=2022-10-27T19-02-22
-ARG CORE_VERSION=2.2.3
-ARG CONSOLE_VERSION=2.2.3
+ARG CORE_VERSION=2.2.4
+ARG CONSOLE_VERSION=2.2.4
 ARG APISERVER_VERSION=0.1.0
-ARG ENVOY_VERSION=2.2.3
-ARG PLUGIN_SERVER_VERSION=2.2.3
-ARG CONTROLLER_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress:2.2.3
-ARG PILOT_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/pilot:2.2.3
-ARG GATEWAY_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/gateway:2.2.3
-ARG PLUGIN_SERVER_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/plugin-server:2.2.3
+ARG ENVOY_VERSION=2.2.4
+ARG PLUGIN_SERVER_VERSION=2.2.4
+ARG CONTROLLER_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress:2.2.4@sha256:0a5b7809a107cbec150f41352a156e31160b8a92df787798e2a9a06cdd5587da
+ARG PILOT_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/pilot:2.2.4@sha256:f742ed20f938c5c1eaf6f8c36c6481a87052d06e903ab6cb0c079165ac0c8284
+ARG GATEWAY_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/gateway:2.2.4@sha256:3dbd609df5db3fca61653eafe0e2310705e485190c4f8cd02d9aab8f07dcf329
+ARG PLUGIN_SERVER_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/plugin-server:2.2.4@sha256:05a3e3615434befdb89928e491a8833255733c099dd24faefe82fea4d63165bb
 
 FROM ${HUB}/api-server:${APISERVER_VERSION} AS apiserver
 FROM ${CONTROLLER_IMAGE} AS controller

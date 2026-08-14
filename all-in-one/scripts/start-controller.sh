@@ -21,7 +21,7 @@ set -e
 
 # Use HTTP for loading wasm plugins from plugin-server
 if [ "$USE_PLUGIN_SERVER" == "on" -a -z "$MCP_SERVER_WASM_IMAGE_URL" ]; then
-    MCP_SERVER_WASM_IMAGE_URL="http://localhost:8002/plugins/mcp-server/1.0.0/plugin.wasm"
+    MCP_SERVER_WASM_IMAGE_URL="http://localhost:8002/plugins/mcp-server/2.0.1/plugin.wasm"
 fi
 export MCP_SERVER_WASM_IMAGE_URL
 
