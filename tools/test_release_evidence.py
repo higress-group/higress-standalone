@@ -57,6 +57,17 @@ class EvidenceTest(unittest.TestCase):
         self.assertEqual(1, workflow.count("version: 1.2.3"))
         self.assertEqual(1, workflow.count("oras-project/setup-oras@8d34698a59f5ffe24821f0b48ab62a3de8b64b20 # v1.2.3\n        with:\n          version: 1.2.3"))
 
+    def test_release_receiver_uses_oras_12_and_accepts_only_paired_attestations(self):
+        workflow = (pathlib.Path(__file__).resolve().parents[1] / ".github/workflows/sync-higress-release.yaml").read_text(encoding="utf-8")
+        self.assertNotIn("--descriptor --format json", workflow)
+        self.assertNotIn(" --raw", workflow)
+        self.assertNotIn('oras blob fetch "$ref@$child" "$config"', workflow)
+        self.assertIn('oras blob fetch "$repo@$config" -o -', workflow)
+        self.assertIn('verify_plugin_server_index /tmp/index.json', workflow)
+        self.assertIn('.annotations["vnd.docker.reference.type"] == "attestation-manifest"', workflow)
+        self.assertIn('([$extra[].annotations["vnd.docker.reference.digest"]] | sort) == ([$runnable[].digest] | sort)', workflow)
+        self.assertIn('select(.platform.os == "linux" and (.platform.architecture == "amd64" or .platform.architecture == "arm64"))', workflow)
+
 
 if __name__ == "__main__":
     unittest.main()
