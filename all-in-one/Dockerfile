@@ -46,6 +46,13 @@ COPY --from=console /app /app
 # Install plugin-server (nginx with wasm plugins)
 COPY --from=plugin-server /usr/share/nginx/html/plugins /usr/share/nginx/html/plugins
 
+# Legacy plugin version compatibility (#4694): the console SDK's spec.yaml for
+# nine plugins still references 1.0.0 while the plugin-server image only carries
+# 2.0.0+. Serve the historical 1.0.0 wasm bytes (pulled from the plugin registry,
+# the exact binaries plugin-server served in 2.2.3) so console-generated URLs
+# resolve. Remove this directory when the console spec.yaml versions are synced.
+COPY all-in-one/compat-plugins/ /usr/share/nginx/html/plugins/
+
 # Install JDK required by console
 ENV JAVA_HOME=/opt/java/openjdk
 COPY --from=jdk $JAVA_HOME $JAVA_HOME
