@@ -69,10 +69,13 @@ RUN arch="$(dpkg --print-architecture)"; \
   wget -q "https://github.com/higress-group/proxy/releases/download/v${ENVOY_VERSION}/envoy-${envoy_arch}.tar.gz" -O /tmp/envoy.tar.gz && \
   tar -xzf /tmp/envoy.tar.gz -C / && \
   rm /tmp/envoy.tar.gz && \
-  chmod +x /usr/local/bin/envoy; \
-  arch="${arch##*-}"; \
-  wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$arch -O /usr/local/bin/yq && chmod +x /usr/local/bin/yq; \
-  mkdir -p /var/log/higress; \
+  chmod +x /usr/local/bin/envoy && \
+  test -x /usr/local/bin/envoy && \
+  arch="${arch##*-}" && \
+  wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$arch -O /usr/local/bin/yq && \
+  chmod +x /usr/local/bin/yq && \
+  test -x /usr/local/bin/yq && \
+  mkdir -p /var/log/higress && \
   mkdir /data;
 
 COPY ./supervisord/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
