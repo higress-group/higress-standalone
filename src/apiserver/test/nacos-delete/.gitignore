@@ -1,0 +1,3 @@
+# Runtime artifacts of the nacos-delete verification
+.runtime/
+certs/
