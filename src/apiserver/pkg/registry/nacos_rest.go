@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"reflect"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -46,6 +46,7 @@ const namesSuffix = "__names__"
 const namesGroup = constant.DEFAULT_GROUP
 const emptyNamesPlaceholder = "EMPTY"
 const defaultNacosCacheSyncDelay time.Duration = 500 * time.Millisecond
+const watcherQueueSize = 1024
 
 var (
 	nacosCacheSyncDelay = defaultNacosCacheSyncDelay
@@ -90,18 +91,20 @@ func NewNacosREST(
 		}
 	}
 	n := &nacosREST{
-		TableConvertor: rest.NewDefaultTableConvertor(groupResource),
-		groupResource:  groupResource,
-		codec:          codec,
-		configClient:   configClient,
-		isNamespaced:   isNamespaced,
-		singularName:   singularName,
-		dataIdPrefix:   strings.ToLower(groupResource.Resource),
-		newFunc:        newFunc,
-		newListFunc:    newListFunc,
-		attrFunc:       attrFunc,
-		watchers:       make(map[string]*nacosWatch, 10),
-		encryptionKey:  dataEncryptionKey,
+		TableConvertor:   rest.NewDefaultTableConvertor(groupResource),
+		groupResource:    groupResource,
+		codec:            codec,
+		configClient:     configClient,
+		isNamespaced:     isNamespaced,
+		singularName:     singularName,
+		dataIdPrefix:     strings.ToLower(groupResource.Resource),
+		newFunc:          newFunc,
+		newListFunc:      newListFunc,
+		attrFunc:         attrFunc,
+		watchers:         make(map[string]*nacosWatch, 10),
+		lastValidObjects: make(map[string]runtime.Object),
+		listenedConfigs:  make(map[string]vo.ConfigParam),
+		encryptionKey:    dataEncryptionKey,
 	}
 	n.namesDataId = n.dataIdPrefix + dataIdSeparator + namesSuffix
 	n.startBackgroundWatcher()
@@ -117,11 +120,41 @@ type nacosREST struct {
 	singularName  string
 	dataIdPrefix  string
 
+	// listRefreshMutex serializes every reconcile and every mutation of the
+	// state below. Lock order is listRefreshMutex -> watchersMutex; nothing
+	// may acquire listRefreshMutex while holding watchersMutex.
 	listRefreshMutex   sync.Mutex
 	listRefreshTicker  *time.Ticker
 	listConfigListened int32
-	watchersMutex      sync.RWMutex
-	watchers           map[string]*nacosWatch
+
+	// configItems is the raw snapshot of the last fully enumerated Nacos
+	// state, keyed by group + "/" + dataId. It is only committed after a
+	// complete SearchConfig pass, so a partial enumeration never masquerades
+	// as deletions.
+	configItems map[string]*model.ConfigItem
+
+	// lastValidObjects holds a deep copy of the last object successfully
+	// published to watchers for each key. Deletions always report this object,
+	// even if the raw config was overwritten with undecodable content before
+	// the delete was observed.
+	lastValidObjects map[string]runtime.Object
+
+	// listenedConfigs records listeners whose ListenConfig call succeeded, so
+	// failures can be retried by later reconciles.
+	listenedConfigs map[string]vo.ConfigParam
+
+	// snapshotReady reports whether at least one reconcile completed; watch
+	// bootstrap is built from that state instead of an independent list.
+	snapshotReady bool
+
+	// destroyed is set under listRefreshMutex; after it is true no reconcile
+	// runs and no new watchers are accepted.
+	destroyed bool
+	stopCh    chan struct{}
+	refreshCh chan struct{}
+
+	watchersMutex sync.RWMutex
+	watchers      map[string]*nacosWatch
 
 	newFunc     func() runtime.Object
 	newListFunc func() runtime.Object
@@ -130,32 +163,53 @@ type nacosREST struct {
 	encryptionKey []byte
 
 	namesDataId string
-	configItems map[string]*model.ConfigItem
 }
 
 func (n *nacosREST) GetSingularName() string {
 	return n.singularName
 }
 
-func (n *nacosREST) startBackgroundWatcher() {
-	if n.listRefreshTicker != nil {
+// requestRefresh performs a non-blocking, coalescing wake of the reconcile
+// loop. It is the only thing SDK callbacks are allowed to do: they must never
+// touch the reconcile state or publish events directly.
+func (n *nacosREST) requestRefresh() {
+	if n.refreshCh == nil {
 		return
 	}
+	select {
+	case n.refreshCh <- struct{}{}:
+	default:
+	}
+}
 
+func (n *nacosREST) startBackgroundWatcher() {
 	n.listRefreshMutex.Lock()
 	defer n.listRefreshMutex.Unlock()
 
-	if n.listRefreshTicker != nil {
+	if n.destroyed || n.listRefreshTicker != nil {
 		return
 	}
 
+	n.refreshCh = make(chan struct{}, 1)
+	n.stopCh = make(chan struct{})
 	n.listRefreshTicker = time.NewTicker(time.Duration(options.NacosListRefreshIntervalSecs) * time.Second)
-	go func(n *nacosREST) {
-		for {
-			<-n.listRefreshTicker.C
+	// The loop owns the ticker reference: Destroy may nil out the struct
+	// field concurrently, and the select must never dereference it.
+	ticker := n.listRefreshTicker
+	go n.backgroundLoop(ticker)
+}
+
+func (n *nacosREST) backgroundLoop(ticker *time.Ticker) {
+	for {
+		select {
+		case <-n.stopCh:
+			return
+		case <-ticker.C:
+			n.listRefreshTickerFunc()
+		case <-n.refreshCh:
 			n.listRefreshTickerFunc()
 		}
-	}(n)
+	}
 }
 
 func (n *nacosREST) listRefreshTickerFunc() {
@@ -175,27 +229,73 @@ func (n *nacosREST) watchNamesConfig() error {
 		DataId: n.namesDataId,
 		Group:  namesGroup,
 		OnChange: func(namespace, group, dataId, data string) {
-			n.refreshConfigList()
+			n.requestRefresh()
 		},
 	})
 }
 
+// Destroy stops the reconcile loop, cancels every SDK listener and detaches
+// all watchers. It is idempotent and never waits for watcher consumers; it
+// must not be called while holding listRefreshMutex from outside.
 func (n *nacosREST) Destroy() {
 	n.listRefreshMutex.Lock()
-	defer n.listRefreshMutex.Unlock()
-	if n.listRefreshTicker != nil {
-		n.listRefreshTicker.Stop()
-		n.listRefreshTicker = nil
+	if n.destroyed {
+		n.listRefreshMutex.Unlock()
+		return
+	}
+	n.destroyed = true
+	ticker := n.listRefreshTicker
+	n.listRefreshTicker = nil
+	stopCh := n.stopCh
+
+	cancelParams := make([]vo.ConfigParam, 0, len(n.listenedConfigs)+1)
+	if atomic.LoadInt32(&n.listConfigListened) == 1 {
+		cancelParams = append(cancelParams, vo.ConfigParam{
+			DataId: n.namesDataId,
+			Group:  namesGroup,
+		})
+	}
+	for _, param := range n.listenedConfigs {
+		cancelParams = append(cancelParams, param)
+	}
+	n.listenedConfigs = make(map[string]vo.ConfigParam)
+	atomic.StoreInt32(&n.listConfigListened, 0)
+
+	n.watchersMutex.Lock()
+	watchers := n.watchers
+	n.watchers = make(map[string]*nacosWatch, 10)
+	n.watchersMutex.Unlock()
+	n.listRefreshMutex.Unlock()
+
+	// Everything below happens without listRefreshMutex: closing stopCh
+	// terminates the background loop and every watcher forwarder, and the
+	// CancelListenConfig calls are plain SDK invocations.
+	if stopCh != nil {
+		close(stopCh)
+	}
+	if ticker != nil {
+		ticker.Stop()
+	}
+	for _, param := range cancelParams {
+		if err := n.configClient.CancelListenConfig(param); err != nil {
+			klog.Errorf("failed to cancel listen config %s/%s: %v", param.Group, param.DataId, err)
+		}
+	}
+	for _, w := range watchers {
+		w.Stop()
 	}
 }
 
 func (n *nacosREST) notifyWatchers(ev watch.Event) {
 	n.watchersMutex.RLock()
 	defer n.watchersMutex.RUnlock()
+	if len(n.watchers) == 0 {
+		return
+	}
 	accessor, _ := meta.Accessor(ev.Object)
 	klog.Infof("event %s %s %s/%s count(watcher)=%d", ev.Type, ev.Object.GetObjectKind(), accessor.GetNamespace(), accessor.GetName(), len(n.watchers))
 	for _, w := range n.watchers {
-		w.SendEvent(ev, false)
+		w.enqueue(ev)
 	}
 }
 
@@ -479,39 +579,60 @@ func (n *nacosREST) objectDataId(ctx context.Context, name string) string {
 func (n *nacosREST) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	ns, _ := genericapirequest.NamespaceFrom(ctx)
 	predicate := n.buildListPredicate(options)
-	nw := &nacosWatch{
-		id:        uuid.New().String(),
-		f:         n,
-		ch:        make(chan watch.Event, 1024),
-		ns:        ns,
-		predicate: &predicate,
-	}
+	nw := newNacosWatch(n, ns, &predicate)
 
 	n.startBackgroundWatcher()
 
-	// On initial watch, send all the existing objects
-	list, err := n.List(ctx, options)
-	if err != nil {
-		return nil, err
+	// Bootstrap under listRefreshMutex so the initial snapshot and the watcher
+	// registration are atomic against reconcile: the watcher observes exactly
+	// "the Added events of one committed snapshot, then the increments that
+	// follow its registration", never a stale Added behind a newer Deleted.
+	n.listRefreshMutex.Lock()
+	if n.destroyed {
+		n.listRefreshMutex.Unlock()
+		return nil, fmt.Errorf("storage for %s is already destroyed", n.groupResource)
 	}
-
-	go func() {
-		danger := reflect.ValueOf(list).Elem()
-		items := danger.FieldByName("Items")
-
-		for i := 0; i < items.Len(); i++ {
-			nw.SendEvent(watch.Event{
-				Type:   watch.Added,
-				Object: listItemToRuntimeObject(items.Index(i)),
-			}, true)
+	if !n.snapshotReady {
+		// No reconcile state yet: build it now. A failed enumeration must be
+		// reported instead of returning a seemingly-complete empty stream.
+		if err := n.reconcileLocked(); err != nil {
+			n.listRefreshMutex.Unlock()
+			return nil, err
 		}
-	}()
-
+	}
+	snapshot := n.snapshotEventsLocked(ns, &predicate)
 	n.watchersMutex.Lock()
-	defer n.watchersMutex.Unlock()
 	n.watchers[nw.id] = nw
+	n.watchersMutex.Unlock()
+	n.listRefreshMutex.Unlock()
+
+	go nw.forwardLoop(snapshot)
 
 	return nw, nil
+}
+
+// snapshotEventsLocked builds the initial Added stream for a new watcher from
+// the last committed reconcile state. Objects are filtered by namespace and
+// selector and deep-copied; the snapshot bypasses the bounded incremental
+// queue, so any snapshot size is delivered without self-inflicted overflow.
+func (n *nacosREST) snapshotEventsLocked(ns string, predicate *storage.SelectionPredicate) []watch.Event {
+	keys := make([]string, 0, len(n.lastValidObjects))
+	for key := range n.lastValidObjects {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	snapshot := make([]watch.Event, 0, len(keys))
+	for _, key := range keys {
+		obj := n.lastValidObjects[key].DeepCopyObject()
+		if !matchesWatcher(predicate, ns, obj) {
+			continue
+		}
+		snapshot = append(snapshot, watch.Event{
+			Type:   watch.Added,
+			Object: obj,
+		})
+	}
+	return snapshot
 }
 
 func (n *nacosREST) buildListPredicate(options *metainternalversion.ListOptions) storage.SelectionPredicate {
@@ -591,12 +712,12 @@ func (n *nacosREST) readRaw(group, dataId string) (string, error) {
 func (n *nacosREST) decodeConfig(decoder runtime.Decoder, config string, newFunc func() runtime.Object) (runtime.Object, error) {
 	decryptedConfig, err := n.decryptConfig(config)
 	if err != nil {
-		klog.Infof("failed to decoded config #1: %v\n%s", err, config)
+		klog.Infof("failed to decoded config #1: %v", err)
 		return nil, err
 	}
 	obj, _, err := decoder.Decode([]byte(decryptedConfig), nil, newFunc())
 	if err != nil {
-		klog.Infof("failed to decoded config #2: %v\n%s", err, config)
+		klog.Infof("failed to decoded config #2: %v", err)
 		return nil, err
 	}
 	accessor, err := meta.Accessor(obj)
@@ -647,98 +768,178 @@ func (n *nacosREST) writeRaw(group, dataId, content, oldMd5 string) error {
 	return nil
 }
 
+// refreshConfigList runs one reconcile cycle: it enumerates the complete Nacos
+// state and reconciles watchers and internal state from that single snapshot.
 func (n *nacosREST) refreshConfigList() {
 	n.listRefreshMutex.Lock()
 	defer n.listRefreshMutex.Unlock()
+	_ = n.reconcileLocked()
+}
 
-	configItems := map[string]*model.ConfigItem{}
-	var allConfigKeys, newConfigKeys []string
+// reconcileLocked performs the deterministic reconcile order. It must be
+// called with listRefreshMutex held.
+//
+//  1. Enumerate the complete raw state into a temporary map; on any failure
+//     keep the previous objects and listeners and report the error without
+//     emitting deletions.
+//  2. Decode present keys. First valid object: publish Added. Changed content
+//     (resourceVersion/content MD5): update and publish Modified. Identical:
+//     no event.
+//  3. Undecodable content never destroys the last valid object, and the key
+//     still counts as present, so no premature Deleted is possible.
+//  4. Keys missing from the complete snapshot: cancel the listener, publish
+//     one Deleted carrying the last valid object, then drop all state for the
+//     key. Keys that never decoded still get their subscription cleaned up.
+//  5. Commit the raw snapshot and rewrite the names index (sorted keys, or
+//     the EMPTY placeholder so removing the last resource leaves no stale
+//     index).
+//  6. (Re-)register listeners for every present key, so transient ListenConfig
+//     failures are retried by later reconciles. Initially invalid configs are
+//     listened too, so a corrected config wakes the reconcile promptly.
+func (n *nacosREST) reconcileLocked() error {
+	if n.destroyed {
+		return errors.New("storage is destroyed")
+	}
+
+	rawItems := make(map[string]*model.ConfigItem, len(n.configItems))
+	var allConfigKeys []string
 	err := n.enumerateConfigs(&vo.SearchConfigParam{
 		Search: "blur",
 		DataId: n.dataIdPrefix + wildcardSuffix,
 	}, func(item *model.ConfigItem) {
 		key := item.Group + "/" + item.DataId
 		allConfigKeys = append(allConfigKeys, key)
-		if _, ok := n.configItems[key]; !ok {
-			newConfigKeys = append(newConfigKeys, key)
-		}
-		configItems[key] = item
+		rawItems[key] = item
 	})
 	if err != nil {
-		return
+		// Keep the previous complete state: an incomplete enumeration must
+		// never be interpreted as deletions.
+		klog.Errorf("failed to enumerate %s configs, keeping previous state: %v", n.groupResource, err)
+		return err
+	}
+	sort.Strings(allConfigKeys)
+
+	for _, key := range allConfigKeys {
+		item := rawItems[key]
+		obj, err := n.decodeConfig(n.codec, item.Content, n.newFunc)
+		if err != nil {
+			// Do not log the config body: it may contain secrets.
+			klog.Errorf("failed to decode config %s/%s: %v", item.Group, item.DataId, err)
+			continue
+		}
+		accessor, err := meta.Accessor(obj)
+		if err != nil {
+			klog.Errorf("config %s/%s has no object metadata: %v", item.Group, item.DataId, err)
+			continue
+		}
+		prev, exists := n.lastValidObjects[key]
+		if !exists {
+			n.lastValidObjects[key] = obj.DeepCopyObject()
+			klog.Infof("%s/%s is added", item.Group, item.DataId)
+			n.notifyWatchers(watch.Event{
+				Type:   watch.Added,
+				Object: obj,
+			})
+			continue
+		}
+		prevAccessor, err := meta.Accessor(prev)
+		if err != nil {
+			klog.Errorf("cached object %s has no metadata: %v", key, err)
+			continue
+		}
+		if prevAccessor.GetResourceVersion() != accessor.GetResourceVersion() {
+			n.lastValidObjects[key] = obj.DeepCopyObject()
+			klog.Infof("%s/%s is changed", item.Group, item.DataId)
+			n.notifyWatchers(watch.Event{
+				Type:   watch.Modified,
+				Object: obj,
+			})
+		}
 	}
 
+	oldKeys := make([]string, 0, len(n.configItems))
+	for key := range n.configItems {
+		oldKeys = append(oldKeys, key)
+	}
+	sort.Strings(oldKeys)
+	for _, key := range oldKeys {
+		if _, ok := rawItems[key]; ok {
+			continue
+		}
+		item := n.configItems[key]
+		// The subscription is always cleaned up, even when no valid object
+		// was ever published for this key.
+		n.cancelListenLocked(key)
+		if prev, ok := n.lastValidObjects[key]; ok {
+			klog.Infof("%s/%s is deleted", item.Group, item.DataId)
+			n.notifyWatchers(watch.Event{
+				Type:   watch.Deleted,
+				Object: prev.DeepCopyObject(),
+			})
+			delete(n.lastValidObjects, key)
+		} else {
+			klog.Infof("%s/%s is deleted (no valid object was published)", item.Group, item.DataId)
+		}
+	}
+
+	n.configItems = rawItems
+	n.updateNamesIndexLocked(allConfigKeys)
+
+	for _, key := range allConfigKeys {
+		if _, listened := n.listenedConfigs[key]; listened {
+			continue
+		}
+		item := rawItems[key]
+		param := vo.ConfigParam{
+			DataId: item.DataId,
+			Group:  item.Group,
+			OnChange: func(namespace, group, dataId, data string) {
+				n.requestRefresh()
+			},
+		}
+		if err := n.configClient.ListenConfig(param); err != nil {
+			klog.Errorf("failed to listen config %s: %v", key, err)
+			continue
+		}
+		n.listenedConfigs[key] = param
+	}
+
+	n.snapshotReady = true
+	return nil
+}
+
+func (n *nacosREST) cancelListenLocked(key string) {
+	param, ok := n.listenedConfigs[key]
+	if !ok {
+		return
+	}
+	delete(n.listenedConfigs, key)
+	if err := n.configClient.CancelListenConfig(param); err != nil {
+		klog.Errorf("failed to cancel listen config %s: %v", key, err)
+	}
+}
+
+func (n *nacosREST) updateNamesIndexLocked(allConfigKeys []string) {
+	var newNamesData string
+	if len(allConfigKeys) > 0 {
+		newNamesData = strings.Join(allConfigKeys, "\n") + "\n"
+	} else {
+		// Nacos does not support empty content; use the same placeholder as
+		// the delete path so removing the last resource never leaves a stale
+		// index behind.
+		newNamesData = emptyNamesPlaceholder
+	}
 	namesData, err := n.readRaw(namesGroup, n.namesDataId)
 	if err != nil {
 		klog.Errorf("failed to read %s/%s: %v", namesGroup, n.namesDataId, err)
-	} else if len(allConfigKeys) > 0 {
-		newNamesData := strings.Join(allConfigKeys, "\n") + "\n"
-		if namesData != newNamesData {
-			err := n.writeRaw(namesGroup, n.namesDataId, newNamesData, calculateMd5(namesData))
-			if err != nil {
-				klog.Errorf("failed to update %s/%s: %v", namesGroup, n.namesDataId, err)
-			}
-		}
+		return
 	}
-
-	var removedConfigKeys []string
-	for key, _ := range n.configItems {
-		if _, ok := configItems[key]; !ok {
-			removedConfigKeys = append(removedConfigKeys, key)
-		}
+	if namesData == newNamesData || (len(allConfigKeys) == 0 && namesData == "") {
+		return
 	}
-
-	for _, key := range newConfigKeys {
-		configItem := configItems[key]
-		obj, err := n.decodeConfig(n.codec, configItem.Content, n.newFunc)
-		if err != nil {
-			klog.Errorf("failed to decode config #5 %s: %v", configItem.DataId, err)
-			delete(configItems, key)
-			continue
-		}
-		klog.Infof("%s/%s is added", configItem.Group, configItem.DataId)
-		n.notifyWatchers(watch.Event{
-			Type:   watch.Added,
-			Object: obj,
-		})
-		err = n.configClient.ListenConfig(vo.ConfigParam{
-			DataId: configItem.DataId,
-			Group:  configItem.Group,
-			OnChange: func(namespace, group, dataId, data string) {
-				obj, err := n.decodeConfig(n.codec, data, n.newFunc)
-				if err != nil {
-					klog.Errorf("failed to decode config #6 %s: %v", dataId, err)
-					return
-				}
-				klog.Infof("%s/%s is changed", group, dataId)
-				n.notifyWatchers(watch.Event{
-					Type:   watch.Modified,
-					Object: obj,
-				})
-			},
-		})
-		if err != nil {
-			klog.Errorf("failed to listen config %s: %v", key, err)
-		}
+	if err := n.writeRaw(namesGroup, n.namesDataId, newNamesData, calculateMd5(namesData)); err != nil {
+		klog.Errorf("failed to update %s/%s: %v", namesGroup, n.namesDataId, err)
 	}
-	for _, key := range removedConfigKeys {
-		configItem := n.configItems[key]
-		obj, err := n.decodeConfig(n.codec, configItem.Content, n.newFunc)
-		if err != nil {
-			klog.Errorf("failed to decode config #7 %s: %v", configItem.DataId, err)
-			continue
-		}
-		_ = n.configClient.CancelListenConfig(vo.ConfigParam{
-			DataId: configItem.DataId,
-			Group:  configItem.Group,
-		})
-		klog.Infof("%s/%s is deleted", configItem.Group, configItem.DataId)
-		n.notifyWatchers(watch.Event{
-			Type:   watch.Deleted,
-			Object: obj,
-		})
-	}
-	n.configItems = configItems
 }
 
 func (n *nacosREST) encryptConfig(config string) (string, error) {
@@ -784,48 +985,158 @@ func calculateMd5(str string) string {
 	return fmt.Sprintf("%x", w.Sum(nil))
 }
 
-type nacosWatch struct {
-	f         *nacosREST
-	id        string
-	ch        chan watch.Event
-	ns        string
-	predicate *storage.SelectionPredicate
-}
-
-func (w *nacosWatch) Stop() {
-	w.f.watchersMutex.Lock()
-	defer w.f.watchersMutex.Unlock()
-	delete(w.f.watchers, w.id)
-}
-
-func (w *nacosWatch) ResultChan() <-chan watch.Event {
-	return w.ch
-}
-
-func (w *nacosWatch) SendEvent(ev watch.Event, force bool) bool {
-	if !force {
-		if w.predicate != nil {
-			match, err := w.predicate.Matches(ev.Object)
-			if err == nil && !match {
-				// If something went wrong, we assume it's a match
-				return false
-			}
-		}
-		if ns := w.ns; ns != "" {
-			accessor, err := meta.Accessor(ev.Object)
-			if err != nil {
-				return false
-			}
-			if accessor.GetNamespace() != ns {
-				return false
-			}
+// matchesWatcher applies the namespace and selector filter of a watcher.
+// Selector errors are treated as a match, matching the historical behavior of
+// the apiserver storage layer.
+func matchesWatcher(predicate *storage.SelectionPredicate, ns string, obj runtime.Object) bool {
+	if predicate != nil {
+		match, err := predicate.Matches(obj)
+		if err == nil && !match {
+			return false
 		}
 	}
-	w.ch <- ev
+	if ns != "" {
+		accessor, err := meta.Accessor(obj)
+		if err != nil {
+			return false
+		}
+		if accessor.GetNamespace() != ns {
+			return false
+		}
+	}
 	return true
 }
 
-// TODO: implement custom table printer optionally
-// func (n *nacosREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
-// 	return &metav1.Table{}, nil
-// }
+// nacosWatch is a single watch stream. Producers only ever perform non-blocking
+// enqueues into the bounded incremental queue; a dedicated forwarder goroutine
+// owns the result channel: it first delivers the bootstrap snapshot, then the
+// queued increments, and it is the only component allowed to close the result
+// channel. A full queue terminates normal delivery with a Kubernetes 410
+// watch.Error so the consumer relists instead of silently missing events.
+type nacosWatch struct {
+	f         *nacosREST
+	id        string
+	ns        string
+	predicate *storage.SelectionPredicate
+
+	incremental chan watch.Event
+	result      chan watch.Event
+
+	stopOnce     sync.Once
+	stopped      chan struct{}
+	onceOverflow sync.Once
+	overflow     chan struct{}
+	terminated   atomic.Bool
+}
+
+func newNacosWatch(f *nacosREST, ns string, predicate *storage.SelectionPredicate) *nacosWatch {
+	return &nacosWatch{
+		f:           f,
+		id:          uuid.New().String(),
+		ns:          ns,
+		predicate:   predicate,
+		incremental: make(chan watch.Event, watcherQueueSize),
+		result:      make(chan watch.Event),
+		stopped:     make(chan struct{}),
+		overflow:    make(chan struct{}),
+	}
+}
+
+// Stop detaches the watcher and unblocks the forwarder immediately, even if
+// its consumer never reads again.
+func (w *nacosWatch) Stop() {
+	w.stopOnce.Do(func() {
+		close(w.stopped)
+		w.terminated.Store(true)
+	})
+	w.f.watchersMutex.Lock()
+	delete(w.f.watchers, w.id)
+	w.f.watchersMutex.Unlock()
+}
+
+func (w *nacosWatch) ResultChan() <-chan watch.Event {
+	return w.result
+}
+
+// enqueue filters and buffers one event without ever blocking the producer.
+// Each event is deep-copied so watchers cannot observe each other's objects.
+func (w *nacosWatch) enqueue(ev watch.Event) {
+	if w.terminated.Load() {
+		return
+	}
+	if !matchesWatcher(w.predicate, w.ns, ev.Object) {
+		return
+	}
+	select {
+	case w.incremental <- watch.Event{
+		Type:   ev.Type,
+		Object: ev.Object.DeepCopyObject(),
+	}:
+	default:
+		w.onceOverflow.Do(func() {
+			close(w.overflow)
+		})
+		w.terminated.Store(true)
+		klog.Warningf("watcher %s incremental queue overflow, sending expired signal", w.id)
+	}
+}
+
+func (w *nacosWatch) forwardLoop(initial []watch.Event) {
+	defer close(w.result)
+	for _, ev := range initial {
+		select {
+		case w.result <- ev:
+		case <-w.stopped:
+			return
+		case <-w.f.stopCh:
+			return
+		}
+	}
+	for {
+		// Overflow takes priority over further normal delivery.
+		select {
+		case <-w.overflow:
+			w.sendExpired()
+			return
+		default:
+		}
+		select {
+		case <-w.overflow:
+			w.sendExpired()
+			return
+		case <-w.stopped:
+			return
+		case <-w.f.stopCh:
+			return
+		case ev, ok := <-w.incremental:
+			if !ok {
+				return
+			}
+			select {
+			case w.result <- ev:
+			case <-w.overflow:
+				w.sendExpired()
+				return
+			case <-w.stopped:
+				return
+			case <-w.f.stopCh:
+				return
+			}
+		}
+	}
+}
+
+// sendExpired reports a Kubernetes 410 status so the consumer relists. It may
+// block until the consumer observes it or the watcher/storage is stopped;
+// Destroy never waits for this delivery.
+func (w *nacosWatch) sendExpired() {
+	status := apierrors.NewResourceExpired("too many pending watch events; relist required").Status()
+	select {
+	case w.result <- watch.Event{
+		Type:   watch.Error,
+		Object: &status,
+	}:
+	case <-w.stopped:
+	case <-w.f.stopCh:
+	}
+}
