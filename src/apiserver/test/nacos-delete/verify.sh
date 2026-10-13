@@ -159,7 +159,7 @@ nacos_config_exists() { # $1 group, $2 dataId
 }
 
 nacos_get_content() { # $1 group, $2 dataId; prints the raw content
-  curl -s "$(nacos_config_url "$1" "$2")" | sed 's/^{"code":0,"message":"success","data"://; s/}$//'
+  curl -s "$(nacos_config_url "$1" "$2")" | sed 's/^{"code":0,"message":"success","data"://; s/}$//' || true
 }
 
 # --- API server REST surface ---------------------------------------------
@@ -169,7 +169,7 @@ api_ingress_url() { # $1 ingress name
 }
 
 api_ingress_code() { # $1 ingress name
-  curl -sk -o /dev/null -w "%{http_code}" "$(api_ingress_url "$1")"
+  curl -sk -o /dev/null -w "%{http_code}" "$(api_ingress_url "$1")" || echo 000
 }
 
 api_publish_ingress() { # $1 ingress manifest (YAML)
@@ -188,6 +188,17 @@ api_delete_ingress() { # $1 ingress name
 
 gateway_config_dump() {
   docker compose -f "$COMPOSE_FILE" exec -T gateway curl -s http://127.0.0.1:15000/config_dump
+}
+
+# HTTP probes run inside the gateway container: the Docker Desktop host port
+# publishing proved flaky under load, while in-container access to the envoy
+# listener is stable and equivalent for black-box assertions.
+gateway_http_code() { # $1 path
+  docker compose -f "$COMPOSE_FILE" exec -T gateway curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:80$1" || echo 000
+}
+
+gateway_http_body() { # $1 path
+  docker compose -f "$COMPOSE_FILE" exec -T gateway curl -s "http://127.0.0.1:80$1" || true
 }
 
 # --- Bounded waiting ------------------------------------------------------
@@ -218,7 +229,7 @@ wait_for_api_status() { # $1 ingress name, $2 expected HTTP code
 wait_for_gateway_status() { # $1 path, $2 expected HTTP code
   local path="$1" expected="$2" waited=0 code
   while [ "$waited" -lt "$WAIT_TIMEOUT_SECS" ]; do
-    code=$(curl -s -o /dev/null -w "%{http_code}" "$T4_GATEWAY_URL$path" || echo 000)
+    code=$(gateway_http_code "$path")
     [ "$code" = "$expected" ] && return 0
     sleep 1
     waited=$((waited + 1))
@@ -355,7 +366,7 @@ wait_for_nacos() {
 
 ensure_namespace() {
   local list code
-  list=$(curl -s "$NACOS_URL/v3/admin/core/namespace/list")
+  list=$(curl -s "$NACOS_URL/v3/admin/core/namespace/list" || true)
   if grep -q "\"namespace\":\"$NAMESPACE\"" <<<"$list"; then
     echo "[$(now)] Nacos namespace $NAMESPACE already exists"
     return
@@ -413,10 +424,16 @@ T4_CONTROLLER_IMAGE="higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higres
 
 generate_gateway_stack() {
   echo "[$(now)] generating the standalone gateway stack under $T4_DIR"
+  # Drop any leftovers of a previous (possibly killed) run before the old
+  # compose file is replaced.
+  timeout 120 docker compose -p t4 down -v --remove-orphans >/dev/null 2>&1 || true
   rm -rf "$T4_DIR"
   mkdir -p "$T4_DIR/canary" "$T4_DIR/volumes"
   cp -r "$REPO_COMPOSE_DIR/scripts" "$T4_DIR/scripts"
   cp -r "$REPO_COMPOSE_DIR/env" "$T4_DIR/env"
+  # The working tree may carry CRLF line endings (Windows checkout); the
+  # runner containers execute these scripts with bash, which cannot.
+  find "$T4_DIR/scripts" "$T4_DIR/env" -type f -exec sed -i 's/\r$//' {} +
 
   cat >"$T4_DIR/canary/default.conf" <<'EOF'
 server {
@@ -689,7 +706,7 @@ wait_for_service_healthy() { # $1 service name
   local svc="$1" waited=0 status
   while [ "$waited" -lt 180 ]; do
     status=$(docker compose -f "$COMPOSE_FILE" ps --format '{{.Name}} {{.Health}}' 2>/dev/null \
-      | grep "$svc" | awk '{print $2}')
+      | { grep "$svc" || true; } | awk '{print $2}')
     [ "$status" = "healthy" ] && return 0
     sleep 2
     waited=$((waited + 2))
@@ -721,18 +738,48 @@ spec:
         pathType: Prefix"
 }
 
+# A second, independent route that stays for the whole run: it keeps the
+# envoy listener alive (with zero routes the gateway drops the :80 listener
+# entirely, so a deleted route would answer connection-refused instead of
+# 404), and it proves the deletion does not disturb unrelated routes.
+publish_keepalive_ingress() { # $1 uid
+  local uid="$1"
+  api_publish_ingress "apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keepalive-test
+  namespace: $NAMESPACE
+  uid: $uid
+  annotations:
+    higress.io/destination: canary.dns:8080
+spec:
+  ingressClassName: higress
+  rules:
+  - http:
+      paths:
+      - backend:
+          resource:
+            apiGroup: networking.higress.io
+            kind: McpBridge
+            name: default
+        path: /keepalive-test
+        pathType: Prefix"
+}
+
 assert_gateway_route_present() {
   wait_for_gateway_status "/canary-test" 200
   local body
-  body=$(curl -s "$T4_GATEWAY_URL/canary-test")
+  body=$(gateway_http_body "/canary-test")
   [ "$body" = "issue-4538-ok" ] || fail "gateway returned \"$body\" instead of the canary backend answer"
-  gateway_config_dump | grep -q "/canary-test" || fail "the /canary-test route is missing from the gateway config_dump"
+  gateway_config_dump | grep -qF "/canary-test" || fail "the /canary-test route is missing from the gateway config_dump"
 }
 
 assert_deletion_propagated() { # $1 dump marker file
   wait_for_api_status "$INGRESS_NAME" 404
   wait_for_gateway_status "/canary-test" 404
   wait_for_gateway_route_gone "/canary-test"
+  # The unrelated keepalive route must survive untouched.
+  wait_for_gateway_status "/keepalive-test" 200
 }
 
 gateway_clean_delete_scenario() {
@@ -766,7 +813,16 @@ gateway_invalid_overwrite_scenario() {
   sleep $((REFRESH_INTERVAL_SECS + 2))
 
   gateway_config_dump >"$LOG_DIR/config-dump-before-x-delete.json"
-  api_delete_ingress "$INGRESS_NAME"
+  # The fix variant deletes through the API server. The baseline variant
+  # cannot: its GET re-decodes the overwritten content, fails, and the DELETE
+  # answers 500 - so fall back to deleting through the Nacos API, which is
+  # exactly what the issue reporter did from the Nacos console.
+  local del_code
+  del_code=$(curl -sk -o /dev/null -w "%{http_code}" -X DELETE "$(api_ingress_url "$INGRESS_NAME")")
+  if [ "$del_code" != "200" ]; then
+    echo "[$(now)] API DELETE returned $del_code (stale content no longer decodes); deleting through the Nacos API instead"
+    nacos_delete "$GROUP" "$DATA_ID"
+  fi
   assert_deletion_propagated
   gateway_config_dump >"$LOG_DIR/config-dump-after-x-delete.json"
   echo "[$(now)] gateway scenario passed: delete after invalid overwrite propagated to the gateway"
@@ -801,7 +857,9 @@ run_gateway_mode() {
   generate_gateway_stack
 
   echo "[$(now)] starting the 2.2.3 standalone stack (variant: $VARIANT)"
-  docker compose -f "$COMPOSE_FILE" up -d || fail "docker compose up failed"
+  # Bounded: a crashing on-failure dependency (e.g. precheck) would otherwise
+  # block the dependency-aware up forever.
+  timeout 600 docker compose -f "$COMPOSE_FILE" up -d || fail "docker compose up failed or timed out"
 
   wait_for_nacos
   ensure_namespace
@@ -813,7 +871,8 @@ run_gateway_mode() {
   # Configure the canary registry on the McpBridge created by prepare.sh.
   local mcpbridge
   mcpbridge=$(curl -sk "$API_URL/apis/networking.higress.io/v1/namespaces/$NAMESPACE/mcpbridges/default" \
-    -H "Accept: application/yaml")
+    -H "Accept: application/yaml" || true)
+  [ -n "$mcpbridge" ] || fail "could not read the McpBridge from the API server"
   if grep -q "name: canary" <<<"$mcpbridge"; then
     echo "[$(now)] McpBridge already carries the canary registry"
   else
@@ -838,6 +897,11 @@ spec:
 
   mkdir -p "$LOG_DIR"
   start_watcher
+
+  # The independent route that must survive every canary-test deletion.
+  publish_keepalive_ingress "uid-4538-keepalive"
+  wait_for_api_status "keepalive-test" 200
+  wait_for_gateway_status "/keepalive-test" 200
 
   gateway_clean_delete_scenario
   gateway_invalid_overwrite_scenario

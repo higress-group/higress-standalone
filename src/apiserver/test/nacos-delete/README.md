@@ -100,6 +100,34 @@ Expected results:
   keeps serving the route; this is the reported defect.
 - `fix`: all scenarios pass.
 
+## Acceptance results (2026-10-12, Higress 2.2.3 data plane)
+
+Full-standalone runs of `verify.sh gateway <variant>` on this branch, with
+the versions and digests listed above (raw logs under the repository
+`reports/4538/` working directory of the contributor):
+
+| scenario | baseline (`higress-4538/apiserver:baseline`) | fix (`higress-4538/apiserver:fix`) |
+| --- | --- | --- |
+| clean delete propagated | PASS | PASS |
+| delete after `x` overwrite + full refresh | **FAIL - the gateway kept answering 200; the route disappeared from `config_dump` right after the delete and then resurrected (0 -> 4 occurrences) because the controller never received a `Deleted` event** | PASS |
+| gateway restart keeps the route deleted | (not reached; route still serving) | PASS |
+| recreate under the same name + second delete | (not reached) | PASS |
+| unrelated keepalive route untouched | PASS until the stuck route blocked the run | PASS |
+
+Evidence files (per variant, written under `.runtime/t4-logs/`):
+`config-dump-before-clean-delete.json`, `config-dump-after-clean-delete.json`,
+`config-dump-before-x-delete.json`, `config-dump-after-x-delete.json`,
+`config-dump-final.json`, `api-watch.jsonl`, plus `docker compose logs -t`
+for nacos/apiserver/controller/pilot/gateway. For the fix variant the dumps
+show the `/canary-test` route removed permanently across every deletion and
+the gateway restart; for the baseline variant the dumps show the route
+resurrecting after an initial transient removal while the gateway kept
+serving HTTP 200, matching the issue report.
+
+The chain mode passed all three sequences with the fix
+(`reports/4538/t3-verify-run.log`) and the unit-level contract suite is red
+on the baseline and green on the fix (`reports/4538/baseline-test-red.log`).
+
 ## Evidence layout
 
 Each run writes to `.runtime/` (and the keep-out directory `.runtime/t4/`):
