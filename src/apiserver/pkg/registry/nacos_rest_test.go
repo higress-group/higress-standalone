@@ -1022,6 +1022,49 @@ func TestDestroyIsIdempotentAndIgnoresLateCallbacks(t *testing.T) {
 	}
 }
 
+func TestDestroyCancelsNamesListenerRegisteredDuringShutdown(t *testing.T) {
+	n, client := newTestIngressREST(t)
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	client.mu.Lock()
+	client.onListenSync = func(param vo.ConfigParam) {
+		if param.Group != namesGroup || param.DataId != n.namesDataId {
+			t.Errorf("unexpected listener registered: %s/%s", param.Group, param.DataId)
+		}
+		close(entered)
+		<-release
+	}
+	client.mu.Unlock()
+
+	refreshDone := make(chan struct{})
+	go func() {
+		n.listRefreshTickerFunc()
+		close(refreshDone)
+	}()
+	select {
+	case <-entered:
+	case <-time.After(testWaitTimeout):
+		close(release)
+		t.Fatal("names listener registration never started")
+	}
+
+	// Destroy finishes while the SDK call has registered its listener but
+	// has not returned to the refresh loop yet.
+	n.Destroy()
+	close(release)
+	select {
+	case <-refreshDone:
+	case <-time.After(testWaitTimeout):
+		t.Fatal("refresh did not finish after listener registration resumed")
+	}
+	if got := client.listenerCount(); got != 0 {
+		t.Fatalf("late names listener survived Destroy: %d listeners", got)
+	}
+	if n.listConfigListened != 0 {
+		t.Fatalf("destroyed storage marked the late listener active")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Concurrency: callbacks, reconciles, watches and Destroy racing must not
 // deadlock, panic or double-close channels. Run with -race.
@@ -1154,6 +1197,12 @@ func TestOverflowQueueSendsExpiredAndKeepsReconcileLive(t *testing.T) {
 		}
 	case <-time.After(testWaitTimeout):
 		t.Fatalf("watch channel was not closed after the 410 error event")
+	}
+	n.watchersMutex.RLock()
+	_, retained := n.watchers[w.watch.(*nacosWatch).id]
+	n.watchersMutex.RUnlock()
+	if retained {
+		t.Fatalf("expired watcher remained registered after its stream closed")
 	}
 }
 

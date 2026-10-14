@@ -813,10 +813,10 @@ gateway_invalid_overwrite_scenario() {
   sleep $((REFRESH_INTERVAL_SECS + 2))
 
   gateway_config_dump >"$LOG_DIR/config-dump-before-x-delete.json"
-  # The fix variant deletes through the API server. The baseline variant
-  # cannot: its GET re-decodes the overwritten content, fails, and the DELETE
-  # answers 500 - so fall back to deleting through the Nacos API, which is
-  # exactly what the issue reporter did from the Nacos console.
+  # API DELETE may return 500 after the raw overwrite because its GET cannot
+  # decode the content. In that case delete through Nacos, as in the reported
+  # console workflow. This scenario verifies Nacos deletion propagation, not
+  # API DELETE of malformed content.
   local del_code
   del_code=$(curl -sk -o /dev/null -w "%{http_code}" -X DELETE "$(api_ingress_url "$INGRESS_NAME")")
   if [ "$del_code" != "200" ]; then

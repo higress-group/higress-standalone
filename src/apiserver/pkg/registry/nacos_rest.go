@@ -215,7 +215,18 @@ func (n *nacosREST) backgroundLoop(ticker *time.Ticker) {
 func (n *nacosREST) listRefreshTickerFunc() {
 	if atomic.LoadInt32(&n.listConfigListened) == 0 {
 		if err := n.watchNamesConfig(); err == nil {
-			atomic.StoreInt32(&n.listConfigListened, 1)
+			n.listRefreshMutex.Lock()
+			destroyed := n.destroyed
+			if !destroyed {
+				atomic.StoreInt32(&n.listConfigListened, 1)
+			}
+			n.listRefreshMutex.Unlock()
+			if destroyed {
+				param := vo.ConfigParam{DataId: n.namesDataId, Group: namesGroup}
+				if err := n.configClient.CancelListenConfig(param); err != nil {
+					klog.Errorf("failed to cancel late names listener %s/%s: %v", param.Group, param.DataId, err)
+				}
+			}
 		} else {
 			klog.Errorf("failed to watch names config: %v", err)
 		}
@@ -1082,7 +1093,13 @@ func (w *nacosWatch) enqueue(ev watch.Event) {
 }
 
 func (w *nacosWatch) forwardLoop(initial []watch.Event) {
-	defer close(w.result)
+	defer func() {
+		w.terminated.Store(true)
+		w.f.watchersMutex.Lock()
+		delete(w.f.watchers, w.id)
+		w.f.watchersMutex.Unlock()
+		close(w.result)
+	}()
 	for _, ev := range initial {
 		select {
 		case w.result <- ev:
