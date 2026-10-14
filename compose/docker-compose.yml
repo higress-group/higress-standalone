@@ -23,9 +23,9 @@ services:
     volumes:
       - ./volumes/nacos:/home/nacos/data
     ports:
-      - "${NACOS_CONSOLE_PORT:-8888}:8080/tcp"
-      - "${NACOS_HTTP_PORT:-8848}:8848/tcp"
-      - "${NACOS_GRPC_PORT:-9848}:9848/tcp"
+      - "127.0.0.1:${NACOS_CONSOLE_PORT:-8888}:8080/tcp"
+      - "127.0.0.1:${NACOS_HTTP_PORT:-8848}:8848/tcp"
+      - "127.0.0.1:${NACOS_GRPC_PORT:-9848}:9848/tcp"
     restart: always
 
   initializer:
