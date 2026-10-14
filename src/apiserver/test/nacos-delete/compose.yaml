@@ -1,0 +1,77 @@
+# Isolated environment for higress-group/higress#4538 deletion verification.
+#
+# Spins up a task-private Nacos server plus the API server built from the
+# current working tree. verify.sh publishes, updates and deletes Ingress
+# configs through the real Nacos HTTP API and consumes the real Kubernetes
+# watch stream exposed by this API server.
+#
+# The compose project never publishes images, and its name and volumes are
+# exclusive to this test. Run it through verify.sh.
+
+name: higress-nacos-delete-4538
+
+services:
+  nacos:
+    hostname: higress-nacos
+    image: higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/nacos-server:v3.0.1
+    environment:
+      MODE: standalone
+      PREFER_HOST_MODE: hostname
+      NACOS_AUTH_IDENTITY_KEY: serveridentity
+      NACOS_AUTH_IDENTITY_VALUE: security
+      NACOS_AUTH_TOKEN: SecretKey012345678901234567890123456789012345678901234567890123456789
+      NACOS_AUTH_ENABLE: "false"
+      NACOS_CORE_AUTH_ENABLED: "false"
+      NACOS_CORE_AUTH_ADMIN_ENABLED: "false"
+      NACOS_CORE_AUTH_CONSOLE_ENABLED: "false"
+      NACOS_CORE_API_COMPATIBILITY_CONSOLE_ENABLED: "true"
+      NACOS_CORE_API_COMPATIBILITY_CORE_ENABLED: "true"
+      NACOS_CORE_API_COMPATIBILITY_ADMIN_ENABLED: "true"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://127.0.0.1:8848/nacos" ]
+      interval: 1s
+      timeout: 3s
+      retries: 60
+    volumes:
+      - nacos-data:/home/nacos/data
+    ports:
+      - "18488:8848/tcp"
+
+  apiserver:
+    hostname: higress-apiserver
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    command:
+      - --secure-port
+      - "8443"
+      - --client-ca-file
+      - /etc/api/ca.crt
+      - --tls-cert-file
+      - /etc/api/server.crt
+      - --tls-private-key-file
+      - /etc/api/server.key
+      - --storage
+      - nacos
+      - --file-root-dir
+      - /opt/data
+      - --nacos-server
+      - http://nacos:8848/nacos
+      - --nacos-ns-id
+      - higress-system
+    depends_on:
+      nacos:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-fk", "https://127.0.0.1:8443/readyz" ]
+      interval: 1s
+      timeout: 3s
+      retries: 60
+    volumes:
+      - ./certs:/etc/api:ro
+    ports:
+      - "18443:8443/tcp"
+
+volumes:
+  nacos-data:
+    name: higress-nacos-delete-4538-data
