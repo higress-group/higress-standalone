@@ -10,6 +10,8 @@
 
 ## 注意
 
+Standalone 模式面向**本地个人测试**场景：默认配置（包括内置 Nacos）不会对不可信网络做防护，请勿将默认配置直接暴露在公网或不受信任的网络中。内置 Nacos 的端口默认仅映射到本机回环地址（127.0.0.1）监听；如需从其他机器访问内置 Nacos，请修改 compose/docker-compose.yml 中的端口映射（增加监听网卡 IP），并同步启用 Nacos 鉴权等加固措施。
+
 Standalone 模式没有大规模生产使用过，目前主要用于本地部署测试的场景，如果生产部署更建议云原生模式部署：https://higress.io/zh-cn/docs/ops/deploy-by-helm
 
 如果是部署在阿里云上，也可以考虑使用 [Higress 企业版](https://higress.cn/cloud/)，这是完全托管的模式，也可以视作是独立部署，不依赖 K8s。
