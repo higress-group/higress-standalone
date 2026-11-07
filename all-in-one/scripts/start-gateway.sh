@@ -15,16 +15,34 @@ waitForPilot
 
 set -e
 
+function configureAccessLogFile() {
+    local meshConfig=$1
+    local o11y=$2
+    local accessLogFile=
+
+    if [ "$o11y" == "on" ]; then
+        accessLogFile='/var/log/proxy/access.log'
+    elif ! grep -qE '^accessLogFile:[[:space:]]*[^[:space:]]+' "$meshConfig"; then
+        accessLogFile='/dev/stdout'
+    fi
+
+    if [ -z "$accessLogFile" ]; then
+        return 0
+    fi
+
+    if grep -qE '^accessLogFile:' "$meshConfig"; then
+        sed -i -E "s|^accessLogFile:.*$|accessLogFile: $accessLogFile|" "$meshConfig"
+    else
+        echo "accessLogFile: $accessLogFile" >> "$meshConfig"
+    fi
+}
+
 createDir /etc/istio/proxy
 createDir /var/lib/istio/data
 createDir /var/log/proxy
 touch /var/log/proxy/access.log
 
-if [ "$O11Y" == "on" ]; then
-    sed -i -E 's/^accessLogFile: .+$/accessLogFile: \/var\/log\/proxy\/access.log/' /etc/istio/config/mesh
-else
-    sed -i -E 's/^accessLogFile: .+$/accessLogFile: \/dev\/stdout/' /etc/istio/config/mesh
-fi
+configureAccessLogFile /etc/istio/config/mesh "$O11Y"
 
 /usr/local/bin/higress-proxy-start.sh proxy router \
     --concurrency=${GATEWAY_CONCURRENCY:-16} \
