@@ -307,7 +307,7 @@ func (c completedConfig) New() (*HigressServer, error) {
 			func() runtime.Object { return &networkingv1.Ingress{} },
 			func() runtime.Object { return &networkingv1.IngressList{} },
 			nil, false)
-		appendStorage(networkingv1Storages, storageCreateFunc, networkingv1.SchemeGroupVersion, true, "ingressclass", "ingressclasses",
+		appendStorage(networkingv1Storages, storageCreateFunc, networkingv1.SchemeGroupVersion, false, "ingressclass", "ingressclasses",
 			func() runtime.Object { return &networkingv1.IngressClass{} },
 			func() runtime.Object { return &networkingv1.IngressClassList{} },
 			nil, false)
