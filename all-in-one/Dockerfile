@@ -1,14 +1,26 @@
 ARG HUB=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress
 ARG BASE_VERSION=2022-10-27T19-02-22
-ARG CORE_VERSION=2.2.5
-ARG CONSOLE_VERSION=2.2.5
+<<<<<<< Updated upstream
+ARG CORE_VERSION=2.2.4
+ARG CONSOLE_VERSION=2.2.4
 ARG APISERVER_VERSION=0.1.0
-ARG ENVOY_VERSION=2.2.5
-ARG PLUGIN_SERVER_VERSION=2.2.5
-ARG CONTROLLER_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress:2.2.5@sha256:38663f158d1e9aa8233f268cc3bc4776aaaa5d5e1e15fdde88db0c7a626ef0f4
-ARG PILOT_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/pilot:2.2.5@sha256:10334ca1baf0d8e1f8a97bb47845d6c12d118eda3d330c86a7707aa9f0628aa9
-ARG GATEWAY_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/gateway:2.2.5@sha256:a82de493902012ce6b555ecb2244156f3c73824474d67549144a7efa334d0299
-ARG PLUGIN_SERVER_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/plugin-server:2.2.5@sha256:ec63c6dfd18e77917faaecfd5fcdebde7e0bc40d42effa3b6d6f77d4f5c2fd40
+ARG ENVOY_VERSION=2.2.4
+ARG PLUGIN_SERVER_VERSION=2.2.4
+ARG CONTROLLER_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress:2.2.4@sha256:0a5b7809a107cbec150f41352a156e31160b8a92df787798e2a9a06cdd5587da
+ARG PILOT_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/pilot:2.2.4@sha256:f742ed20f938c5c1eaf6f8c36c6481a87052d06e903ab6cb0c079165ac0c8284
+ARG GATEWAY_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/gateway:2.2.4@sha256:3dbd609df5db3fca61653eafe0e2310705e485190c4f8cd02d9aab8f07dcf329
+ARG PLUGIN_SERVER_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/plugin-server:2.2.4@sha256:05a3e3615434befdb89928e491a8833255733c099dd24faefe82fea4d63165bb
+=======
+ARG CORE_VERSION=2.2.6
+ARG CONSOLE_VERSION=2.2.6
+ARG APISERVER_VERSION=0.1.0
+ARG ENVOY_VERSION=2.2.6
+ARG PLUGIN_SERVER_VERSION=2.2.6
+ARG CONTROLLER_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress:2.2.6@sha256:7fe8bb4d4a2e83d1ef31c1a7e6dcf86d1a1a0f37c6058b6b662d920ab6d10310
+ARG PILOT_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/pilot:2.2.6@sha256:901ff203f9faa10c50eaf13c44f3e4d12e6b9b5dce381eccb7595207c69ce209
+ARG GATEWAY_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/gateway:2.2.6@sha256:5d0618399fa98b9f4ad3c34b58f084b51624e3cc4eccdde72554b636d16b5da4
+ARG PLUGIN_SERVER_IMAGE=higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/plugin-server:2.2.6@sha256:0eb87e59928fc5975f29fc1926ebd138f61f6c23a9e115ea75b42d4803891cd8
+>>>>>>> Stashed changes
 
 FROM ${HUB}/api-server:${APISERVER_VERSION} AS apiserver
 FROM ${CONTROLLER_IMAGE} AS controller
@@ -69,13 +81,10 @@ RUN arch="$(dpkg --print-architecture)"; \
   wget -q "https://github.com/higress-group/proxy/releases/download/v${ENVOY_VERSION}/envoy-${envoy_arch}.tar.gz" -O /tmp/envoy.tar.gz && \
   tar -xzf /tmp/envoy.tar.gz -C / && \
   rm /tmp/envoy.tar.gz && \
-  chmod +x /usr/local/bin/envoy && \
-  test -x /usr/local/bin/envoy && \
-  arch="${arch##*-}" && \
-  wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$arch -O /usr/local/bin/yq && \
-  chmod +x /usr/local/bin/yq && \
-  test -x /usr/local/bin/yq && \
-  mkdir -p /var/log/higress && \
+  chmod +x /usr/local/bin/envoy; \
+  arch="${arch##*-}"; \
+  wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$arch -O /usr/local/bin/yq && chmod +x /usr/local/bin/yq; \
+  mkdir -p /var/log/higress; \
   mkdir /data;
 
 COPY ./supervisord/supervisord.conf /etc/supervisor/conf.d/supervisord.conf

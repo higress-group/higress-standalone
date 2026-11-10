@@ -1,108 +1,207 @@
 {
   "console": {
-    "chartDigest": "sha256:a16b2917ebe6b63ecf81f94bcfc70fcf1c680f639970365a0a04a492b1d58fa6",
-    "chartRef": "higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress-console:2.2.5",
-    "commit": "0279ce1a01510c60667cab53494764f1a35f3701",
-    "provenanceAssetId": 610415324,
+<<<<<<< Updated upstream
+    "chartDigest": "sha256:c0d4a0b336004fdfa9b5cfd0a02ef18cd19c068e517d0b7e1d62ac090973cec0",
+    "chartRef": "higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress-console:2.2.4",
+    "commit": "36aa9c67fb0057164dab9b1fe687b38fe5b8a022",
+    "provenanceAssetId": 513647811,
     "provenanceAssetName": "plugin-release-provenance.json",
-    "provenanceAssetSha256": "a6324adf84b907ce582f49996c524404dff71d87937c7fc4c4a6cf1d4931b9c7",
-    "releaseId": 403158311,
-    "tag": "v2.2.5"
+    "provenanceAssetSha256": "116b82f925e6eb16933672adba84435d78eee3857a888ecdc2be6c9f62d06b49",
+    "releaseId": 370262354,
+    "tag": "v2.2.4"
   },
-  "consoleChartDigest": "sha256:a16b2917ebe6b63ecf81f94bcfc70fcf1c680f639970365a0a04a492b1d58fa6",
-  "consoleChartRef": "higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress-console:2.2.5",
-  "consoleVersion": "2.2.5",
+  "consoleChartDigest": "sha256:c0d4a0b336004fdfa9b5cfd0a02ef18cd19c068e517d0b7e1d62ac090973cec0",
+  "consoleChartRef": "higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress-console:2.2.4",
+  "consoleVersion": "2.2.4",
+=======
+    "chartDigest": "sha256:c43b3a21049f8f0ea65d3f5558bded6f6387f2fce2947d5451ec7fb6cc7a14a5",
+    "chartRef": "higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress-console:2.2.6",
+    "commit": "b3e541b3b22e6d44817fc33e66fd5a2953960304",
+    "provenanceAssetId": 728576553,
+    "provenanceAssetName": "plugin-release-provenance.json",
+    "provenanceAssetSha256": "1b046ad597d393215f27a8ef553f940061040c7972d5becac22f2a037f7d5eb4",
+    "releaseId": 439506504,
+    "tag": "v2.2.6"
+  },
+  "consoleChartDigest": "sha256:c43b3a21049f8f0ea65d3f5558bded6f6387f2fce2947d5451ec7fb6cc7a14a5",
+  "consoleChartRef": "higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress-console:2.2.6",
+  "consoleVersion": "2.2.6",
+>>>>>>> Stashed changes
   "gatewayImages": {
     "controller": {
       "annotationsByPlatform": {
         "linux/amd64": {
-          "io.higress.gateway-version": "2.2.5",
-          "io.higress.higress-source-commit": "4deae1dd3b4cb2707273748985e55bef28e747d1",
-          "io.higress.plugin-snapshot-sha256": "9289508efb6a16e28c41d43b1a449f9c1592a0b1e16d3185cf4ee53b0f3065b8",
-          "org.opencontainers.image.revision": "4deae1dd3b4cb2707273748985e55bef28e747d1"
+<<<<<<< Updated upstream
+          "io.higress.gateway-version": "2.2.4",
+          "io.higress.higress-source-commit": "58666ac985cee19a0a9a353421c63cead6d0cb47",
+          "io.higress.plugin-snapshot-sha256": "09bc798df37e50dae2e684947885c31eb756636c76a98761a9a980fc031e3a1a",
+          "org.opencontainers.image.revision": "58666ac985cee19a0a9a353421c63cead6d0cb47"
         },
         "linux/arm64": {
-          "io.higress.gateway-version": "2.2.5",
-          "io.higress.higress-source-commit": "4deae1dd3b4cb2707273748985e55bef28e747d1",
-          "io.higress.plugin-snapshot-sha256": "9289508efb6a16e28c41d43b1a449f9c1592a0b1e16d3185cf4ee53b0f3065b8",
-          "org.opencontainers.image.revision": "4deae1dd3b4cb2707273748985e55bef28e747d1"
+          "io.higress.gateway-version": "2.2.4",
+          "io.higress.higress-source-commit": "58666ac985cee19a0a9a353421c63cead6d0cb47",
+          "io.higress.plugin-snapshot-sha256": "09bc798df37e50dae2e684947885c31eb756636c76a98761a9a980fc031e3a1a",
+          "org.opencontainers.image.revision": "58666ac985cee19a0a9a353421c63cead6d0cb47"
         }
       },
-      "digest": "sha256:38663f158d1e9aa8233f268cc3bc4776aaaa5d5e1e15fdde88db0c7a626ef0f4",
+      "digest": "sha256:0a5b7809a107cbec150f41352a156e31160b8a92df787798e2a9a06cdd5587da",
+=======
+          "io.higress.gateway-version": "2.2.6",
+          "io.higress.higress-source-commit": "1fef633553462434ccafad94a6ef35d2b367450f",
+          "io.higress.plugin-snapshot-sha256": "d67425048b4b0578f45c0d320043196dea327dffd0c61efc84b0ae33a65f705f",
+          "org.opencontainers.image.revision": "1fef633553462434ccafad94a6ef35d2b367450f"
+        },
+        "linux/arm64": {
+          "io.higress.gateway-version": "2.2.6",
+          "io.higress.higress-source-commit": "1fef633553462434ccafad94a6ef35d2b367450f",
+          "io.higress.plugin-snapshot-sha256": "d67425048b4b0578f45c0d320043196dea327dffd0c61efc84b0ae33a65f705f",
+          "org.opencontainers.image.revision": "1fef633553462434ccafad94a6ef35d2b367450f"
+        }
+      },
+      "digest": "sha256:7fe8bb4d4a2e83d1ef31c1a7e6dcf86d1a1a0f37c6058b6b662d920ab6d10310",
+>>>>>>> Stashed changes
       "platforms": [
         "linux/amd64",
         "linux/arm64"
       ],
-      "ref": "higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress:2.2.5"
+<<<<<<< Updated upstream
+      "ref": "higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress:2.2.4"
+=======
+      "ref": "higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress:2.2.6"
+>>>>>>> Stashed changes
     },
     "gateway": {
       "annotationsByPlatform": {
         "linux/amd64": {
-          "io.higress.gateway-version": "2.2.5",
-          "io.higress.higress-source-commit": "4deae1dd3b4cb2707273748985e55bef28e747d1",
-          "io.higress.plugin-snapshot-sha256": "9289508efb6a16e28c41d43b1a449f9c1592a0b1e16d3185cf4ee53b0f3065b8",
-          "org.opencontainers.image.revision": "4deae1dd3b4cb2707273748985e55bef28e747d1"
+<<<<<<< Updated upstream
+          "io.higress.gateway-version": "2.2.4",
+          "io.higress.higress-source-commit": "58666ac985cee19a0a9a353421c63cead6d0cb47",
+          "io.higress.plugin-snapshot-sha256": "09bc798df37e50dae2e684947885c31eb756636c76a98761a9a980fc031e3a1a",
+          "org.opencontainers.image.revision": "58666ac985cee19a0a9a353421c63cead6d0cb47"
         },
         "linux/arm64": {
-          "io.higress.gateway-version": "2.2.5",
-          "io.higress.higress-source-commit": "4deae1dd3b4cb2707273748985e55bef28e747d1",
-          "io.higress.plugin-snapshot-sha256": "9289508efb6a16e28c41d43b1a449f9c1592a0b1e16d3185cf4ee53b0f3065b8",
-          "org.opencontainers.image.revision": "4deae1dd3b4cb2707273748985e55bef28e747d1"
+          "io.higress.gateway-version": "2.2.4",
+          "io.higress.higress-source-commit": "58666ac985cee19a0a9a353421c63cead6d0cb47",
+          "io.higress.plugin-snapshot-sha256": "09bc798df37e50dae2e684947885c31eb756636c76a98761a9a980fc031e3a1a",
+          "org.opencontainers.image.revision": "58666ac985cee19a0a9a353421c63cead6d0cb47"
         }
       },
-      "digest": "sha256:a82de493902012ce6b555ecb2244156f3c73824474d67549144a7efa334d0299",
+      "digest": "sha256:3dbd609df5db3fca61653eafe0e2310705e485190c4f8cd02d9aab8f07dcf329",
+=======
+          "io.higress.gateway-version": "2.2.6",
+          "io.higress.higress-source-commit": "1fef633553462434ccafad94a6ef35d2b367450f",
+          "io.higress.plugin-snapshot-sha256": "d67425048b4b0578f45c0d320043196dea327dffd0c61efc84b0ae33a65f705f",
+          "org.opencontainers.image.revision": "1fef633553462434ccafad94a6ef35d2b367450f"
+        },
+        "linux/arm64": {
+          "io.higress.gateway-version": "2.2.6",
+          "io.higress.higress-source-commit": "1fef633553462434ccafad94a6ef35d2b367450f",
+          "io.higress.plugin-snapshot-sha256": "d67425048b4b0578f45c0d320043196dea327dffd0c61efc84b0ae33a65f705f",
+          "org.opencontainers.image.revision": "1fef633553462434ccafad94a6ef35d2b367450f"
+        }
+      },
+      "digest": "sha256:5d0618399fa98b9f4ad3c34b58f084b51624e3cc4eccdde72554b636d16b5da4",
+>>>>>>> Stashed changes
       "platforms": [
         "linux/amd64",
         "linux/arm64"
       ],
-      "ref": "higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/gateway:2.2.5"
+<<<<<<< Updated upstream
+      "ref": "higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/gateway:2.2.4"
+=======
+      "ref": "higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/gateway:2.2.6"
+>>>>>>> Stashed changes
     },
     "pilot": {
       "annotationsByPlatform": {
         "linux/amd64": {
-          "io.higress.gateway-version": "2.2.5",
-          "io.higress.higress-source-commit": "4deae1dd3b4cb2707273748985e55bef28e747d1",
-          "io.higress.plugin-snapshot-sha256": "9289508efb6a16e28c41d43b1a449f9c1592a0b1e16d3185cf4ee53b0f3065b8",
-          "org.opencontainers.image.revision": "4deae1dd3b4cb2707273748985e55bef28e747d1"
+<<<<<<< Updated upstream
+          "io.higress.gateway-version": "2.2.4",
+          "io.higress.higress-source-commit": "58666ac985cee19a0a9a353421c63cead6d0cb47",
+          "io.higress.plugin-snapshot-sha256": "09bc798df37e50dae2e684947885c31eb756636c76a98761a9a980fc031e3a1a",
+          "org.opencontainers.image.revision": "58666ac985cee19a0a9a353421c63cead6d0cb47"
         },
         "linux/arm64": {
-          "io.higress.gateway-version": "2.2.5",
-          "io.higress.higress-source-commit": "4deae1dd3b4cb2707273748985e55bef28e747d1",
-          "io.higress.plugin-snapshot-sha256": "9289508efb6a16e28c41d43b1a449f9c1592a0b1e16d3185cf4ee53b0f3065b8",
-          "org.opencontainers.image.revision": "4deae1dd3b4cb2707273748985e55bef28e747d1"
+          "io.higress.gateway-version": "2.2.4",
+          "io.higress.higress-source-commit": "58666ac985cee19a0a9a353421c63cead6d0cb47",
+          "io.higress.plugin-snapshot-sha256": "09bc798df37e50dae2e684947885c31eb756636c76a98761a9a980fc031e3a1a",
+          "org.opencontainers.image.revision": "58666ac985cee19a0a9a353421c63cead6d0cb47"
         }
       },
-      "digest": "sha256:10334ca1baf0d8e1f8a97bb47845d6c12d118eda3d330c86a7707aa9f0628aa9",
+      "digest": "sha256:f742ed20f938c5c1eaf6f8c36c6481a87052d06e903ab6cb0c079165ac0c8284",
+=======
+          "io.higress.gateway-version": "2.2.6",
+          "io.higress.higress-source-commit": "1fef633553462434ccafad94a6ef35d2b367450f",
+          "io.higress.plugin-snapshot-sha256": "d67425048b4b0578f45c0d320043196dea327dffd0c61efc84b0ae33a65f705f",
+          "org.opencontainers.image.revision": "1fef633553462434ccafad94a6ef35d2b367450f"
+        },
+        "linux/arm64": {
+          "io.higress.gateway-version": "2.2.6",
+          "io.higress.higress-source-commit": "1fef633553462434ccafad94a6ef35d2b367450f",
+          "io.higress.plugin-snapshot-sha256": "d67425048b4b0578f45c0d320043196dea327dffd0c61efc84b0ae33a65f705f",
+          "org.opencontainers.image.revision": "1fef633553462434ccafad94a6ef35d2b367450f"
+        }
+      },
+      "digest": "sha256:901ff203f9faa10c50eaf13c44f3e4d12e6b9b5dce381eccb7595207c69ce209",
+>>>>>>> Stashed changes
       "platforms": [
         "linux/amd64",
         "linux/arm64"
       ],
-      "ref": "higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/pilot:2.2.5"
+<<<<<<< Updated upstream
+      "ref": "higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/pilot:2.2.4"
     }
   },
-  "gatewayVersion": "2.2.5",
+  "gatewayVersion": "2.2.4",
   "higress": {
-    "commit": "4deae1dd3b4cb2707273748985e55bef28e747d1",
-    "releaseId": 403180124,
-    "tag": "v2.2.5"
+    "commit": "58666ac985cee19a0a9a353421c63cead6d0cb47",
+    "releaseId": 370271059,
+    "tag": "v2.2.4"
   },
-  "higressCommit": "4deae1dd3b4cb2707273748985e55bef28e747d1",
-  "idempotencyKey": "731cd5ab5c6aa2cd244cdf96616148d4f8571b48fb2a40cad47fbfbf9db4a20a",
-  "mcpServerVersion": "2.0.3",
+  "higressCommit": "58666ac985cee19a0a9a353421c63cead6d0cb47",
+  "idempotencyKey": "640a9807b43d4ef1224c6b14e8da469cdb4e1d8dfb6f6233151f296057d99874",
+  "mcpServerVersion": "2.0.1",
   "pluginServer": {
-    "digest": "sha256:ec63c6dfd18e77917faaecfd5fcdebde7e0bc40d42effa3b6d6f77d4f5c2fd40",
+    "digest": "sha256:05a3e3615434befdb89928e491a8833255733c099dd24faefe82fea4d63165bb",
     "labelsByPlatform": {
       "linux/amd64": {
-        "io.higress.gateway-version": "2.2.5",
-        "io.higress.higress-source-commit": "13558bb73e0ef36fac6d7b7446e4da4801693f7c",
-        "io.higress.plugin-snapshot-sha256": "9289508efb6a16e28c41d43b1a449f9c1592a0b1e16d3185cf4ee53b0f3065b8",
+        "io.higress.gateway-version": "2.2.4",
+        "io.higress.higress-source-commit": "27debc8b2e065dace2ee9edd280963a560c7fee5",
+        "io.higress.plugin-snapshot-sha256": "09bc798df37e50dae2e684947885c31eb756636c76a98761a9a980fc031e3a1a",
+=======
+      "ref": "higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/pilot:2.2.6"
+    }
+  },
+  "gatewayVersion": "2.2.6",
+  "higress": {
+    "commit": "1fef633553462434ccafad94a6ef35d2b367450f",
+    "releaseId": 439888735,
+    "tag": "v2.2.6"
+  },
+  "higressCommit": "1fef633553462434ccafad94a6ef35d2b367450f",
+  "idempotencyKey": "e23252fe322e47805c66e54b45a126e0b22dc7d48ba924f782f9521e78c61c1d",
+  "mcpServerVersion": "2.0.3",
+  "pluginServer": {
+    "digest": "sha256:0eb87e59928fc5975f29fc1926ebd138f61f6c23a9e115ea75b42d4803891cd8",
+    "labelsByPlatform": {
+      "linux/amd64": {
+        "io.higress.gateway-version": "2.2.6",
+        "io.higress.higress-source-commit": "e723d938fca32284ea4ef741ea4a007e92ded1d1",
+        "io.higress.plugin-snapshot-sha256": "d67425048b4b0578f45c0d320043196dea327dffd0c61efc84b0ae33a65f705f",
+>>>>>>> Stashed changes
         "maintainer": "NGINX Docker Maintainers <docker-maint@nginx.com>",
         "org.opencontainers.image.revision": "e56a5556341e9d446233ae642f05abfe4e8c4a9b"
       },
       "linux/arm64": {
-        "io.higress.gateway-version": "2.2.5",
-        "io.higress.higress-source-commit": "13558bb73e0ef36fac6d7b7446e4da4801693f7c",
-        "io.higress.plugin-snapshot-sha256": "9289508efb6a16e28c41d43b1a449f9c1592a0b1e16d3185cf4ee53b0f3065b8",
+<<<<<<< Updated upstream
+        "io.higress.gateway-version": "2.2.4",
+        "io.higress.higress-source-commit": "27debc8b2e065dace2ee9edd280963a560c7fee5",
+        "io.higress.plugin-snapshot-sha256": "09bc798df37e50dae2e684947885c31eb756636c76a98761a9a980fc031e3a1a",
+=======
+        "io.higress.gateway-version": "2.2.6",
+        "io.higress.higress-source-commit": "e723d938fca32284ea4ef741ea4a007e92ded1d1",
+        "io.higress.plugin-snapshot-sha256": "d67425048b4b0578f45c0d320043196dea327dffd0c61efc84b0ae33a65f705f",
+>>>>>>> Stashed changes
         "maintainer": "NGINX Docker Maintainers <docker-maint@nginx.com>",
         "org.opencontainers.image.revision": "e56a5556341e9d446233ae642f05abfe4e8c4a9b"
       }
@@ -111,16 +210,31 @@
       "linux/amd64",
       "linux/arm64"
     ],
-    "ref": "higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/plugin-server:2.2.5"
+<<<<<<< Updated upstream
+    "ref": "higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/plugin-server:2.2.4"
   },
-  "pluginServerDigest": "sha256:ec63c6dfd18e77917faaecfd5fcdebde7e0bc40d42effa3b6d6f77d4f5c2fd40",
-  "pluginServerRef": "higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/plugin-server:2.2.5",
-  "pluginServerVersion": "2.2.5",
+  "pluginServerDigest": "sha256:05a3e3615434befdb89928e491a8833255733c099dd24faefe82fea4d63165bb",
+  "pluginServerRef": "higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/plugin-server:2.2.4",
+  "pluginServerVersion": "2.2.4",
   "schemaVersion": 1,
   "snapshot": {
-    "path": "plugins/release/snapshots/2.2.5.json",
-    "sha256": "9289508efb6a16e28c41d43b1a449f9c1592a0b1e16d3185cf4ee53b0f3065b8"
+    "path": "plugins/release/snapshots/2.2.4.json",
+    "sha256": "09bc798df37e50dae2e684947885c31eb756636c76a98761a9a980fc031e3a1a"
   },
-  "snapshotSha256": "9289508efb6a16e28c41d43b1a449f9c1592a0b1e16d3185cf4ee53b0f3065b8",
+  "snapshotSha256": "09bc798df37e50dae2e684947885c31eb756636c76a98761a9a980fc031e3a1a",
+  "standaloneBaseCommit": "a66316732ea27be0ddb0cfa7436257fa03543a6b"
+=======
+    "ref": "higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/plugin-server:2.2.6"
+  },
+  "pluginServerDigest": "sha256:0eb87e59928fc5975f29fc1926ebd138f61f6c23a9e115ea75b42d4803891cd8",
+  "pluginServerRef": "higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/plugin-server:2.2.6",
+  "pluginServerVersion": "2.2.6",
+  "schemaVersion": 1,
+  "snapshot": {
+    "path": "plugins/release/snapshots/2.2.6.json",
+    "sha256": "d67425048b4b0578f45c0d320043196dea327dffd0c61efc84b0ae33a65f705f"
+  },
+  "snapshotSha256": "d67425048b4b0578f45c0d320043196dea327dffd0c61efc84b0ae33a65f705f",
   "standaloneBaseCommit": "9b83988013d80aa82527600841b1ce7c8fdb67b9"
+>>>>>>> Stashed changes
 }
