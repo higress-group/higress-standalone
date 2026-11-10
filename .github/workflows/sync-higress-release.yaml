@@ -136,10 +136,10 @@ jobs:
         run: |
           set -euo pipefail
           key=$(jq -r .idempotencyKey /tmp/render.json); branch="release/higress-${key:0:12}"
-          # The render step writes the pin files in the current worktree. Stash
-          # them before switching to the deterministic base/branch so checkout
-          # does not abort on locally modified files, then re-apply them.
-          git stash push -m rendered-release-pins -- all-in-one/Dockerfile compose/.env bin/configure.sh all-in-one/scripts/start-controller.sh release-provenance.json >/dev/null 2>&1 || true
+          # The render step writes the pin files in the current worktree. Move
+          # them aside before switching to the deterministic base/branch; the
+          # render step is re-run against the checked-out base below.
+          git checkout -- all-in-one/Dockerfile compose/.env bin/configure.sh all-in-one/scripts/start-controller.sh release-provenance.json
           base=$(jq -r .standaloneBaseCommit /tmp/render.json)
           lookup=/tmp/branch-lookup.err
           if remote=$(gh api "repos/higress-group/higress-standalone/git/ref/heads/$branch" 2>"$lookup"); then
@@ -151,7 +151,8 @@ jobs:
           else
             cat "$lookup" >&2; echo "deterministic branch lookup failed" >&2; exit 1
           fi
-          git stash pop >/dev/null 2>&1 || true
+          python3 tools/render_release_pins.py --input /tmp/render.json
+          git diff --check
           git config user.name "higress-standalone-release-bot"; git config user.email "release-bot@higress.io"
           git add all-in-one/Dockerfile compose/.env bin/configure.sh all-in-one/scripts/start-controller.sh release-provenance.json
           git commit -m "chore: pin immutable Higress release" || true

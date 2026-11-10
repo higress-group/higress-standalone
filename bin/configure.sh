@@ -37,19 +37,11 @@ source "$ROOT/bin/base.sh"
 
 source "$COMPOSE_ROOT/.env"
 
-<<<<<<< Updated upstream
-HIGRESS_PLUGIN_SERVER_TAG=${HIGRESS_PLUGIN_SERVER_TAG:-2.2.4}
-HIGRESS_CONTROLLER_IMAGE=${HIGRESS_CONTROLLER_IMAGE:-higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress:2.2.4@sha256:0a5b7809a107cbec150f41352a156e31160b8a92df787798e2a9a06cdd5587da}
-HIGRESS_PILOT_IMAGE=${HIGRESS_PILOT_IMAGE:-higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/pilot:2.2.4@sha256:f742ed20f938c5c1eaf6f8c36c6481a87052d06e903ab6cb0c079165ac0c8284}
-HIGRESS_GATEWAY_IMAGE=${HIGRESS_GATEWAY_IMAGE:-higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/gateway:2.2.4@sha256:3dbd609df5db3fca61653eafe0e2310705e485190c4f8cd02d9aab8f07dcf329}
-HIGRESS_PLUGIN_SERVER_IMAGE=${HIGRESS_PLUGIN_SERVER_IMAGE:-higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/plugin-server:2.2.4@sha256:05a3e3615434befdb89928e491a8833255733c099dd24faefe82fea4d63165bb}
-=======
 HIGRESS_PLUGIN_SERVER_TAG=${HIGRESS_PLUGIN_SERVER_TAG:-2.2.6}
 HIGRESS_CONTROLLER_IMAGE=${HIGRESS_CONTROLLER_IMAGE:-higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/higress:2.2.6@sha256:7fe8bb4d4a2e83d1ef31c1a7e6dcf86d1a1a0f37c6058b6b662d920ab6d10310}
 HIGRESS_PILOT_IMAGE=${HIGRESS_PILOT_IMAGE:-higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/pilot:2.2.6@sha256:901ff203f9faa10c50eaf13c44f3e4d12e6b9b5dce381eccb7595207c69ce209}
 HIGRESS_GATEWAY_IMAGE=${HIGRESS_GATEWAY_IMAGE:-higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/gateway:2.2.6@sha256:5d0618399fa98b9f4ad3c34b58f084b51624e3cc4eccdde72554b636d16b5da4}
 HIGRESS_PLUGIN_SERVER_IMAGE=${HIGRESS_PLUGIN_SERVER_IMAGE:-higress-registry.cn-hangzhou.cr.aliyuncs.com/higress/plugin-server:2.2.6@sha256:0eb87e59928fc5975f29fc1926ebd138f61f6c23a9e115ea75b42d4803891cd8}
->>>>>>> Stashed changes
 
 CONFIGURED_MARK="$COMPOSE_ROOT/.configured"
 
